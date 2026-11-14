@@ -3,7 +3,7 @@
 // five short steps, about 20 seconds, skippable.
 import { icon } from './icons.js';
 
-const DEFAULTS = { volume: 0.8, voiceOff: false, voiceId: '', units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
+const DEFAULTS = { volume: 0.8, voiceOff: false, liveVoice: true, voiceId: '', units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
 const CAP = { s: '17px', m: '21px', l: '27px' };
 
 export function loadSettings() {
@@ -36,6 +36,7 @@ export function initSettings(ctx) {
     el.innerHTML = `<div class="bcard" role="dialog" aria-label="Settings"><h2>${icon('settings', 20)}Settings</h2>
       <div class="srow"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${S.volume}" data-vol aria-label="Volume"/><small><kbd>N</kbd> mutes</small></div>
       <div class="srow"><span>Maya's voice</span>${seg('voiceOff', [['false', 'On'], ['true', 'Captions only']])}</div>
+      ${ctx.config.mayaAgent ? `<div class="srow"><span>Talking to Maya</span>${seg('liveVoice', [['true', 'Live conversation'], ['false', 'Hold V to talk']])}</div>` : ''}
       <div class="srow voicerow"><span>Which voice</span><select data-voice aria-label="Maya's voice"><option value="">Loading voices...</option></select><button class="act" data-a="hear">Hear it</button></div>
       <div class="srow"><span>Caption size</span>${seg('capSize', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])}</div>
       <div class="srow"><span>Distances</span>${seg('units', [['metric', 'Meters'], ['imperial', 'Feet and miles']])}</div>

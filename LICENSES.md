@@ -58,6 +58,8 @@ Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0),
 |---|---|---|
 | lucide-static | ISC | Interface icons (`src/icons.js` inlines the handful it uses at build time) |
 | suncalc | BSD-2-Clause | Sun position for the time of day slider (`src/buyer.js`) |
+| @elevenlabs/client (with @elevenlabs/types) | MIT | Maya's live conversation (`src/mayaLive.js`) |
+| livekit-client (pulled in by @elevenlabs/client) | Apache-2.0 | WebRTC audio for the live conversation |
 
 ## Outside data used by the insight pipeline (tools/enrich_city.py)
 

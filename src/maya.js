@@ -7,6 +7,7 @@ import { scripted, extractPrefs, PEOPLE_RE } from './mayaScript.js';
 import { parseMission } from './parser.js';
 import { dataBase } from './data.js';
 import { icon } from './icons.js';
+import { initMayaLive } from './mayaLive.js';
 import { money } from './format.js';
 
 const AVATAR = `<svg viewBox="0 0 120 120" width="88" height="88" aria-hidden="true">
@@ -36,7 +37,9 @@ export function initMaya(ctx) {
   const S = { state: 'idle', prefs: [], history: [], offered: null, busy: 0, lastLatency: null, lastTools: [], source: null, caption: '', alts: [] };
   try { S.prefs = JSON.parse(sessionStorage.getItem('gpa-maya-prefs') || '[]'); } catch { /* fresh session */ }
   const pub = () => { window.__gpa.maya = { state: S.state, prefs: S.prefs.map((p) => p.text), tools: S.lastTools, source: S.source, voice: S.lastVoice || null, caption: S.caption, latencyMs: S.lastLatency, offered: S.offered?.id || null, alts: S.alts.map((l) => l.id), say: (t) => hear(t) }; };
-  function setState(s) { S.state = s; el.dataset.state = s; q('.mstate').innerHTML = { idle: 'Hold <kbd>V</kbd> to talk', listening: 'Listening', thinking: 'Thinking', talking: 'Talking' }[s]; pub(); }
+  let statusText = null, liveLevel = null, live = null;
+  const idleHint = () => (live?.available() ? 'Press <kbd>V</kbd> to talk' : 'Hold <kbd>V</kbd> to talk');
+  function setState(s) { S.state = s; el.dataset.state = s; q('.mstate').innerHTML = statusText || { idle: idleHint(), listening: 'Listening', thinking: 'Thinking', talking: 'Talking' }[s]; el.classList.toggle('live', !!live?.state.conv); pub(); }
   function renderPrefs() {
     q('.mprefs').innerHTML = S.prefs.slice(-6).map((p, i) => `<li>${p.text}<button data-i="${i}" aria-label="Forget ${p.text}">×</button></li>`).join('');
     for (const b of el.querySelectorAll('.mprefs button')) b.addEventListener('click', () => { S.prefs.splice(S.prefs.length - Math.min(6, S.prefs.length) + Number(b.dataset.i), 1); savePrefs(); });
@@ -78,6 +81,7 @@ export function initMaya(ctx) {
   // ---- voice out: a queue of sentences, each streamed from the server; browser voice as fallback
   let ac = null, analyser = null, levelBuf = null, queue = [], playing = null, speakToken = 0, firstAudioAt = 0, heardAt = 0, synthTimer = 0;
   function level() {
+    if (liveLevel) return liveLevel();
     if (playing?.synth) return 0.35 + 0.35 * Math.abs(Math.sin(performance.now() / 70)) * (0.5 + 0.5 * Math.sin(performance.now() / 190));
     if (!analyser || !playing) return 0;
     analyser.getByteTimeDomainData(levelBuf);
@@ -86,7 +90,7 @@ export function initMaya(ctx) {
     return Math.min(1, Math.sqrt(s / levelBuf.length) * 5);
   }
   const mouth = q('.mouth');
-  ctx.on('post', () => { if (S.state === 'talking') { const m = level(); mouth.setAttribute('ry', (2 + m * 8).toFixed(1)); mouth.setAttribute('rx', (7 - m * 1.5).toFixed(1)); } });
+  ctx.on('post', () => { if (S.state === 'talking' || liveLevel) { const m = level(); mouth.setAttribute('ry', (2 + m * 8).toFixed(1)); mouth.setAttribute('rx', (7 - m * 1.5).toFixed(1)); } });
   function bubble(text, who = 'maya') {
     const b = q('.mbubble');
     if (!text) { b.classList.remove('show'); return; }
@@ -260,9 +264,11 @@ export function initMaya(ctx) {
   async function hear(raw) {
     const text = String(raw || '').trim();
     if (!text) return;
+    for (const p of extractPrefs(text)) remember(p);
+    // in a live conversation typed lines, the B key and the phone's words go straight to her
+    if (live?.active) { ctx.emit('heard', text); live.send(text); return; }
     interrupt();
     ctx.emit('heard', text);
-    for (const p of extractPrefs(text)) remember(p);
     bubble(`“${text}”`, 'you');
     // with no home selected, a plain search goes to the map filters (fast, works offline)
     if (!ctx.reveal?.open && !PEOPLE_RE.test(text) && !/\?|\b(maya|afford|my (work|office|gym|school)|mission|client|compare|better|cheaper)\b/i.test(text)) {
@@ -273,7 +279,7 @@ export function initMaya(ctx) {
   }
   // a line the game itself wants said in her voice (mission narration, tutorial)
   function say(text, opts = {}) {
-    if (!text) return;
+    if (!text || live?.state.conv) return;
     if (opts.interrupt !== false) interrupt();
     el.classList.add('show');
     const sp = splitter((s) => enqueue(s, { show: opts.caption !== false }));
@@ -291,9 +297,20 @@ export function initMaya(ctx) {
   q('.mava').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ctx.voice?.openType(); } });
   setState('idle'); renderPrefs();
 
+  live = initMayaLive(ctx, {
+    S, tools, extra, selected, act, bubble, setState,
+    show: () => el.classList.add('show'),
+    status: (t) => { statusText = t; if (!t) setState(S.state); else q('.mstate').innerHTML = t; el.classList.toggle('live', !!t); },
+    level: (fn) => { liveLevel = fn; if (!fn) mouth.setAttribute('ry', '2'); },
+  });
+  ctx.mayaLive = live;
+  ctx.on('settings', () => { if (S.state === 'idle') setState('idle'); });
+  setState('idle');
+
   return {
+    live,
     hear, ask, say, interrupt, remember, act,
-    open(pitchNow) { el.classList.add('show'); if (pitchNow) { interrupt(); ask('__pitch__'); } },
+    open(pitchNow) { el.classList.add('show'); if (pitchNow) { if (live?.active) { live.send('Tell me about this home.'); return; } interrupt(); ask('__pitch__'); } },
     listening(on) { if (on) { interrupt(); setState('listening'); el.classList.add('show'); } else if (S.state === 'listening') setState('idle'); },
     get state() { return S; },
     get speaking() { return !!playing; },

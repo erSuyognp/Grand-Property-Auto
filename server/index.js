@@ -56,7 +56,7 @@ app.get('/api/config', (_req, res) => {
     mode: GAME_MODE,
     llm: LLM_ENABLED && llmReady(),
     tts: TTS_ENABLED,
-    maya: maya.ready(), mayaTts: maya.ttsReady(), stt: maya.ttsReady(),
+    maya: maya.ready(), mayaTts: maya.ttsReady(), stt: maya.ttsReady(), mayaAgent: maya.liveReady(),
     matterportSdkKey: GAME_MODE === 'mock' ? '' : process.env.MATTERPORT_SDK_KEY || '',
     googleMapsKey: GAME_MODE === 'mock' ? '' : process.env.GOOGLE_MAPS_API_KEY || '',
     showcaseBase: process.env.MATTERPORT_SHOWCASE_BASE || 'https://my.matterport.com',
@@ -100,6 +100,7 @@ app.post('/api/maya', (req, res) => maya.handle(req, res));
 app.post('/api/maya/tts', (req, res) => maya.tts(req, res));
 app.get('/api/maya/tts', (req, res) => maya.tts(req, res));
 app.get('/api/maya/voices', (req, res) => maya.voices(req, res));
+app.get('/api/maya/session', (req, res) => maya.session(req, res));
 app.post('/api/stt', express.raw({ type: ['audio/*', 'application/octet-stream'], limit: '6mb' }), (req, res) => maya.stt(req, res));
 
 // ---- "My places": look up an address the player typed (Census geocoder, public, no key).

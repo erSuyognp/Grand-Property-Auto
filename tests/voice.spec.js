@@ -87,3 +87,25 @@ test('voice out: Maya answers in her streamed voice, and it starts promptly', as
   expect(m.ms).toBeLessThan(9000); // about 2.3 s alone; slower when other tests share the machine and the APIs
   await page.evaluate(() => window.__gpa.ctx.maya.interrupt());
 });
+
+test('live: V starts a conversation with the ElevenLabs agent, she hears the mic, uses a tool and answers', async ({ page }) => {
+  test.setTimeout(150_000);
+  const cfg = await (await page.request.get('http://localhost:8787/api/config')).json();
+  test.skip(!cfg.mayaAgent || !fs.existsSync(WAV), 'no agent id or voice key on the server');
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?autostart=1&noshowcase=1&tiles=0');
+  await page.waitForFunction(() => window.__gpa?.ready === true && window.__gpa.ctx.insights.ready, null, { timeout: 60_000 });
+  expect(await page.evaluate(() => window.__gpa.mayaLive.available)).toBe(true);
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => window.__gpa.mayaLive.status === 'connected', null, { timeout: 30_000 });
+  // the fake mic keeps saying "Find me a three bedroom home near a park."
+  await page.waitForFunction(() => window.__gpa.mayaLive.heard.length > 8, null, { timeout: 45_000 });
+  await page.waitForFunction(() => window.__gpa.mayaLive.tools.length > 0 && window.__gpa.mayaLive.said.length > 8, null, { timeout: 60_000 });
+  const live = await page.evaluate(() => window.__gpa.mayaLive);
+  console.log('live', JSON.stringify({ heard: live.heard, tools: live.tools, said: live.said.slice(0, 160) }));
+  await page.screenshot({ path: `${process.env.SHOT_DIR || 'shots'}/70-maya-live.png` });
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => window.__gpa.mayaLive.status === 'off', null, { timeout: 15_000 });
+  expect(errors, errors.join('\n')).toEqual([]);
+});

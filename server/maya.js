@@ -30,7 +30,7 @@ export const FAIR_HOUSING_RULES = `Fair housing rules. Follow them word for word
 7. Recommendations are based only on what the player asked for (budget, size, features, commute, amenities), never on who lives somewhere.
 8. Schools: say which schools are nearby and how far, and the schools named in the listing. No school ratings or opinions about school quality.`;
 
-const SYSTEM = `You are Maya, the voice of a driving game for home buyers and renters called Grand Property Auto. You are an original character: a friendly, sharp local real estate agent. Your words are spoken aloud by a text to speech voice and shown as captions.
+export const SYSTEM = `You are Maya, the voice of a driving game for home buyers and renters called Grand Property Auto. You are an original character: a friendly, sharp local real estate agent. Your words are spoken aloud by a text to speech voice and shown as captions.
 
 How you talk:
 - Short spoken sentences. Specific numbers. Honest about downsides. Never pushy. No lists, no markdown, no emoji, no headings.
@@ -267,5 +267,16 @@ ${JSON.stringify(facts)}` : '',
       Readable.fromWeb(r.body).on('error', () => res.end()).pipe(res);
     } catch { if (!res.headersSent) res.status(504).json({ error: 'tts timeout' }); else res.end(); }
   }
-  return { handle, tts, stt, voices, ready, ttsReady, model: MODEL };
+  // Live conversation: a short lived token for the ElevenLabs agent. The key stays on the server.
+  const agentId = process.env.ELEVENLABS_AGENT_ID || '';
+  const liveReady = () => ttsReady() && !!agentId;
+  async function session(_req, res) {
+    if (!liveReady()) return res.status(404).json({ error: 'live voice off' });
+    try {
+      const r = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`, { headers: { 'xi-api-key': ttsKey }, signal: AbortSignal.timeout(7000) });
+      if (!r.ok) return res.status(502).json({ error: 'agent ' + r.status });
+      res.set('cache-control', 'no-store').json({ token: (await r.json()).token });
+    } catch { res.status(504).json({ error: 'agent timeout' }); }
+  }
+  return { handle, tts, stt, voices, session, liveReady, ready, ttsReady, model: MODEL };
 }

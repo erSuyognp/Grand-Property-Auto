@@ -8,7 +8,7 @@
 // clip is transcribed through the server (/api/stt). Typing (T) is the last resort.
 export function initVoice(ctx) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, listening = false, finalText = '', interim = '', wantStop = false;
+  let rec = null, listening = false, finalText = '', interim = '', wantStop = false, liveKey = false;
   let mode = SR ? 'browser' : 'record';
   try { if (sessionStorage.getItem('gpa-voice-mode') === 'record') mode = 'record'; } catch { /* private mode */ }
   if (ctx.params.get('stt') === 'record') mode = 'record';
@@ -114,6 +114,9 @@ export function initVoice(ctx) {
 
   function start() {
     if (listening) return;
+    // live conversation with Maya: V is a switch (press to start, press to end), not a hold
+    if (ctx.mayaLive && (ctx.mayaLive.active || ctx.mayaLive.connecting || ctx.mayaLive.available())) { liveKey = true; ctx.maya?.interrupt(); ctx.mayaLive.toggle().then((ok) => { if (ok === false) { liveKey = false; } }); return; }
+    liveKey = false;
     ctx.maya?.interrupt();
     wantStop = false;
     if (mode === 'record' || !SR) {
@@ -123,6 +126,7 @@ export function initVoice(ctx) {
     try { startBrowser(); } catch { end(); if (canRecord()) { mode = 'record'; startRecord(); } else openType(); }
   }
   function stop() {
+    if (liveKey) return;
     if (wantStop) return;
     wantStop = true;
     if (!listening) return;
