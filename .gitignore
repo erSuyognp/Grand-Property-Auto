@@ -1,0 +1,10 @@
+.env
+data/raw/
+data/cache/
+node_modules/
+dist/
+shots/
+test-results/
+playwright-report/
+__pycache__/
+*.pyc
