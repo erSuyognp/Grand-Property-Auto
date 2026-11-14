@@ -60,6 +60,10 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
 
+## Your car model (added Nov 14)
+
+- The Lamborghini model you gave me is the player's car on this laptop. It is **CC BY-NC-ND 4.0** (non commercial, no modifications, credit required) and carries the Lamborghini logo, so it is kept out of git and out of mock mode, and credited on the title screen. For anything public or recorded, add `?kenney` to the address to use the free Kenney car instead.
+
 ## Aerial view and the map (added Nov 14)
 
 - **Default view is now high and tilted** (about 50 m up, looking 50 degrees down). The Google city looks sharp from there and holds 60 fps. `C` cycles aerial, straight down, street view.

@@ -1,7 +1,7 @@
 // The car and its arcade physics: speed dependent steering, drift when turning hard at
 // speed, terrain following, and sliding collisions against building footprints.
 import * as THREE from 'three';
-import { makeCarModel } from './carmodel.js';
+import { makeCarModel, makeLocalCar } from './carmodel.js';
 
 const R = 1.35; // collision radius in meters
 
@@ -33,7 +33,24 @@ function extrude(points, width, bevel) {
 function swapInModel(built, model, color) {
   if (new URLSearchParams(location.search).has('boxcar')) return;
   const old = [...built.body.children], oldWheels = built.wheels.map((w) => w.pivot);
-  makeCarModel(model, color).then((m) => {
+  const params = new URLSearchParams(location.search);
+  // the player's car: a model of your own if one is in public/models/local/ (never in mock
+  // mode), otherwise the Kenney sedan
+  const own = !built.traffic && window.__gpa?.mode !== 'mock' && !params.has('kenney');
+  const pick = own ? makeLocalCar().catch(() => makeCarModel(model, color)) : makeCarModel(model, color);
+  pick.then((m) => {
+    if (m.local) {
+      for (const o of old) o.visible = false;
+      for (const o of oldWheels) o.visible = false;
+      built.body.add(m.holder);
+      built.wheels.length = 0;
+      for (const w of m.wheels) built.wheels.push(w);
+      window.__gpa.carCredit = m.credit;
+      const el = document.querySelector('#title .powered');
+      if (el && !el.dataset.car) { el.dataset.car = '1'; el.append(document.createElement('br'), m.credit); }
+      console.info('[car] ' + m.credit);
+      return;
+    }
     for (const o of old) o.visible = false;
     for (const o of oldWheels) o.visible = false;
     built.body.add(m.holder);
@@ -114,7 +131,7 @@ export function buildCarMesh(color = 0xd63a1c, simple = false, model = 'sedan-sp
 
   if (simple) {
     add(new THREE.BoxGeometry(1.5, 0.1, 0.06), light, 0, 0.66, -2.19);
-    swapInModel({ car, body, wheels, mats: { light, tail } }, model, color);
+    swapInModel({ car, body, wheels, mats: { light, tail }, traffic: true }, model, color);
     return { car, body, wheels, mats: { light, tail } };
   }
   // headlamps: one cone that only carries light after dusk
@@ -251,6 +268,7 @@ export function createCar(ctx) {
     body.rotation.z = THREE.MathUtils.lerp(body.rotation.z, -s.steer * Math.min(1, speedAbs / 20) * 0.09, Math.min(1, dt * 8));
     body.rotation.x = THREE.MathUtils.lerp(body.rotation.x, -inp.throttle * 0.025, Math.min(1, dt * 6));
     for (const wh of wheels) {
+      if (wh.spin) { wh.spin(-(vf * dt) / wh.r); continue; } // a model whose rims turn but cannot steer
       wh.w.rotation.x -= ((wh.dir || 1) * (vf * dt)) / (wh.r || 0.37);
       if (wh.front) wh.pivot.rotation.y = s.steer * 0.45;
     }

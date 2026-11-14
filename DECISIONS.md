@@ -127,6 +127,12 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Keys moved again:** `M` is the map, `G` alone switches the Google 3D city, `N` is sound. (Earlier the same day `M` had been made the Google switch; a map on `M` is what players expect, and the map screen is what "the map" now means.)
 - The map redraws its live layer every frame at 1500 px, which costs frame rate while it is open (about 40 fps); the game behind it is paused.
 
+## Player car from a user supplied model (Nov 14, asked for in chat)
+- The model handed over is "Lamborghini Aventador LP700-4" by Gonzalit, CC BY-NC-ND 4.0 (read from the file's own metadata). That is not a permissive license, and the project rule is permissive only. The owner asked for it, so it is wired in as a **local only** option rather than added to the project: the file sits in `public/models/local/` (gitignored), the game uses it for the player's car when it is there and falls back to the Kenney sedan when it is not, mock mode never uses it (public screenshots stay clean), and its author and license are shown on the title screen.
+- Because of the no derivatives term it is not repainted or re-exported. It is only scaled to 4.7 m, set on the ground and turned to face forward at run time. Its rims spin; the tires are part of the body mesh, so the front wheels do not steer visibly.
+- `?kenney` forces the Kenney car; `?carflip` turns a model that comes out backwards.
+- Open question for the owner: whether a non commercial, branded model belongs in a demo for a sponsor's judges. The safe choice for anything recorded or public is the Kenney car.
+
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
 - MatterPak textured meshes: unlocked but not generated for any of our scans. Ask CoStar or Matterport (track channel) to generate MatterPaks for the 8 demo homes, then run `python tools/sponsor/build_matterpak.py --city houston`; the game still needs a GLB loader for the result.

@@ -19,6 +19,9 @@ public/data/*
 # decoder files copied from node_modules at build time
 public/libs/
 
+# a car model of your own (not ours to redistribute): used locally, never committed
+public/models/local/
+
 # build and test output
 node_modules/
 dist/

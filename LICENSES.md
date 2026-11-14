@@ -36,6 +36,8 @@ Added for walk mode (dev only, used by the local MatterPak converter): `obj2gltf
 
 Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0), in `public/models/kenney/` with its `License.txt`. Four models are used (sedan-sports for the player; sedan, suv and hatchback-sports for traffic). CC0 is public domain dedication, more permissive than MIT.
 
+**Local only, not in the repo, NOT permissively licensed:** `public/models/local/car.glb` is "Lamborghini Aventador LP700-4" by Gonzalit (sketchfab.com/Gonzalit), **CC BY-NC-ND 4.0**: attribution required, non commercial use only, no modified versions. It is gitignored, loaded only if present, never used in mock mode, used unmodified (fitted and oriented at run time only), and credited on the title screen. It also carries Lamborghini's name and logo. Do not ship it, do not use it in public or commercial material, and delete it with the rest after the event.
+
 ## Python (tools/requirements.txt)
 
 | Package | License |
