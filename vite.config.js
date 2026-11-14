@@ -22,7 +22,9 @@ const decoders = () => {
     fs.cpSync('node_modules/three/examples/jsm/libs/draco/gltf', `${to}/libs/draco`, { recursive: true });
     fs.cpSync('node_modules/three/examples/jsm/libs/basis', `${to}/libs/basis`, { recursive: true });
   };
-  return { name: 'decoders', buildStart() { copy('public'); }, closeBundle() { if (fs.existsSync('dist')) copy('dist'); } };
+  // the CC0 car models live in public/models and go into the build as they are
+  const models = () => fs.cpSync('public/models', 'dist/models', { recursive: true });
+  return { name: 'decoders', buildStart() { copy('public'); }, closeBundle() { if (fs.existsSync('dist')) { copy('dist'); models(); } } };
 };
 
 export default defineConfig({

@@ -27,14 +27,42 @@ export function initTiles(ctx) {
 
   const S = {
     on: false, loading: false, failed: '', tiles: null, holder: null, models: 0, calibrated: 0,
-    errorTarget: 20, city: null, timer: 0, materials: new Set(), startedAt: 0,
+    errorTarget: 24, city: null, timer: 0, materials: new Set(), startedAt: 0,
   };
   const ray = new THREE.Raycaster();
   ray.firstHitOnly = true;
   const DOWN = new THREE.Vector3(0, -1, 0), origin = new THREE.Vector3(), view = new THREE.Vector3();
   const cache = new Map();
   let budget = RAY_BUDGET, terrainAt = null;
-  const gain = new THREE.Color(1, 1, 1);
+  // Photo colors untouched: the frame goes through filmic tone mapping in post (the sky and
+  // the car need it), so each tile pixel is run through the exact inverse first. What comes
+  // out of the pipeline is the photo's own color. gpaGain only moves at dusk and night.
+  const U = { gpaExposure: { value: 0.46 }, gpaGain: { value: new THREE.Color(1, 1, 1) } };
+  const gain = U.gpaGain.value;
+  const maxAniso = ctx.renderer.capabilities.getMaxAnisotropy();
+  const UNTONE = `
+    uniform float gpaExposure; uniform vec3 gpaGain;
+    vec3 gpaUntone(vec3 c) {
+      const mat3 inM = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+      const mat3 outM = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+      vec3 y = clamp(inverse(outM) * clamp(c, 0.0, 0.985), 0.0, 0.985);
+      vec3 A = 0.983729 * y - 1.0, B = 0.4329510 * y - 0.0245786, C = 0.238081 * y + 0.000090537;
+      vec3 v = (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+      return max(inverse(inM) * v, 0.0) * (0.6 / gpaExposure);
+    }`;
+  function untone(m) {
+    if (m.userData.gpa) return;
+    m.userData.gpa = true;
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (shader, renderer) => {
+      if (prev) prev(shader, renderer);
+      Object.assign(shader.uniforms, U);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\n' + UNTONE)
+        .replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = gpaUntone(diffuseColor.rgb) * gpaGain;');
+    };
+    m.needsUpdate = true;
+  }
 
   // attribution, required by the Map Tiles terms: logo and data credits, always visible
   const credit = document.createElement('div');
@@ -64,11 +92,12 @@ export function initTiles(ctx) {
     // unlit photos through the HDR pipeline: undo the exposure, then follow the time of day
     const e = ctx.env.state;
     const night = e.night || 0;
-    const k = (0.74 / (e.exposure || 0.46)) * (1 - 0.86 * THREE.MathUtils.smoothstep(night, 0.3, 1));
+    U.gpaExposure.value = e.exposure || 0.46;
+    // midday: exactly the photo. Golden hour warms it a little, night dims and cools it.
+    const k = 1 - 0.86 * THREE.MathUtils.smoothstep(night, 0.3, 1);
     const t = e.tint || { r: 1, g: 1, b: 1 }, m = Math.max(t.r, t.g, t.b) || 1;
-    const warm = night > 0.1 ? 0.75 : 0.12;
+    const warm = night > 0.6 ? 0.75 : night > 0.05 ? 0.3 : 0;
     gain.setRGB(k * (1 - warm + warm * (t.r / m)), k * (1 - warm + warm * (t.g / m)), k * (1 - warm + warm * (t.b / m)));
-    for (const mat of S.materials) mat.color.copy(gain);
   }
 
   function prepare(sceneObj) {
@@ -81,7 +110,20 @@ export function initTiles(ctx) {
         m.dispose();
         o.material = m = basic;
       }
-      m.color.copy(gain);
+      m.color.set(0xffffff);
+      m.toneMapped = false;
+      const tex = m.map;
+      if (tex && !tex.userData.gpa) {
+        // sharp at a glancing angle (the road ahead) and stable in the distance
+        tex.userData.gpa = true;
+        tex.anisotropy = maxAniso;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.generateMipmaps = true;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+      }
+      untone(m);
       S.materials.add(m);
     });
   }
@@ -101,6 +143,9 @@ export function initTiles(ctx) {
     tiles.registerPlugin(new TilesFadePlugin());
     tiles.registerPlugin(new TileCompressionPlugin());
     tiles.errorTarget = S.errorTarget;
+    // keep what is around the car in memory so nearby blocks do not drop out and reload
+    tiles.lruCache.minSize = 9000; tiles.lruCache.maxSize = 12000;
+    tiles.lruCache.minBytesSize = 0.8 * 2 ** 30; tiles.lruCache.maxBytesSize = 1.0 * 2 ** 30;
     tiles.setCamera(ctx.camera);
     tiles.setResolutionFromRenderer(ctx.camera, ctx.renderer);
     tiles.addEventListener('load-model', (e) => { S.models++; prepare(e.scene); });
@@ -129,6 +174,8 @@ export function initTiles(ctx) {
     catcher.visible = true;
     ctx.world.setCityVisible(false);
     document.body.classList.add('g3d');
+    ctx.env.setHaze(600, 3400); // clear nearby, sky colored far away
+    if (ctx.post.setNeutral) ctx.post.setNeutral(true);
     calibrate();
     console.info(`[tiles] Google 3D city on after ${Math.round(performance.now() - S.startedAt)} ms (${S.models} tiles)`);
     ctx.emit('tiles', true);
@@ -154,6 +201,8 @@ export function initTiles(ctx) {
     S.on = false; S.loading = false;
     catcher.visible = false;
     document.body.classList.remove('g3d');
+    ctx.env.setHaze(null);
+    if (ctx.post && ctx.post.setNeutral) ctx.post.setNeutral(false);
     if (ctx.world) ctx.world.setCityVisible(true);
     if (was) ctx.emit('tiles', false);
   }
@@ -239,10 +288,12 @@ export function initTiles(ctx) {
     // hold 60 fps: coarser tiles when the frame rate sags, finer again when there is room
     const fps = window.__gpa.fps;
     slow += dt;
-    if (slow > 2 && fps) {
+    if (slow > 1.5 && fps) {
+      // sharper tiles one step at a time while the frame rate holds above 55, back off below it
       slow = 0;
-      if (fps < 55 && S.errorTarget < 40) S.errorTarget += 4;
-      else if (fps >= 59 && S.errorTarget > 16) S.errorTarget -= 1;
+      if (fps < 52 && S.errorTarget < 40) S.errorTarget += 4;
+      else if (fps < 55 && S.errorTarget < 40) S.errorTarget += 1;
+      else if (fps >= 57 && S.errorTarget > 6) S.errorTarget -= 2;
       S.tiles.errorTarget = S.errorTarget;
     }
     const now = performance.now();

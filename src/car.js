@@ -1,6 +1,7 @@
 // The car and its arcade physics: speed dependent steering, drift when turning hard at
 // speed, terrain following, and sliding collisions against building footprints.
 import * as THREE from 'three';
+import { makeCarModel } from './carmodel.js';
 
 const R = 1.35; // collision radius in meters
 
@@ -26,8 +27,29 @@ function extrude(points, width, bevel) {
   return g;
 }
 
+// The drawn car above is the stand in: as soon as the Kenney model (CC0) has loaded it takes
+// over, with its own wheels, and a brake light strip and headlamp strip stay on top of it. If
+// the model file is missing the stand in simply stays.
+function swapInModel(built, model, color) {
+  if (new URLSearchParams(location.search).has('boxcar')) return;
+  const old = [...built.body.children], oldWheels = built.wheels.map((w) => w.pivot);
+  makeCarModel(model, color).then((m) => {
+    for (const o of old) o.visible = false;
+    for (const o of oldWheels) o.visible = false;
+    built.body.add(m.holder);
+    built.wheels.length = 0;
+    for (const w of m.wheels) built.wheels.push({ ...w, r: m.radius });
+    const box = new THREE.Box3().setFromObject(m.holder);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry((box.max.x - box.min.x) * 0.72, 0.07, 0.04), built.mats.tail);
+    tail.position.set(0, box.max.y * 0.52, box.max.z + 0.005);
+    const head = new THREE.Mesh(new THREE.BoxGeometry((box.max.x - box.min.x) * 0.72, 0.06, 0.04), built.mats.light);
+    head.position.set(0, box.max.y * 0.46, box.min.z - 0.005);
+    built.body.add(tail, head);
+  }).catch((e) => console.warn('[car] model not loaded, keeping the drawn car:', e.message || e));
+}
+
 // simple = a traffic car: same body, fewer small parts, no headlamp cone
-export function buildCarMesh(color = 0xd63a1c, simple = false) {
+export function buildCarMesh(color = 0xd63a1c, simple = false, model = 'sedan-sports') {
   const car = new THREE.Group();
   const paint = new THREE.MeshPhysicalMaterial({ color, metalness: 0.5, roughness: 0.36, clearcoat: 1, clearcoatRoughness: 0.05 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x14171a, roughness: 0.75, metalness: 0.2 });
@@ -92,6 +114,7 @@ export function buildCarMesh(color = 0xd63a1c, simple = false) {
 
   if (simple) {
     add(new THREE.BoxGeometry(1.5, 0.1, 0.06), light, 0, 0.66, -2.19);
+    swapInModel({ car, body, wheels, mats: { light, tail } }, model, color);
     return { car, body, wheels, mats: { light, tail } };
   }
   // headlamps: one cone that only carries light after dusk
@@ -99,6 +122,7 @@ export function buildCarMesh(color = 0xd63a1c, simple = false) {
   beam.position.set(0, 0.9, -1.9);
   beam.target.position.set(0, 0, -16);
   car.add(beam, beam.target);
+  swapInModel({ car, body, wheels, mats: { light, tail } }, model, color);
   return { car, body, wheels, mats: { light, tail }, beam };
 }
 
@@ -227,7 +251,7 @@ export function createCar(ctx) {
     body.rotation.z = THREE.MathUtils.lerp(body.rotation.z, -s.steer * Math.min(1, speedAbs / 20) * 0.09, Math.min(1, dt * 8));
     body.rotation.x = THREE.MathUtils.lerp(body.rotation.x, -inp.throttle * 0.025, Math.min(1, dt * 6));
     for (const wh of wheels) {
-      wh.w.rotation.x -= (vf * dt) / 0.37;
+      wh.w.rotation.x -= ((wh.dir || 1) * (vf * dt)) / (wh.r || 0.37);
       if (wh.front) wh.pivot.rotation.y = s.steer * 0.45;
     }
   }

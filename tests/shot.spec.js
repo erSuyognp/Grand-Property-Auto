@@ -89,6 +89,12 @@ test('shot: load and drive', async ({ page }) => {
   await page.waitForFunction(() => window.__gpa.ctx.listingsSys.near?.id === window.__gpa.mission().target, null, { timeout: 10_000 });
   await page.waitForTimeout(600);
   await page.keyboard.press('KeyE');
+  await page.waitForTimeout(700);
+  // an apartment community asks which space to walk into first: take the community itself
+  await page.evaluate(() => {
+    const g = window.__gpa;
+    if (g.ctx.hud.choosing) { g.ctx.hud.closeChooser(); g.ctx.tour.enter(g.ctx.listingsSys.near); }
+  });
   await page.waitForFunction(() => window.__gpa.tour && window.__gpa.tour.path, null, { timeout: 30_000 });
   await page.waitForTimeout(1800);
   await page.screenshot({ path: `${DIR}/07-tour.png` });

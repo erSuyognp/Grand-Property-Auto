@@ -60,6 +60,14 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
 
+## Visual quality pass (added Nov 14)
+
+- **Google city looks much better from the new camera:** higher chase view (about 10 m up, 14 m back; closer when you stop), photo colors untouched, three times the tile detail at 56 to 58 fps, SMAA and light sharpening. `M` switches Google map and block city.
+- **Street level is still soft.** Google's mesh is made from aerial photos: trees are lumps and walls smear when the camera is low. The higher camera hides most of it; nothing in the game can add detail Google does not have.
+- **LA moved to a low rise neighborhood** around 5836 La Mirada Ave (the downtown data is kept in `public/data/la_downtown/`).
+- **New car:** Kenney's CC0 sedan in red.
+- **Not done:** bloom limited to markers and beams (bloom is off over the Google city instead).
+
 ## Walk mode (added Nov 14)
 
 - **Inside a home you now walk like in a game:** WASD, click to look with the mouse, Shift runs, stairs and walls work, footsteps and a quiet room tone, a room name and size toast as you enter each room, the floor plan with your position, a vignette. `T` switches to the other viewers, `G` opens the empty rooms in the photo view, `Esc` exits (twice if the mouse is locked).

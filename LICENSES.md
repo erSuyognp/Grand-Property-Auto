@@ -34,6 +34,8 @@ Added for the real 3D city: `3d-tiles-renderer` 0.5.4 (NASA-AMMOS 3DTilesRendere
 
 Added for walk mode (dev only, used by the local MatterPak converter): `obj2gltf` 3.2.0 and `gltf-pipeline` 4.3.1, both Cesium, Apache-2.0. They are installed and wired into `tools/sponsor/build_matterpak.py`, but have not run on real data yet because no MatterPak could be downloaded (see DECISIONS.md).
 
+Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0), in `public/models/kenney/` with its `License.txt`. Four models are used (sedan-sports for the player; sedan, suv and hatchback-sports for traffic). CC0 is public domain dedication, more permissive than MIT.
+
 ## Python (tools/requirements.txt)
 
 | Package | License |

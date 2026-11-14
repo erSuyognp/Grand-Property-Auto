@@ -28,10 +28,15 @@ export function createCamera(ctx) {
   function chaseTarget(car, out, outLook) {
     const s = car.state;
     const speed = Math.abs(s.speed);
-    const dist = 8.5 + speed * 0.17, height = 3.6 + speed * 0.05 + orbitPitch * 9;
+    // about 10 m up and 14 m back, pitched down about 20 degrees; it sinks to about 6 m when
+    // the car is nearly stopped (arriving at a house feels closer) and rises a little at speed
+    const moving = THREE.MathUtils.smoothstep(speed, 0.5, 9);
+    const dist = 10.5 + moving * 3.5 + speed * 0.1, height = 6 + moving * 4 + speed * 0.07 + orbitPitch * 9;
     const a = s.heading + orbit;
     out.set(s.x + Math.sin(a) * dist, s.y + height, s.z + Math.cos(a) * dist);
-    outLook.set(s.x - Math.sin(s.heading) * 4, s.y + 1.3, s.z - Math.cos(s.heading) * 4);
+    // the point on the ground that puts the view 20 degrees below the horizon
+    const ahead = height / Math.tan(THREE.MathUtils.degToRad(20)) - dist;
+    outLook.set(s.x - Math.sin(s.heading) * ahead, s.y + 0.6, s.z - Math.cos(s.heading) * ahead);
     if (topDown) {
       out.set(s.x + Math.sin(s.heading) * 0.01, s.y + 95 + speed, s.z + Math.cos(s.heading) * 0.01);
       outLook.set(s.x, s.y, s.z);
@@ -76,7 +81,7 @@ export function createCamera(ctx) {
     if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
     else cam.up.set(0, 1, 0);
     cam.lookAt(look);
-    const targetFov = mode === 'chase' && car ? 62 + Math.min(14, Math.abs(car.state.speed) * 0.32) : 58;
+    const targetFov = mode === 'chase' && car ? 60 + Math.min(8, Math.max(0, Math.abs(car.state.speed) - 22) * 0.4) : 58;
     if (Math.abs(cam.fov - targetFov) > 0.05) { cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 3); cam.updateProjectionMatrix(); }
   }
 

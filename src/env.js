@@ -76,7 +76,7 @@ export function createEnv(ctx) {
   const tmpA = new THREE.Color(), tmpB = new THREE.Color();
   const sunDir = new THREE.Vector3(), skyDir = new THREE.Vector3();
   const state = { name: 'day', night: 0, t: 1 };
-  let envDirty = true, envClock = 0, time = 0;
+  let envDirty = true, envClock = 0, time = 0, haze = null;
 
   function copyPreset(dst, p) {
     for (const k of NUM) dst[k] = p[k];
@@ -91,7 +91,7 @@ export function createEnv(ctx) {
     sunDir.setFromSphericalCoords(1, rad(90 - cur.lightElev), rad(cur.azim));
     sun.color.copy(cur.sun); sun.intensity = cur.sunI;
     hemi.color.copy(cur.hemiSky); hemi.groundColor.copy(cur.hemiGround); hemi.intensity = cur.hemiI;
-    scene.fog.color.copy(cur.fog); scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
+    scene.fog.color.copy(cur.fog); scene.fog.near = haze ? haze[0] : cur.fogNear; scene.fog.far = haze ? haze[1] : cur.fogFar;
     scene.environmentIntensity = cur.envI;
     renderer.toneMappingExposure = cur.exposure;
     stars.material.opacity = Math.max(0, cur.night - 0.45) * 1.8;
@@ -154,5 +154,7 @@ export function createEnv(ctx) {
       return next;
     },
     setShadows(on) { sun.castShadow = on; },
+    // the Google city wants clear air nearby and haze only in the distance
+    setHaze(near, far) { haze = near == null ? null : [near, far]; apply(); },
   };
 }

@@ -3,6 +3,7 @@
 // route finder as the gold line, so they go where the aerial photo looks like asphalt.
 import * as THREE from 'three';
 import { buildCarMesh } from './car.js';
+import { TRAFFIC_MODELS } from './carmodel.js';
 import { findPath } from './nav.js';
 
 const COLORS = [0xd9dde0, 0x1d2126, 0x8e9499, 0x2f4f7a, 0x7a1f1f, 0xe9e4d6, 0x39453c, 0xb9862e];
@@ -43,7 +44,7 @@ export function initTraffic(ctx) {
     }
     if (roadCells.length < 50) return;
     for (let k = 0; k < count; k++) {
-      const built = buildCarMesh(COLORS[k % COLORS.length], true);
+      const built = buildCarMesh(COLORS[k % COLORS.length], true, TRAFFIC_MODELS[k % TRAFFIC_MODELS.length]);
       const p = randomRoad(world);
       const c = { ...built, mesh: built.car, x: p.x, z: p.z, y: world.heightAt(p.x, p.z), heading: Math.random() * 6.28, speed: 0, route: null, i: 0, wait: 0 };
       c.mesh.position.set(c.x, c.y, c.z);
@@ -95,7 +96,7 @@ export function initTraffic(ctx) {
       c.y = world.heightAt(c.x, c.z);
       c.mesh.position.set(c.x, c.y, c.z);
       c.mesh.rotation.y = c.heading;
-      for (const w of c.wheels) w.w.rotation.x -= (c.speed * dt) / 0.37;
+      for (const w of c.wheels) w.w.rotation.x -= ((w.dir || 1) * (c.speed * dt)) / (w.r || 0.37);
       c.mats.tail.emissiveIntensity = target < c.speed - 0.5 ? 5 : 0.7 + night * 1.3;
       c.mats.light.emissiveIntensity = 1.2 + night * 5;
       // the player bounces off: push out along the line between the two cars

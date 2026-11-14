@@ -20,7 +20,7 @@ const dbg = gl.getExtension('WEBGL_debug_renderer_info');
 const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
 const software = /swiftshader|llvmpipe|software|basic render/i.test(gpu);
 const quality = { low: params.get('q') === 'low' || (software && params.get('q') !== 'high'), gpu };
-renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 1.5));
+renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !quality.low;
 renderer.shadowMap.type = THREE.PCFShadowMap;
