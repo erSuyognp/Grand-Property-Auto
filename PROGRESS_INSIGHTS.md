@@ -8,25 +8,25 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] 1-4. Honesty rules in CLAUDE.md
 - [x] 5-8. Fair housing rules in CLAUDE.md
 - [x] 9. Data agreement rule in CLAUDE.md
-- [ ] build, test, shot, commit
+- [x] build, test, shot, commit
 
 ## Prompt 2: Enrichment pipeline (data for every listing in the area)
-- [ ] 1. Value vs nearby: price per sqft for this home vs homes within 1 km of the same type
-- [ ] 2. Rent vs buy: for the same bed count, the median asking rent of apartment listings
-- [ ] 3. Home facts from listing features: HOA fee and what it includes, community amenities,
-- [ ] 4. Apartment communities: floor plans, rent ranges, units available, community
-- [ ] 5. Neighborhood activity from commercial data within 1.5 km: number of commercial
-- [ ] 6. Roof material, shape and condition, existing solar, pool, tree cover percent, lot
-- [ ] 7. Places (OpenStreetMap Overpass, one query for the whole bbox plus a 3 km margin):
-- [ ] 8. Drive times: Google Routes API compute route matrix (GOOGLE_SERVER_KEY) from each
-- [ ] 9. Census: tract from the Census geocoder; from ACS 5 year: median household income,
-- [ ] 10. Risk: FEMA National Risk Index for the tract (overall risk and the top 3 hazards,
-- [ ] 11. Energy: EIA average residential electricity price for the state (latest month).
-- [ ] 12. Solar: Google Solar API buildingInsights for the home's lat/lon: max panel count,
-- [ ] 13. Money: 30 year rate from FRED (MORTGAGE30US). Property tax from a small cited table
-- [ ] 14. True monthly cost = principal and interest (default 20% down, slider later) +
-- [ ] 15. Errands (supermarket, pharmacy, cafe drive or walk times), Commute (downtown and
-- [ ] build, test, shot, commit
+- [x] 1. Value vs nearby: price per sqft for this home vs homes within 1 km of the same type
+- [x] 2. Rent vs buy: for the same bed count, the median asking rent of apartment listings
+- [x] 3. Home facts from listing features: HOA fee and what it includes, community amenities,
+- [x] 4. Apartment communities: floor plans, rent ranges, units available, community
+- [~] 5. Neighborhood activity: done except tenants by industry (the kit has no industry on these tenancies): number of commercial
+- [x] 6. Roof material, shape and condition, existing solar, pool, tree cover percent, lot
+- [x] 7. Places (OpenStreetMap Overpass, one query for the whole bbox plus a 3 km margin):
+- [~] 8. Drive times: fallback only (distance at 25 mph, labeled Estimate; Routes API refused the key, no ORS key so rings are distance rings):
+- [x] 9. Census: tract from the Census geocoder; from ACS 5 year: median household income,
+- [x] 10. Risk: FEMA National Risk Index for the tract (overall risk and the top 3 hazards,
+- [x] 11. Energy: EIA average residential electricity price for the state (latest month).
+- [~] 12. Solar: NREL PVWatts + Vexcel roof (Google Solar refused the key): for the home's lat/lon: max panel count,
+- [x] 13. Money: 30 year rate from FRED (MORTGAGE30US). Property tax from a small cited table
+- [x] 14. True monthly cost = principal and interest (default 20% down, slider later) +
+- [x] 15. Errands (supermarket, pharmacy, cafe drive or walk times), Commute (downtown and
+- [x] build, test, shot, commit
 
 ## Prompt 3: The property reveal (select a property, the world animates)
 - [ ] 1. Camera swoops to a drone view above the home (smooth, about 1.2 s), the rest of the

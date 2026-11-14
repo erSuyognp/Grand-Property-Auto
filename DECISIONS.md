@@ -178,3 +178,23 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Keys.** None of the new keys in the plan's table are in `.env` (`GOOGLE_SERVER_KEY`, `ELEVENLABS_API_KEY`, `NREL_API_KEY`, `EIA_API_KEY`, `FRED_API_KEY`, `CENSUS_API_KEY`, `ORS_API_KEY`). The pipeline tries the existing `GOOGLE_MAPS_API_KEY` server side for Solar and Routes, `TTS_API_KEY` for Maya's voice, and key free endpoints where they exist (FRED csv download, Census without a key, NREL `DEMO_KEY`); otherwise the fallback the plan names. See "Needs attention" at the end of this section.
 - **Keys on the keyboard.** `M` stays the map and `A` stays steer left, so the client inbox is `I` and the "Can I afford it?" profile is `P`. `R` is car reset while driving and the tape measure inside a home. `B` is better options, `V` talks to Maya.
 - **File names.** The existing `src/missions.js` is the voice search and GPS guide; the new client missions live in `src/clients.js`.
+
+### Prompt 2: enrichment pipeline
+- `tools/enrich_city.py` is generic; everything that reads kit field paths is in `tools/sponsor/kit_insights.py` (gitignored, rule 3). `--city mock` builds synthetic insights offline for `public/data/mock/` (committed, zero Sponsor Data).
+- **Census ACS** now refuses requests without a key, so the ACS 2024 5-year values are read through the Census Reporter API (no key). Same tables, same numbers.
+- **NREL** moved its API host to `developer.nlr.gov`; PVWatts is called once per city (1 kW at the area center) with `DEMO_KEY` and scaled per roof.
+- **Google Solar and Routes** answer 403 for the key in `.env` (tried twice). Fallbacks from the plan: PVWatts + Vexcel roof area for solar, distance at 25 mph on a route 1.3 times the straight line for drive times, 3 mph for walk times. All labeled Estimate.
+- **Rings.** No OpenRouteService key, so rings are distance rings. A 5 minute drive ring is 2.6 km, larger than the whole 1.5 km neighborhood, so the reveal draws 5, 10 and 15 minute *walk* rings (310, 620, 925 m), which fit the map and say more about a neighborhood this size. Drive ring radii are still stored.
+- **Property tax.** Texas homes use the listing's own tax figure when it has one, else Harris County's effective rate from ACS (median taxes paid / median home value, 1.62%). Los Angeles uses 1.2% of the price (1% Prop 13 levy plus voter approved local rates), because California reassesses on sale and the ACS figure would understate a new buyer's bill.
+- **Insurance** is the state average homeowners premium from the Insurance Information Institute's public table (NAIC data, 2022: CA $1,492, TX $2,397), never scaled to the home and never called a quote. The pressure label comes from the FEMA rating and flood zone.
+- **Electric use** = EIA state average household use (table 5A, 2024) scaled by floor area against an assumed 1,800 sq ft typical home, limited to half to double. The 1,800 is our assumption and is stated in the "i" text.
+- **Roof condition** is Vexcel's 1 to 5 rating, read as 5 = best. The kit does not say which end is good (see Needs attention).
+- **Solar** is skipped ("Shared roof") when the footprint is far larger than the home (condo and townhouse blocks) and for apartment communities.
+- **Tenants by industry** is not available: the industry field is empty on nearly all tenancies in the kit. Largest employers by staff count is shown instead.
+- **Underground rail** (the Metro B Line tunnel in Hollywood) is left out of the street noise check.
+
+### Needs attention
+- `GOOGLE_SERVER_KEY` is missing and the existing Google key is not allowed to call Solar or Routes: enable both APIs on a server side key to get real panel layouts and drive times, then rerun `python tools/enrich_city.py --city la` and `--city houston`.
+- `ORS_API_KEY` missing: no true drive time isochrones.
+- Confirm with Vexcel which end of the roof condition scale is good (we assume 5).
+- The insurance averages are 2022 data, the newest in the public table.

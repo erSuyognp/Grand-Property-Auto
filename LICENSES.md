@@ -50,3 +50,23 @@ Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0),
 | pillow | MIT-CMU (HPND), permissive |
 | shapely | BSD-3-Clause |
 | pandas | BSD-3-Clause |
+| openpyxl | MIT (reads one EIA spreadsheet in tools/enrich_city.py) |
+
+## Added in the insights run
+
+| Package | License | Used for |
+|---|---|---|
+| lucide-static | ISC | Interface icons (`src/icons.js` inlines the handful it uses at build time) |
+
+## Outside data used by the insight pipeline (tools/enrich_city.py)
+
+| Source | Terms | What is taken |
+|---|---|---|
+| OpenStreetMap (Overpass API) | ODbL: credit "OpenStreetMap contributors" (shown in each card's "i" text) | Places, highways, rail lines, airports |
+| U.S. Census Bureau ACS 5-year, read through the Census Reporter API | Public domain data | Tract and city medians (income, home value, rent, owner share, year built, taxes paid) |
+| Census geocoder | Public domain | Census tract of a point |
+| FEMA National Risk Index, FEMA National Flood Hazard Layer | Public domain | Tract risk rating and hazards, flood zone at a point |
+| U.S. Energy Information Administration | Public domain | State residential electricity price (Electric Power Monthly table 5.6.A) and average household use (table 5A) |
+| FRED, Federal Reserve Bank of St. Louis | Series MORTGAGE30US, source Freddie Mac; cited | Weekly 30 year mortgage rate |
+| NREL PVWatts v8 | Public API (DEMO_KEY, or NREL_API_KEY when set) | Yearly solar output per kW at the area center |
+| Insurance Information Institute (NAIC data) | Cited; two numbers per state | Average homeowners and renters premium by state |
