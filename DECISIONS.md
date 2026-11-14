@@ -84,6 +84,20 @@
 - New dependency: `three-mesh-bvh` (MIT), logged in LICENSES.md.
 - Pixel ratio cap went from 1.75 to 1.5 to pay for the HDR pipeline; adaptive quality now drops resolution, then shadows, then bloom.
 
+## Real 3D city and drone view (Nov 14, asked for in chat)
+- `src/tiles.js` shows Google Photorealistic 3D Tiles in place of the block city (NASA 3DTilesRendererJS with the Google auth, reorientation, fade and compression plugins, Draco and KTX2 loaders served from our own origin). `G` switches between the two; the choice is remembered.
+- **Not seen working yet.** On Nov 14 Google answered every tile request for the key in `.env` with HTTP 403 (first "Map Tiles API has not been used in project ... or it is disabled", later "Permission denied on the service"). The automatic fallback to the block city was seen working; alignment, brightness, ground following and frame rate with real tiles were not. See MORNING.md for the one switch to flip.
+- The Google key goes to the browser through `/api/config` (never in mock mode), not through the bundle, so the bundle check did not need loosening; its comment and the config test now list the key as allowed.
+- What Google receives: tile requests for the area around the camera, from the browser. No listing, address, price or any CoStar, Vexcel or Matterport data is sent. Mock mode never loads tiles (its neighborhood is not a real place), and the tiles need internet, so offline the block city is used.
+- The plugin leaves west on +x and north on +z; the tiles sit in a holder turned half a turn so east is +x and south is +z like `src/geo.js`. The area's ellipsoid height is not known, so instead of lifting every marker, the tiles are moved up or down until their street matches our terrain where the car stands (measured twice: long rays first, short rays once sharper tiles arrive).
+- Ground under the car: rays cast down from just above our terrain height (so tree canopies and roofs are not hit), lowest of five nearby rays (so a parked car in the photo mesh is not a bump), cached per 1.5 m cell for 7 seconds, at most 8 new cells per frame, terrain.json where a ray misses or disagrees by more than 4 m.
+- Tiles are unlit and take no shadows; their brightness follows the time of day. The car keeps its sun shadow through a small shadow catcher under it.
+- Frame rate: errorTarget starts at 16, rises by 4 when under 50 fps and creeps back when there is room.
+- Tests run with `tiles=0` so they do not depend on Google or spend quota; `SHOT_TILES=1 npm run shot` shoots the 3D city.
+- Drone view (`src/drone.js`, key `Q`): only two Houston homes for sale in our areas have an exterior splat, none in LA. `python tools/build_splat.py --city houston` downloads each splat (about 160 MB), keeps the 700,000 Gaussians that matter most within 38 m of the house and writes a 22 MB `.splat`. The orbit runs at about 41 to 45 fps on this laptop; fewer Gaussians would raise that.
+- The splat's own frame is not aligned to north, so the orbit starts at a random bearing; it is not lined up with the street outside.
+
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
+- Google 3D city: the key in `.env` is refused (HTTP 403). Enable the Map Tiles API and billing on the key's Google Cloud project, and allow the key to call it.
 - Listing photos: the photo hosts refuse scripted downloads (403). If CoStar can provide a way to fetch them, rerun `python tools/build_city.py --city houston --steps listings,photos`.

@@ -25,7 +25,7 @@ export async function createWorld(ctx, city) {
   scene.add(group);
   const disposables = [];
 
-  const [area, groundMeta, terrain, buildingsGeo, scatter, listings, commercial, nearby] = await Promise.all([
+  const [area, groundMeta, terrain, buildingsGeo, scatter, listings, commercial, nearby, splats] = await Promise.all([
     loadDataJson(city, 'area.json'),
     loadDataJson(city, 'ground.json'),
     loadDataJson(city, 'terrain.json').catch(() => null),
@@ -34,6 +34,7 @@ export async function createWorld(ctx, city) {
     loadDataJson(city, 'listings.json'),
     loadDataJson(city, 'commercial.json').catch(() => []),
     loadDataJson(city, 'nearby.json').catch(() => ({})),
+    loadDataJson(city, 'splats.json').catch(() => ({})),
   ]);
   const base = area.mock ? '/data/mock/' : dataBase(city);
   const proj = makeProjection(area.center);
@@ -462,6 +463,8 @@ export async function createWorld(ctx, city) {
       lampHeadMat.emissiveIntensity = lit * 6;
       glowMat.opacity = lit * 0.55;
     },
+    // the Google 3D city replaces what is drawn; the data underneath stays
+    setCityVisible(on) { for (const o of group.children) o.visible = on; },
     dispose() {
       scene.remove(group);
       group.traverse((o) => {
@@ -475,6 +478,7 @@ export async function createWorld(ctx, city) {
   for (const l of listings) {
     const q = proj.toLocal(l.lat, l.lon);
     l.x = q.x; l.z = q.z;
+    if (splats && splats[l.id] && !area.mock) l.splat = splats[l.id]; // exterior drone splat (src/drone.js)
   }
   for (const c of commercial) {
     const q = proj.toLocal(c.lat, c.lon);

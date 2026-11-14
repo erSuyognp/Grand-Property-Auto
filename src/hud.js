@@ -37,7 +37,7 @@ export function initHud(ctx) {
     toast: $('<div id="toast"></div>'),
     chooser: $('<div id="chooser" class="panel"></div>'),
     lightbox: $('<div id="lightbox" class="clickable"><img alt=""/></div>'),
-    help: $('<div id="help" class="chip">WASD drive · Space handbrake · Shift boost · V talk · C view · L time of day · R reset · 0 demo</div>'),
+    help: $('<div id="help" class="chip">WASD drive · Space handbrake · Shift boost · V talk · C view · L time of day · G 3D city · R reset · 0 demo</div>'),
     fade: $('<div id="fade"></div>'),
     typebox: $('<form id="typebox"><input type="text" maxlength="140" placeholder="Say what you are looking for" autocomplete="off"/></form>'),
   };
@@ -141,6 +141,7 @@ export function initHud(ctx) {
         ${curb ? `<div class="curb">${curb}</div>` : ''}
         <div class="prompts">
           ${canTour ? '<span class="clickable" data-act="tour"><kbd>E</kbd> Walk inside</span>' : '<span class="dim">No 3D tour</span>'}
+          ${l.splat ? '<span class="clickable" data-act="drone"><kbd>Q</kbd> Drone view</span>' : ''}
           <span class="clickable" data-act="save"><kbd>F</kbd> ${saved ? 'Saved' : 'Save'}</span>
         </div>
       </div>`;
@@ -154,6 +155,7 @@ export function initHud(ctx) {
     for (const c of el.card.querySelectorAll('.curb img')) c.addEventListener('click', () => lightbox(c.src));
     el.card.querySelector('[data-act="tour"]')?.addEventListener('click', () => ctx.emit('key', 'KeyE', null));
     el.card.querySelector('[data-act="save"]')?.addEventListener('click', () => ctx.emit('key', 'KeyF', null));
+    el.card.querySelector('[data-act="drone"]')?.addEventListener('click', () => ctx.emit('key', 'KeyQ', null));
   }
   ctx.on('near-listing', (l) => { showCard(l); if (l) showCommercial(null); });
   ctx.on('saved', () => { if (current) showCard(current); el.saved.querySelector('b').textContent = ctx.saved.size; el.saved.classList.toggle('has', ctx.saved.size > 0); });

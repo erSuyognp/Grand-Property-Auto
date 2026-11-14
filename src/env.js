@@ -97,6 +97,8 @@ export function createEnv(ctx) {
     stars.material.opacity = Math.max(0, cur.night - 0.45) * 1.8;
     stars.visible = stars.material.opacity > 0.01;
     state.night = cur.night;
+    state.exposure = cur.exposure;
+    state.tint = cur.sun;
   }
   function bakeEnv() {
     const disc = U.showSunDisc ? U.showSunDisc.value : 0;

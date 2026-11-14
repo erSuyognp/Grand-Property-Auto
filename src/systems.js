@@ -12,6 +12,8 @@ import { initCompare } from './compare.js';
 import { initDemo } from './demo.js';
 import { findPath } from './nav.js';
 import { initTraffic } from './traffic.js';
+import { initTiles } from './tiles.js';
+import { initDrone } from './drone.js';
 
 export async function initSystems(ctx) {
   ctx.saved = initSaved(ctx);
@@ -26,6 +28,8 @@ export async function initSystems(ctx) {
   ctx.demoSys = initDemo(ctx);
   ctx.title = initTitle(ctx);
   ctx.traffic = initTraffic(ctx);
+  ctx.tiles = initTiles(ctx);
+  ctx.drone = initDrone(ctx);
 
   // "Take me there" from the saved homes screen: a mission with one target
   ctx.missions.goTo = (l) => {

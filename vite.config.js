@@ -15,8 +15,18 @@ const mockDataOnly = () => ({
   },
 });
 
+// Draco and Basis decoders for the Google 3D Tiles, served from our own origin (no CDN):
+// copied out of three's package into public/libs for dev and into dist/libs for the build.
+const decoders = () => {
+  const copy = (to) => {
+    fs.cpSync('node_modules/three/examples/jsm/libs/draco/gltf', `${to}/libs/draco`, { recursive: true });
+    fs.cpSync('node_modules/three/examples/jsm/libs/basis', `${to}/libs/basis`, { recursive: true });
+  };
+  return { name: 'decoders', buildStart() { copy('public'); }, closeBundle() { if (fs.existsSync('dist')) copy('dist'); } };
+};
+
 export default defineConfig({
-  plugins: [mockDataOnly()],
+  plugins: [mockDataOnly(), decoders()],
   optimizeDeps: { entries: ['index.html'] },
   server: {
     port: 5173,

@@ -81,3 +81,19 @@ kbd { display: inline-block; min-width: 22px; padding: 2px 6px; border-radius: 6
 #typebox { position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%); display: none; pointer-events: auto; }
 #typebox.show { display: block; }
 #typebox input { width: min(520px, 70vw); padding: 12px 18px; border-radius: 999px; border: 2px solid var(--gold); background: rgba(14, 17, 22, 0.92); color: var(--paper); font: 18px var(--font); outline: none; }
+
+/* ---- Google Map Tiles attribution (required whenever the 3D city is shown) */
+#g-attr { position: fixed; left: 50%; bottom: 3px; transform: translateX(-50%); display: none; align-items: center; gap: 7px; z-index: 4; font: 10px/1 var(--font); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); white-space: nowrap; pointer-events: none; max-width: 70vw; overflow: hidden; }
+#g-attr img { height: 14px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)); }
+body.g3d #g-attr { display: flex; }
+body.g3d #legend { bottom: 26px; }
+
+/* ---- drone view: only the listing card and a small label stay on screen */
+#drone-label { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); display: none; gap: 10px; align-items: center; z-index: 6; padding: 8px 16px; border-radius: 999px; background: rgba(14, 17, 23, 0.82); color: var(--paper); font: 13px var(--font); white-space: nowrap; }
+#drone-label b { color: var(--gold); font-size: 14px; }
+#drone-label span { opacity: 0.8; }
+body.drone #drone-label { display: flex; }
+body.drone #hud > *:not(#card):not(#fade):not(#toast), body.drone #g-attr { display: none !important; }
+
+/* the card's prompts (E, Q, F) stay in view however long the card is */
+#card .prompts { position: sticky; bottom: 0; background: linear-gradient(to bottom, rgba(20, 24, 31, 0), rgba(20, 24, 31, 0.97) 35%); padding-top: 14px; padding-bottom: 10px; margin-bottom: -4px; }

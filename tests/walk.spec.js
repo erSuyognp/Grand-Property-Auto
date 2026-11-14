@@ -14,7 +14,7 @@ test('walk freely inside a home', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (/\[tour\]/.test(m.text())) console.log(m.text().slice(0, 200)); });
-  await page.goto(`/?autostart=1&mute=1&noshowcase=1&city=${CITY}`);
+  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0&city=${CITY}`);
   await page.waitForFunction(() => window.__gpa?.ready === true, null, { timeout: 60_000 });
   const pick = Number(process.env.WALK_PICK || 0);
   const id = await page.evaluate(async (n) => {

@@ -36,7 +36,7 @@ python tools/check_data.py houston la mock
 python tools/check_confidential.py
 ```
 
-Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, drag or arrow keys to look, Shift to walk faster, G see it empty, T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, G Google 3D city or block city, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, drag or arrow keys to look, Shift to walk faster, G see it empty, T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
 
 ## Needs you
 
@@ -59,6 +59,11 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Title, intro drop, saved homes compare (Tab), demo mode (0).**
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
+
+## Real 3D city and drone view (added Nov 14)
+
+- **Google 3D city: built, but Google refuses the key, so I have not seen it on screen.** Every request came back HTTP 403. In the Google Cloud console for the key's project: enable **Map Tiles API**, make sure billing is on, and if the key has API restrictions add Map Tiles API to them (referrers to allow: `http://localhost:8787/*` and `http://localhost:5173/*`). Then reload; `G` switches between the Google city and the block city. Until then the game falls back to the block city after 6 seconds by itself (that part I did see work). Expect to tune brightness and ground height once tiles load: `SHOT_TILES=1 npm run shot` writes screenshots to compare with `shots/`.
+- **Drone view works:** park at either of the two Houston homes that have a drone splat (their cards show `Q Drone view`), press `Q`, `Esc` to return. About 41 to 45 fps.
 
 ## Realism pass (added Nov 14)
 

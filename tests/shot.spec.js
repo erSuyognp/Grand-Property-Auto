@@ -7,11 +7,14 @@ import fs from 'node:fs';
 const MODE = process.env.SHOT_MODE ? `&mode=${process.env.SHOT_MODE}` : '';
 const CITY = process.env.SHOT_CITY ? `&city=${process.env.SHOT_CITY}` : '';
 const DIR = process.env.SHOT_DIR || 'shots';
+// SHOT_TILES=1 shoots the Google 3D city (needs the key and internet); the default is the
+// block city, which is the same on every run
+const TILES = process.env.SHOT_TILES ? '&tiles=1' : '&tiles=0';
 const ready = (page) => page.waitForFunction(() => window.__gpa?.ready === true, null, { timeout: 60_000 });
 
 test('shot: title screen', async ({ page }) => {
   fs.mkdirSync(DIR, { recursive: true });
-  await page.goto(`/?mute=1${MODE}${CITY}`);
+  await page.goto(`/?mute=1${MODE}${CITY}${TILES}`);
   await ready(page);
   // public (mock) shots: do not show the laptop's network address or a scannable code
   if (process.env.SHOT_MODE === 'mock') await page.addStyleTag({ content: '#qr .inner { display: none !important; }' });
@@ -27,8 +30,13 @@ test('shot: load and drive', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  await page.goto(`/?autostart=1&mute=1&noshowcase=1${MODE}${CITY}`);
+  await page.goto(`/?autostart=1&mute=1&noshowcase=1${MODE}${CITY}${TILES}`);
   await ready(page);
+  if (process.env.SHOT_TILES) {
+    await page.waitForFunction(() => { const t = window.__gpa.tiles(); return t.on || t.failed; }, null, { timeout: 20_000 });
+    console.log('tiles', JSON.stringify(await page.evaluate(() => window.__gpa.tiles())));
+    await page.waitForTimeout(5000);
+  }
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${DIR}/01-loaded.png` });
 

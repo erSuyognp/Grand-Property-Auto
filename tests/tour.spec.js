@@ -12,7 +12,7 @@ test('walk inside: Showcase, own viewer, empty view, exit', async ({ page }) => 
   test.setTimeout(180_000);
   fs.mkdirSync(DIR, { recursive: true });
   page.on('console', (m) => { if (/\[tour\]/.test(m.text())) console.log(m.text().slice(0, 200)); });
-  await page.goto(`/?autostart=1&mute=1&city=${CITY}`);
+  await page.goto(`/?autostart=1&mute=1&tiles=0&city=${CITY}`);
   await page.waitForFunction(() => window.__gpa?.ready === true, null, { timeout: 60_000 });
   // a home whose panoramas are on disk, so both paths can be shown
   const id = await page.evaluate(async () => {

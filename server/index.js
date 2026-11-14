@@ -46,13 +46,15 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Client config. GAME_MODE=mock means the client loads only public/data/mock/.
-// MATTERPORT_SDK_KEY is the only key ever sent to the browser (domain locked public key).
+// Two keys reach the browser, both meant for it: MATTERPORT_SDK_KEY (domain locked public key)
+// and GOOGLE_MAPS_API_KEY (Map Tiles; restrict it by HTTP referrer in the Google console).
 app.get('/api/config', (_req, res) => {
   res.json({
     mode: GAME_MODE,
     llm: LLM_ENABLED && llmReady(),
     tts: TTS_ENABLED,
     matterportSdkKey: GAME_MODE === 'mock' ? '' : process.env.MATTERPORT_SDK_KEY || '',
+    googleMapsKey: GAME_MODE === 'mock' ? '' : process.env.GOOGLE_MAPS_API_KEY || '',
     showcaseBase: process.env.MATTERPORT_SHOWCASE_BASE || 'https://my.matterport.com',
     sdkUrl: process.env.MATTERPORT_SDK_URL || 'https://static.matterport.com/showcase-sdk/latest.js',
     lanIp: lanIp(),

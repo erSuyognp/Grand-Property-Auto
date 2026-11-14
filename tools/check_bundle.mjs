@@ -1,6 +1,7 @@
-// Fails the build if a server-side secret ended up in the browser bundle. The only key the
-// browser may see is MATTERPORT_SDK_KEY (a domain locked public key), and it is not in the
-// bundle either: the client reads it from /api/config at run time.
+// Fails the build if a server-side secret ended up in the browser bundle. Two keys are meant
+// for the browser and are not treated as secrets here: MATTERPORT_SDK_KEY (a domain locked
+// public key) and GOOGLE_MAPS_API_KEY (Google Map Tiles, restricted by referrer). Today both
+// reach the client through /api/config at run time rather than through the bundle.
 import fs from 'node:fs';
 import path from 'node:path';
 import 'dotenv/config';
