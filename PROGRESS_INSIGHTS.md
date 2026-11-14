@@ -95,3 +95,7 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] 6. Update demo mode and DEMO_SCRIPT.md: open on the problem (scrolling flat listings),
 - [x] 7. Mock mode screenshots of every screen to docs/mock_shots/ for Devpost.
 - [x] build, test, shot, commit
+
+Finished Sat Nov 14 2026. Report: INSIGHTS_REPORT.md.
+
+INSIGHTS DONE
