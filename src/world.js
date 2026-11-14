@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { makeProjection } from './geo.js';
 import { dataBase, loadDataJson } from './data.js';
+import { buildRoads } from './roads.js';
 import { facadeMaterials, pitchedRoof, treeGeometry, treeMaterials, foliageTexture, lampGeometry, glowTexture, groundMaterial } from './worldgfx.js';
 
 const WALLS = [0xe6d5b8, 0xd9c7a8, 0xcfd3d6, 0xe9e0cf, 0xd6b99a, 0xbfc8c2, 0xe2cdb9, 0xc9b8a6, 0xf0e6d6, 0xb9aea0];
@@ -331,6 +332,23 @@ export async function createWorld(ctx, city) {
       cost[i] = road ? 1 : 3.2;
     }
   }
+  // ---- streets traced from the photo: they get real surfaces, and routes, traffic, lamps
+  // and the spawn point use them instead of "anything gray"
+  let roads = null;
+  if (!ctx.params.has('noroads')) {
+    try { roads = buildRoads({ img, uvAt, G, bounds, buildings }); } catch (e) { console.warn('[roads]', e.message); }
+  }
+  if (roads) {
+    groundLook.setRoads(roads);
+    disposables.push(roads.texture);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      const sd = roads.sdAt(bounds.minX + (c + 0.5) * CELL, bounds.minZ + (r + 0.5) * CELL);
+      cost[i] = sd < -1 ? 1 : cost[i] <= 1 ? 1.9 : 4;
+    }
+  }
+  window.__gpa.roads = roads ? { streets: roads.segments.length, meters: Math.round(roads.length), angle: +((roads.angle * 180) / Math.PI).toFixed(1), ms: roads.ms } : null;
+
   // connected areas of free cells: routes and spawns stay in the largest one, so a courtyard
   // or a gap sealed off by buildings is never chosen as a start or a goal
   const comp = new Int32Array(cols * rows);
@@ -430,7 +448,7 @@ export async function createWorld(ctx, city) {
   let lastNight = -1;
 
   const world = {
-    city, area, proj, bounds, group, buildings, listings, commercial, nearby, base, mini, G, uvAt,
+    city, area, proj, bounds, group, buildings, listings, commercial, nearby, base, mini, G, uvAt, roads,
     heightAt, buildingAt, nearBuildings, pointIn, isFree, findSpawn,
     grid: { cols, rows, cell: CELL, blocked, cost, comp, mainComp },
     listingByBuilding,

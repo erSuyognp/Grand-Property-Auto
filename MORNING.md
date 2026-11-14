@@ -64,14 +64,15 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 
 - **Look:** physical sky with clouds, sun shadows, sky reflections in glass and car paint, bloom and a film grade; midday, golden hour and night (`L`). Sloped roofs, five facade types, leafy trees with dappled shadows, street lamps, a new car model, 9 traffic cars. Holds 60 fps on this laptop in Houston, LA and mock.
 - **Walk freely inside:** `E` now drops you into the home on foot. WASD walks, walls and furniture stop you, stairs work. It uses the scan's 3D mesh with the real photos projected on it. Houston: 40 of 47 scans; LA: 49 of 65. `python tools/build_mesh.py --city houston` rebuilds that data (inside the event window only).
-- **Not GTA 5:** roads are still the aerial photo (no painted lane lines, kerbs or sidewalks as geometry), there are no pedestrians, and buildings are textured boxes with roofs. Inside homes, surfaces that no scan point saw look smeared when you walk far from the scan points.
+- **Streets:** traced from the aerial photo at load: asphalt, double yellow or dashed lines by street width, gutters, kerbs and sidewalks, in Houston, LA and mock. Kerbs are drawn flat (no bump), and there are no crosswalks.
+- **Not GTA 5:** there are no pedestrians, buildings are textured boxes with roofs, and curved roads still show the photo. Inside homes, surfaces that no scan point saw look smeared when you walk far from the scan points.
 
 ## What is mocked or limited
 
 - **Mock mode** (`?mode=mock` or `GAME_MODE=mock`) is fully synthetic: 1,389 invented buildings, 80 invented listings, 4 drawn interiors. `docs/mock_shots/` (used by the README and for Devpost) was made this way, with the QR panel hidden.
 - **Listing photos are not cached.** The photo hosts refused scripted downloads (403), and I did not try to get around that. The browser can load them directly (it did in my runs), and when it cannot, cards show a still from the home's own 3D scan and the aerial photos instead.
 - **No rentals in either box** (the picked areas have homes for sale, sold homes and apartment communities). "For rent" shows 0; rent questions land on apartment communities.
-- **No road data.** Routes come from the building outlines plus "looks like asphalt" in the aerial photo. The gold line sometimes cuts across a parking lot or between buildings.
+- **Streets are traced from the photo, not from road data.** Straight streets on the grid get real asphalt, lane paint, kerbs and sidewalks, and routes follow them. Curved roads and short stubs keep the photo, and a long straight parking aisle is sometimes drawn as a street.
 - **Houses are boxes** with photo roofs and a simple window texture. No pitched roof geometry.
 - **Own viewer has 8 scan positions per home** (the Showcase has all of them). Many of these homes were scanned empty, so "See it empty" often looks the same as the furnished view.
 - **LA has only 8 homes** in the box; it is mostly apartment towers. Houston is the better demo city.

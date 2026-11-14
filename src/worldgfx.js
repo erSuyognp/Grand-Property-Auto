@@ -374,13 +374,18 @@ export function groundMaterial(groundTex) {
   detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
   detail.anisotropy = 8;
   const mat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.94, metalness: 0 });
+  // streets (src/roads.js): a distance map the shader turns into asphalt, paint and kerbs
+  const none = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  none.needsUpdate = true;
+  const R = { roadMap: { value: none }, roadRect: { value: new THREE.Vector4(0, 0, 1, 1) }, roadRot: { value: new THREE.Vector2(1, 0) }, roadOn: { value: 0 } };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.detailMap = { value: detail };
+    Object.assign(shader.uniforms, R);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec2 vGroundXZ;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D detailMap;\nvarying vec2 vGroundXZ;\nfloat gRough = 0.0;')
+      .replace('#include <common>', '#include <common>\nuniform sampler2D detailMap;\nuniform sampler2D roadMap;\nuniform vec4 roadRect;\nuniform vec2 roadRot;\nuniform float roadOn;\nvarying vec2 vGroundXZ;\nfloat gRough = 0.0;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         {
           vec3 gc = diffuseColor.rgb;
@@ -410,8 +415,49 @@ export function groundMaterial(groundTex) {
           crisp = mix(crisp, road, gAsphalt);
           diffuseColor.rgb = mix(gc, crisp, gNear);
           gRough = gAsphalt * gNear * (dFine.g - 0.45) * 0.5;
+          vec2 ruv = (vGroundXZ - roadRect.xy) / roadRect.zw;
+          if (roadOn > 0.5 && ruv.x > 0.0 && ruv.x < 1.0 && ruv.y > 0.0 && ruv.y < 1.0) {
+            vec4 rd = texture2D(roadMap, ruv);
+            float sd = rd.r, cdist = abs(rd.g), other = rd.b, hw = abs(rd.a);
+            float aa = clamp(fwidth(sd), 0.008, 2.0);
+            // coordinates along the street grid, for dashes and paving joints
+            vec2 gq = vec2(vGroundXZ.x * roadRot.x + vGroundXZ.y * roadRot.y, -vGroundXZ.x * roadRot.y + vGroundXZ.y * roadRot.x);
+            float along = rd.a > 0.0 ? gq.x : gq.y;
+            float thin = clamp(0.13 / (aa * 1.5), 0.0, 1.0); // thin paint fades instead of flickering far away
+            vec3 conc = vec3(0.4, 0.39, 0.365) * (0.78 + dFine.r * 0.44) * (0.86 + dWide.r * 0.28);
+            vec2 jq = abs(fract(gq / 1.5) - 0.5);
+            float joint = mix(smoothstep(0.004, 0.02, 0.5 - max(jq.x, jq.y)), 1.0, clamp(aa * 6.0, 0.0, 1.0));
+            float walk = smoothstep(0.16 - aa, 0.16 + aa, sd) * (1.0 - smoothstep(1.85 - aa, 1.85 + aa, sd));
+            vec3 col = mix(diffuseColor.rgb, conc * mix(0.6, 1.0, joint), walk * 0.94);
+            float kerb = smoothstep(-aa, aa, sd) * (1.0 - smoothstep(0.16 - aa, 0.16 + aa, sd));
+            col = mix(col, conc * 1.3, kerb);
+            float onRoad = 1.0 - smoothstep(-aa, aa, sd);
+            vec3 asph = vec3(0.1, 0.1, 0.105) * (0.62 + dFine.g * 0.8) * (0.8 + dMid.g * 0.4) * (0.78 + dWide.r * 0.44);
+            asph = mix(asph, conc * 0.7, smoothstep(-0.42 - aa, -0.42 + aa, sd));       // gutter pan
+            asph *= 1.0 - 0.55 * smoothstep(-0.07 - aa, 0.0, sd);                       // shadow under the kerb face
+            float clearOf = smoothstep(0.6, 2.4, other);                                // no paint through a junction
+            float wear = clamp(0.35 + dMid.r * 0.9, 0.0, 1.0) * thin;
+            float lw = 0.065;
+            float dbl = 1.0 - smoothstep(lw, lw + aa, abs(cdist - 0.15));
+            float single = (1.0 - smoothstep(lw, lw + aa, cdist)) * step(0.62, fract(along / 11.0));
+            float yellow = clearOf * (hw >= 5.0 ? dbl : hw >= 3.3 ? single : 0.0);
+            float white = clearOf * step(6.4, hw) * (1.0 - smoothstep(lw, lw + aa, abs(cdist - hw * 0.5))) * step(0.66, fract(along / 12.0));
+            asph = mix(asph, vec3(0.6, 0.42, 0.035), yellow * wear);
+            asph = mix(asph, vec3(0.6), white * wear);
+            col = mix(col, asph, onRoad);
+            diffuseColor.rgb = col;
+            gRough = onRoad * (dFine.g - 0.45) * 0.5;
+          }
         }`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor - 0.12 * step(0.0001, abs(gRough)) - gRough, 0.3, 1.0);');
   };
-  return { mat, detail };
+  return {
+    mat, detail,
+    setRoads(roads) {
+      R.roadMap.value = roads.texture;
+      R.roadRect.value.set(roads.rect.minX, roads.rect.minZ, roads.rect.w, roads.rect.h);
+      R.roadRot.value.set(Math.cos(roads.angle), Math.sin(roads.angle));
+      R.roadOn.value = 1;
+    },
+  };
 }

@@ -67,7 +67,15 @@ export function initTraffic(ctx) {
       const r = c.route;
       while (c.i < r.length - 1 && Math.hypot(r[c.i].x - c.x, r[c.i].z - c.z) < 7) c.i++;
       if (c.i >= r.length - 1) { c.route = null; continue; }
-      const t = r[Math.min(r.length - 1, c.i + 1)];
+      const t0 = r[c.i], t1 = r[Math.min(r.length - 1, c.i + 1)];
+      // keep right: aim beside the route, as far as the street is wide
+      let tx = t1.x, tz = t1.z;
+      if (world.roads) {
+        const lx = t1.x - t0.x, lz = t1.z - t0.z, ll = Math.hypot(lx, lz) || 1;
+        const off = THREE.MathUtils.clamp(-world.roads.sdAt(t1.x, t1.z) - 1.4, 0, 1.9);
+        tx += (-lz / ll) * off; tz += (lx / ll) * off;
+      }
+      const t = { x: tx, z: tz };
       const want = Math.atan2(-(t.x - c.x), -(t.z - c.z));
       const err = wrap(want - c.heading);
       c.heading += THREE.MathUtils.clamp(err, -1.6 * dt, 1.6 * dt) * Math.min(1, c.speed / 2 + 0.3);
