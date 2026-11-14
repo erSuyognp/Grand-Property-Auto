@@ -12,6 +12,7 @@ Rule 6 of the data agreement: only permissive licenses (MIT, BSD, Apache 2.0, IS
 | dotenv | 18.0.10 | BSD-2-Clause | .env loading |
 | qrcode | 1.5.4 | MIT | phone pairing QR code |
 | @anthropic-ai/sdk | 1.8.0 | Apache-2.0 | mission parser / narration (only when LLM_ENABLED=true) |
+| selfsigned | 5.5.0 | MIT | self-signed certificate for the phone controller's local https page |
 | vite (dev) | 8.3.8 | MIT | dev server and bundler |
 | concurrently (dev) | 10.0.7 | MIT | runs vite + server together |
 | playwright, @playwright/test (dev) | 1.65.1 | Apache-2.0 | screenshots and smoke tests |
