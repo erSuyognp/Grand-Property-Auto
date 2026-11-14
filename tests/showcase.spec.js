@@ -6,7 +6,8 @@ import fs from 'node:fs';
 const model = process.env.SHOWCASE_CHECK;
 test.skip(!model, 'set SHOWCASE_CHECK=<modelId> to run');
 
-for (const base of ['https://my.matterport.com', 'https://beta-app.matterport.com']) {
+// bases to try: SHOWCASE_BASES=comma,separated (defaults to the public Showcase host)
+for (const base of (process.env.SHOWCASE_BASES || 'https://my.matterport.com').split(',')) {
   test(`showcase connects via ${base}`, async ({ page }) => {
     test.setTimeout(90_000);
     page.on('console', (m) => { if (m.text().includes('[showcase]')) console.log(m.text().slice(0, 300)); });

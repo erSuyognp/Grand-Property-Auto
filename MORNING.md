@@ -1,0 +1,91 @@
+# Good morning
+
+All ten phases are checked off. The game runs on real Houston and LA data and on the mock neighborhood, at 60 fps on this laptop's integrated GPU. Read "Needs you" first.
+
+## Run the demo
+
+```bash
+npm run demo
+```
+
+Then open http://localhost:8787 in Chrome and press F11. That one command builds the game, checks that no server key is in the browser bundle, and serves everything from the Node server (the Matterport SDK key only works on localhost, which this is).
+
+For development (hot reload):
+
+```bash
+npm run dev
+```
+
+Then open http://localhost:5173.
+
+Other commands:
+
+```bash
+npm test
+```
+
+```bash
+npm run shot
+```
+
+```bash
+python tools/check_data.py houston la mock
+```
+
+```bash
+python tools/check_confidential.py
+```
+
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: W next spot, G see it empty, T switch viewer, N next space, Esc exit.
+
+## Needs you
+
+1. **Decide `LLM_ENABLED`.** `BUILD_PLAN.md` says CoStar OK'd third party APIs in Discord, but `CLAUDE.md` rule 7 still has the old "unconfirmed, keep it off" text, and `.env` says `LLM_ENABLED=false`. I was not permitted to edit the override rules in `CLAUDE.md` and left the defaults alone. Right now the game uses the local keyword parser, template narration and the browser voice, and it works well that way. To turn on Claude (and the ElevenLabs narrator voice), set `LLM_ENABLED=true` in `.env` and restart, and update rule 7 in `CLAUDE.md` yourself so the two documents agree. I tested the Claude path once with an invented sentence and invented numbers only: 1.6 to 2.4 s per mission, 1.6 s per narration.
+2. **Try a real phone.** The phone controller passes its test with a second browser page, but I could not hold a phone. Scan the QR code on the title screen. The phone will warn about the self-signed certificate once (Advanced, Proceed). If the page does not load, Windows Firewall is the likely cause: allow Node on private networks for ports 8443 and 8787, or use the laptop's hotspot. Tilt and the mic need the https link the QR code gives.
+3. **Try your voice.** Speech recognition was only tested by injecting text. It needs Chrome, a mic permission click, and internet (the browser's speech service). T always works as the typed fallback.
+4. **Listen to it.** I cannot hear. Engine, tire squeal, chimes and the narrator voice are untested by ear. M mutes the effects.
+5. **`BUILD_PLAN.md` contains sponsor API hostnames and details** (your own notes). `tools/check_confidential.py` reports it as a warning. Remove it or keep it out of anything you share. The first Phase 1 commit also has three API terms in an old version of `DECISIONS.md`; if you ever share the git history rather than a zip of the files, squash first.
+6. **After 4:00 PM Sunday:** `bash tools/purge.sh`, then the by-hand steps it prints. It now also deletes `tools/sponsor/` and `server/sponsor/` (see below).
+
+## What works (checked by tests on real data)
+
+- **World:** both cities build from the aerial data: ground photo at 8192 px, 1,710 buildings in Houston and 444 in downtown LA with real heights, roofs textured from the aerial photo, trees, pools, terrain, shadows, fog at the edge, invisible walls. City switcher on the title screen and in the game.
+- **Driving:** arcade handling, drift, boost, sliding wall collisions, chase camera that stays out of buildings, top view, gamepad mapping (not tested with a real pad).
+- **Listings:** Houston has 8 homes for sale, 15 recently sold and 10 apartment communities; LA has 6 for sale, 2 sold and 34 apartment communities. Markers by kind and price, legend and 1 to 4 filters, listing cards with aerial badges and four angled aerial photos per home, commercial cards, rotating minimap, speedometer, saved counter.
+- **Walk inside:** the real Matterport Showcase through the Embed SDK (connects on localhost), my own panorama viewer as fallback and for "See it empty", room names and sizes, a floor map of scan positions, floor rings that point at the real positions (calibrated against the Showcase), photo gallery as the last resort. 47 Houston models and 65 LA models have panoramas on disk.
+- **Voice missions:** filters, top five highlighted, gold route that mostly follows streets, arrow with distance, narration on arrival, thumbs up or down after a tour, follow ups ("cheaper", "bigger yard", "closer to a park", "more like this one"), and spoken commands ("take me inside", "save this one", "see it empty").
+- **Aerial search:** "near a park / school / shops / playground / tennis / water" is instant from the prebuilt index. A new word ("coffee shop") makes one live search (about 1 s, cached). "More like this one" uses the visual search (0.2 s).
+- **Phone controller:** QR pairing over the LAN, tilt or drag steering, pedals, mic or typing, action buttons that follow the screen, saved homes tab, haptics.
+- **Title, intro drop, saved homes compare (Tab), demo mode (0).**
+- **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
+- **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
+
+## What is mocked or limited
+
+- **Mock mode** (`?mode=mock` or `GAME_MODE=mock`) is fully synthetic: 1,389 invented buildings, 80 invented listings, 4 drawn interiors. `docs/mock_shots/` (used by the README and for Devpost) was made this way, with the QR panel hidden.
+- **Listing photos are not cached.** The photo hosts refused scripted downloads (403), and I did not try to get around that. The browser can load them directly (it did in my runs), and when it cannot, cards show a still from the home's own 3D scan and the aerial photos instead.
+- **No rentals in either box** (the picked areas have homes for sale, sold homes and apartment communities). "For rent" shows 0; rent questions land on apartment communities.
+- **No road data.** Routes come from the building outlines plus "looks like asphalt" in the aerial photo. The gold line sometimes cuts across a parking lot or between buildings.
+- **Houses are boxes** with photo roofs and a simple window texture. No pitched roof geometry.
+- **Own viewer has 8 scan positions per home** (the Showcase has all of them). Many of these homes were scanned empty, so "See it empty" often looks the same as the furnished view.
+- **LA has only 8 homes** in the box; it is mostly apartment towers. Houston is the better demo city.
+- **Height fallbacks:** 157 Houston and 102 LA buildings got a default height where the surface data did not show a building.
+- **Area pick deviates from the plan's formula:** apartment communities are capped at 10 per box in the score, otherwise LA would have been 66 apartment towers and one home.
+
+## Where things are
+
+- `DEMO_SCRIPT.md`: the 2 minute live script and which judge cares about what.
+- `DEVPOST.md`, `README.md`: no schemas, field names, endpoints, counts of records or real addresses. Images from `docs/mock_shots/` only.
+- `DECISIONS.md`: every call I made, by phase. "Needs real data" is at the bottom.
+- `LICENSES.md`: one new dependency (`selfsigned`, MIT) for the phone's local https page. Still no GPL family packages.
+- `tools/sponsor/` and `server/sponsor/`: the pipeline scripts and the search proxy. They embed sponsor field names and API details, so they are **gitignored, exist only on this laptop, and are deleted by the purge**. `tools/pick_area.py` and `tools/build_city.py` are thin wrappers around them. They are not in git history: if you need to keep the pipeline code past Sunday, ask CoStar first.
+- `data/SCHEMA_NOTES.md`, `data/VEXCEL_NOTES.md`, `data/MATTERPORT_NOTES.md`, `data/MATTERPORT_SCHEMA.md`: local notes, gitignored.
+- `shots/`: real data screenshots from the last run, local only. `shots/la/` and `shots/prod/` too.
+
+## If you rebuild data
+
+```bash
+python tools/build_city.py --city houston
+```
+
+Everything is cached under `data/cache/`, so a rerun is quick. Steps can be run one at a time with `--steps elements,dedupe,ortho,terrain,listings,curb,nearby,photos,matterport`. The first run of the height step is the slow one (about 2 minutes now that duplicates are removed first). Sponsor calls refuse to run outside the event window.

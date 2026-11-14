@@ -11,3 +11,5 @@
 - [x] Phase 8: Phone as the controller
 - [x] Phase 9: Polish and demo mode
 - [x] Phase 10: Ship it
+
+ALL PHASES DONE

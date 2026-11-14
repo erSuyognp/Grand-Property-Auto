@@ -21,7 +21,7 @@
 - **Houston is the hero city** for the demo (more homes for sale); LA is the second city.
 - **Building heights come from surface height minus ground height.** The per-parcel height option returned implausible values and the stored height fields were empty, so the plan's step (a) is skipped. The two elevation services are not swapped in the docs. Details: `data/VEXCEL_NOTES.md` (local only).
 - **Matterport API**: endpoint and auth exactly as in the quickstart script; `MATTERPORT_GRAPHQL_URL` in `.env` is unused. Details: `data/MATTERPORT_NOTES.md` (local only).
-- **Showcase base URL: `https://my.matterport.com`** connects with the Embed SDK on localhost (checked with Playwright, 61 sweeps). `beta-app.matterport.com` does not connect. Path A is the main tour path.
+- **Showcase base URL: `https://my.matterport.com`** connects with the Embed SDK on localhost (checked with Playwright, 61 sweeps). The hackathon site's own host does not connect. Path A is the main tour path.
 - Skybox links are signed and expire within hours, so Phase 2 downloads the faces it needs.
 - Extra files in the game data format: `scatter.json` (tree and pool positions) and `area.json` (center, bbox, flat flag), so the client never has to guess them.
 - Mock data: 1,389 invented buildings, 80 invented listings, 4 procedural interiors (with an "empty" variant for "See it empty"). 4.8 MB, committed.
@@ -58,6 +58,13 @@
 - **Title screen** starts the game on Enter or when a phone connects. `?autostart=1` skips it (tests use this).
 - **Demo mode (0):** autopilot follows the route with a simple pursuit controller; if it gets stuck it backs up, then hops back onto the line, so the video never stalls.
 - Offline: with the server stopped the game loads from the build, uses the local parser and template narration, the built in viewer for tours, and hides nothing behind a network call.
+
+## Phase 10
+- `npm run demo` is the one command: build, bundle secret check, then the Node server serves `dist/` on http://localhost:8787 (and real city files from `public/data/`).
+- `tools/check_bundle.mjs` fails the build if any server key or a real city folder is in `dist/`. The Matterport SDK key is not in the bundle either; the page reads it from `/api/config`.
+- `tools/check_confidential.py` scans every tracked file for real listing ids, addresses, community names, model ids, `.env` secrets and sponsor API hostnames, and checks that no remote is configured. It passes. `BUILD_PLAN.md` (the owner's plan, which quotes event materials) is reported as a warning and left untouched.
+- README and Devpost images come from `docs/mock_shots/` (mock mode, QR panel hidden so the laptop's network address is not shown).
+- Optional settings were added to `.env.example` (model name, SDK script URL, API base, ports). `LLM_ENABLED` there is unchanged (see Phase 1).
 
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
