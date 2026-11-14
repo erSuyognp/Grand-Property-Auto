@@ -13,6 +13,7 @@ export function initVoice(ctx) {
 
   function start() {
     if (listening) return;
+    ctx.maya?.interrupt();
     if (!SR) { openType(); return; }
     finalText = ''; interim = ''; wantStop = false;
     try {
@@ -38,10 +39,12 @@ export function initVoice(ctx) {
         listening = false;
         mic.classList.remove('on');
         ctx.hud.live(null);
-        if (text) ctx.missions.handle(text);
+        ctx.maya?.listening(false);
+        if (text) (ctx.maya ? ctx.maya.hear(text) : ctx.missions.handle(text));
       };
       rec.start();
       listening = true;
+      ctx.maya?.listening(true); // barge in: she stops talking the moment you start
       mic.classList.add('on');
       ctx.hud.live('');
       ctx.audio.blip(740, 0.07);
@@ -66,7 +69,7 @@ export function initVoice(ctx) {
     e.preventDefault();
     const text = input.value.trim();
     closeType();
-    if (text) ctx.missions.handle(text);
+    if (text) (ctx.maya ? ctx.maya.hear(text) : ctx.missions.handle(text));
   });
   input.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeType(); e.stopPropagation(); });
   input.addEventListener('blur', () => setTimeout(closeType, 100));

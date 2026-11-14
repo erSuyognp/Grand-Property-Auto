@@ -1,0 +1,50 @@
+/* Maya: avatar in a round frame at the bottom center, caption bubble, preference chips. */
+#maya { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; font-family: var(--ui); color: var(--text); pointer-events: none; z-index: 2; max-width: min(720px, 56vw); }
+#maya .mrow { display: flex; align-items: center; gap: 12px; padding: 6px 16px 6px 6px; border-radius: 999px; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--line); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4); transition: transform 0.4s var(--spring); }
+#maya .mava { position: relative; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; pointer-events: auto; transition: transform 0.35s var(--spring); }
+#maya .mava svg { width: 64px; height: 64px; display: block; border-radius: 50%; }
+#maya .mava:hover { transform: scale(1.08); }
+#maya .mava::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 3px solid transparent; transition: border-color 0.2s; }
+#maya[data-state="listening"] .mava::before { border-color: #ff5a5a; animation: mring 1s ease-in-out infinite; }
+#maya[data-state="talking"] .mava::before { border-color: #ffc940; }
+#maya[data-state="thinking"] .mava::before { border-color: #4cc9f0; animation: mring 1.4s ease-in-out infinite; }
+#maya[data-state="talking"] .mrow, #maya[data-state="listening"] .mrow { transform: scale(1.06); }
+@keyframes mring { 50% { transform: scale(1.12); opacity: 0.5; } }
+#maya .eyes { transform-origin: 60px 58px; animation: mblink 4.6s infinite; }
+@keyframes mblink { 0%, 95%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+#maya[data-state="listening"] .mava svg { transform: rotate(-4deg); transition: transform 0.3s var(--spring); }
+#maya .mdots { position: absolute; right: -4px; top: -4px; display: none; gap: 3px; padding: 5px 7px; border-radius: 999px; background: #14181f; }
+#maya[data-state="thinking"] .mdots { display: flex; }
+#maya .mdots i { width: 5px; height: 5px; border-radius: 50%; background: #4cc9f0; animation: mdot 1s infinite; }
+#maya .mdots i:nth-child(2) { animation-delay: 0.15s; }
+#maya .mdots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes mdot { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+#maya .mside { display: flex; flex-direction: column; gap: 1px; min-width: 96px; }
+#maya .mside b { font: 700 15px var(--ui); }
+#maya .mstate { font-size: 12px; color: var(--muted); }
+#maya .mstate kbd { min-width: 18px; font-size: 10.5px; padding: 0 4px; }
+#maya .mprefs { list-style: none; margin: 3px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; max-width: 420px; }
+#maya .mprefs li { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 4px 2px 9px; border-radius: 999px; background: rgba(255, 201, 64, 0.2); color: #ffe08a; animation: chipin 0.45s var(--spring); }
+#maya .mprefs button { border: 0; background: none; color: inherit; opacity: 0.7; font-size: 13px; line-height: 1; padding: 0 3px; cursor: pointer; pointer-events: auto; }
+@keyframes chipin { from { transform: scale(0.5); opacity: 0; } }
+#maya .mbubble { max-width: 100%; padding: 10px 18px; border-radius: 16px; background: rgba(14, 17, 23, 0.9); border: 1px solid var(--line); font: 600 var(--cap, 21px)/1.3 var(--ui); text-align: center; text-wrap: balance; opacity: 0; transform: translateY(10px) scale(0.97); transition: opacity 0.2s, transform 0.4s var(--spring); }
+#maya .mbubble.show { opacity: 1; transform: none; }
+#maya .mbubble[data-who="you"] { font-weight: 400; font-style: italic; color: var(--muted); font-size: calc(var(--cap, 21px) * 0.82); }
+#maya .malts { display: none; gap: 8px; pointer-events: auto; }
+#maya .malts.show { display: flex; }
+#maya .malts button { display: grid; gap: 2px; text-align: left; min-width: 150px; max-width: 200px; padding: 9px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(12px); color: var(--text); font-family: var(--ui); cursor: pointer; animation: chipin 0.5s var(--spring) backwards; transition: transform 0.25s var(--spring), border-color 0.15s; }
+#maya .malts button:nth-child(2) { animation-delay: 0.08s; }
+#maya .malts button:nth-child(3) { animation-delay: 0.16s; }
+#maya .malts button:first-child { border-color: #ffc940; }
+#maya .malts button:hover { transform: translateY(-4px); border-color: #fff; }
+#maya .malts b { font: 20px var(--display); }
+#maya .malts span { font-size: 12px; color: var(--muted); }
+#maya .malts em { font-style: normal; font-size: 12px; color: #9df0bd; min-height: 15px; }
+#maya .malts i { font-style: normal; font-size: 12px; font-weight: 700; color: #ffc940; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+/* the older caption and live transcript sit above her */
+#caption { bottom: 178px; }
+#live { bottom: 132px; }
+#micbtn { display: none; }
+body.revealing #maya { left: calc(50% - min(226px, 19vw)); }
+#hud.hidden-play #maya { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #maya .eyes, #maya .mava::before, #maya .mdots i { animation: none; } }

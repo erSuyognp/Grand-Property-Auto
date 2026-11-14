@@ -326,6 +326,8 @@ export function initMissions(ctx) {
     ctx.emit('spoken', text);
     window.__gpa.lastSpoken = text;
     if (ctx.params.has('mute') || ctx.muteVoice) return;
+    // one voice in the game: Maya says the line (her caption bubble stays out of it)
+    if (ctx.maya) { ctx.maya.say(text, { caption: false, interrupt: opts.interrupt !== false }); return; }
     if (ctx.config.tts) {
       try {
         const res = await fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(3500) });

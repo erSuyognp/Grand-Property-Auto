@@ -18,6 +18,7 @@ import { initBigMap } from './bigmap.js';
 import { initInsights } from './insights.js';
 import { initReveal } from './reveal.js';
 import { initPanel } from './panel.js';
+import { initMaya } from './maya.js';
 
 export async function initSystems(ctx) {
   ctx.saved = initSaved(ctx);
@@ -38,14 +39,15 @@ export async function initSystems(ctx) {
   ctx.insights = initInsights(ctx);
   ctx.reveal = initReveal(ctx);
   ctx.panel = initPanel(ctx);
+  ctx.maya = initMaya(ctx);
 
   // "Take me there" from the saved homes screen: a mission with one target
-  ctx.missions.goTo = (l) => {
+  ctx.missions.goTo = (l, quiet) => {
     const M = ctx.missions.state;
     M.top = [l]; M.target = l; M.active = true; M.arrived = false;
     ctx.listingsSys.setHighlights([l.id], l);
     ctx.missions.reroute(true);
-    ctx.missions.speak(`Heading to ${l.name || l.address}.`);
+    if (!quiet) ctx.missions.speak(`Heading to ${l.name || l.address}.`);
   };
 
   ctx.on('key', (code) => {

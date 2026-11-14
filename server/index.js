@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dataWindowGuard, inDataWindow } from './dataWindow.js';
 import { parseMission, narrate } from '../src/parser.js';
 import { llmMission, llmNarrate, llmReady } from './llm.js';
+import { createMaya } from './maya.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -35,6 +36,8 @@ function lanIp() {
   return found[0]?.address || '127.0.0.1';
 }
 
+const maya = createMaya({ root: ROOT, mode: GAME_MODE, enabled: LLM_ENABLED });
+
 const app = express();
 app.use(express.json({ limit: '200kb' }));
 
@@ -53,6 +56,7 @@ app.get('/api/config', (_req, res) => {
     mode: GAME_MODE,
     llm: LLM_ENABLED && llmReady(),
     tts: TTS_ENABLED,
+    maya: maya.ready(), mayaTts: maya.ttsReady(),
     matterportSdkKey: GAME_MODE === 'mock' ? '' : process.env.MATTERPORT_SDK_KEY || '',
     googleMapsKey: GAME_MODE === 'mock' ? '' : process.env.GOOGLE_MAPS_API_KEY || '',
     showcaseBase: process.env.MATTERPORT_SHOWCASE_BASE || 'https://my.matterport.com',
@@ -90,6 +94,10 @@ app.post('/api/narrate', async (req, res) => {
   }
   res.json({ source: 'local', text: fallback });
 });
+
+// ---- Maya, the voice sales agent (server/maya.js)
+app.post('/api/maya', (req, res) => maya.handle(req, res));
+app.post('/api/maya/tts', (req, res) => maya.tts(req, res));
 
 // ---- optional nicer narrator voice
 app.post('/api/tts', async (req, res) => {

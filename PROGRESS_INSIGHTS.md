@@ -39,14 +39,14 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] build, test, shot, commit
 
 ## Prompt 4: Maya, the voice saleswoman
-- [ ] 1. Speech in: hold V (or the phone mic) uses the Web Speech API with interim results
-- [ ] 2. Brain: server /api/maya streams from Claude (model from env) with tool use. Tools,
-- [ ] 3. Voice out: stream Claude's text sentence by sentence into ElevenLabs streaming TTS
-- [ ] 4. Memory within the session: a running list of the player's stated preferences
-- [ ] 5. Behavior:
-- [ ] 6. Avatar: an original illustrated character in a round frame bottom center (no photo
-- [ ] 7. If LLM or TTS fails, she falls back to scripted lines built from the insight data, so
-- [ ] build, test, shot, commit
+- [~] 1. Speech in (barge in happens when the player presses V or the mic, which stops her at once; there is no always-on mic listening for the player while she talks): hold V (or the phone mic) uses the Web Speech API with interim results
+- [x] 2. Brain: server /api/maya streams from Claude (model from env) with tool use. Tools,
+- [x] 3. Voice out: stream Claude's text sentence by sentence into ElevenLabs streaming TTS
+- [x] 4. Memory within the session: a running list of the player's stated preferences
+- [x] 5. Behavior:
+- [x] 6. Avatar: an original illustrated character in a round frame bottom center (no photo
+- [x] 7. If LLM or TTS fails, she falls back to scripted lines built from the insight data, so
+- [x] build, test, shot, commit
 
 ## Prompt 5: Missions (real buyer and renter situations, every data type)
 - [ ] 1. "First Home": budget, 2+ beds, under X min drive to a supermarket. Score: fit,

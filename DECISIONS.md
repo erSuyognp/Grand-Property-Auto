@@ -206,3 +206,14 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Dimming** is a 20% exposure drop while a home is selected; highlights are drawn unlit so they stay bright.
 - **Icons** are Lucide (ISC), inlined at build time by `src/icons.js`.
 - New files: `src/insights.js` (loader), `src/reveal.js` (3D sequence), `src/panel.js` (cards), `src/ui.css` (design system), `src/costmath.js` (shared money math), `tests/reveal.spec.js`.
+
+### Prompt 4: Maya
+- **Two brains, one set of tools.** `src/mayaTools.js` holds her tools as plain functions over the insight files. The server (`server/maya.js`) gives them to Claude; the browser (`src/mayaScript.js`) uses the same functions for scripted lines when `LLM_ENABLED` is off, the server is unreachable, nothing comes back in 9 seconds, or the model declines. So the demo never goes silent and both brains state the same numbers.
+- **What the model sees.** Homes are named h1, h2, ... and described by numbers only: no street address, listing id, agent, tenant or employer names. Place names come from OpenStreetMap. This keeps rule 7's "spoken words and a few listing numbers" line.
+- **Speed.** The selected home's facts are fetched on the server and sent with the question, so she usually starts talking without a tool round trip: about 1 second to the first caption in testing. The model is `MAYA_MODEL` or `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`, as the rest of the game), with low effort and thinking off between tools where the model allows it. A model refusal falls back to her scripted line rather than a second model.
+- **Voice.** ElevenLabs stock voice "Bella" (`ELEVENLABS_VOICE_ID` in `.env`), streamed one sentence at a time through `/api/maya/tts` using the existing `TTS_API_KEY`; first audio byte in about 0.3 s. Fallback is the browser's on-device voice. Every game line (mission narration too) is now said in her voice. Off in mock mode and with `?mute=1`.
+- **Barge in** is push to talk: pressing V or the mic stops her mid sentence and starts listening. An always-open mic was not built: the browser's speech recognition picks up her own voice from the speakers.
+- **Searches still work offline.** With no home selected, a plain search line ("three bedrooms under 900k with a pool") goes straight to the local filter parser as before; questions, and everything said while a home is selected, go to Maya.
+- **Numbers are written as digits** in her captions ("$860,000") so they scan quickly; the voice reads them correctly.
+- **Fair housing.** Rules 5 to 8 are in her system prompt word for word. Questions about people get one sentence ("I can't speak to who lives somewhere") and then facts about the place. The scripted brain has the same redirect.
+- **Her avatar** is an original SVG drawing (no photo): blinks when idle, tilts and shows a red ring while listening, dots while thinking, mouth driven by the audio level while talking.

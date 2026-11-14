@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import 'dotenv/config';
 
-const secrets = ['VEXCEL_API_KEY', 'MATTERPORT_API_KEY', 'MATTERPORT_API_TOKEN', 'ANTHROPIC_API_KEY', 'TTS_API_KEY']
+const secrets = ['VEXCEL_API_KEY', 'MATTERPORT_API_KEY', 'MATTERPORT_API_TOKEN', 'ANTHROPIC_API_KEY', 'TTS_API_KEY', 'GOOGLE_SERVER_KEY', 'ELEVENLABS_API_KEY', 'NREL_API_KEY', 'EIA_API_KEY', 'FRED_API_KEY', 'CENSUS_API_KEY', 'ORS_API_KEY']
   .map((name) => [name, process.env[name]]).filter(([, v]) => v && v.length >= 8);
 const files = [];
 (function walk(dir) {
