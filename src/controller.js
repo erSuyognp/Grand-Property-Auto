@@ -67,7 +67,9 @@ export function initController(ctx) {
       p.steer = Math.max(-1, Math.min(1, Number(m.steer) || 0));
       p.gas = Math.max(0, Math.min(1, Number(m.gas) || 0));
       p.brake = Math.max(0, Math.min(1, Number(m.brake) || 0));
-      if (ctx.tour.active && Math.abs(p.steer) > 0.25) ctx.tour.look(p.steer * 0.03);
+      if (ctx.tour.active && Math.abs(p.steer) > 0.25) ctx.tour.look((ctx.tour.path === 'W' ? -1 : 1) * p.steer * 0.03);
+      // walking a home from the phone: tilt turns, the pedals walk forward and back
+      if (ctx.tour.active) ctx.tour.pad(0, p.gas - p.brake);
     } else if (m.t === 'key' && typeof m.code === 'string' && /^(Key[A-Z]|Digit\d|Escape|Enter|Tab|Arrow(Up|Down|Left|Right))$/.test(m.code)) {
       ctx.emit('key', m.code, null);
       setTimeout(() => ctx.emit('keyup', m.code, null), 60);

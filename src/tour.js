@@ -56,6 +56,8 @@ export function initTour(ctx) {
       <div class="tprice"></div><div class="tfacts"></div><div class="taddr"></div>
       <div class="troom"></div>
     </div></div>
+    <div class="vignette"></div>
+    <div class="rtoast"></div>
     <canvas class="fmap" width="320" height="320"></canvas>
     <div class="bar">
       <button data-act="empty"><kbd>G</kbd> See it empty</button>
@@ -73,7 +75,30 @@ export function initTour(ctx) {
     pano: null, empty: false, yaw: 0, pitch: 0, sweepId: null, gallery: [], gi: 0, token: 0, startedAt: 0,
   };
 
-  const walk = createWalk(ctx, { onPano(p) { T.pano = p; updateOverlay(); } });
+  const walk = createWalk(ctx, {
+    onPano(p) {
+      T.pano = p;
+      updateOverlay();
+      // walking into another room: say which one and how big
+      if (T.path === 'W' && p.room !== T.lastRoom) {
+        T.lastRoom = p.room;
+        const r = T.meta?.rooms?.find((x) => x.id === p.room);
+        const name = p.roomLabel || r?.label;
+        if (name) roomToast(name, r?.area ? `${Math.round(r.area * 10.764).toLocaleString('en-US')} sqft` : '');
+      }
+    },
+    onStep(speed) { ctx.audio.step(speed); },
+  });
+  let toastTimer = 0;
+  function roomToast(name, detail) {
+    const el = q('.rtoast');
+    el.innerHTML = `<b></b><span></span>`;
+    el.firstChild.textContent = name;
+    el.lastChild.textContent = detail;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
 
   // ---------------------------------------------------------------- Path B scene
   const scene = new THREE.Scene();
@@ -234,7 +259,7 @@ export function initTour(ctx) {
     const hasEmpty = !!T.meta?.panos?.some((p) => p.empty);
     const be = q('[data-act="empty"]');
     be.style.display = hasEmpty ? '' : 'none';
-    be.lastChild.textContent = T.empty ? ' Furnished' : ' See it empty';
+    be.lastChild.textContent = T.path === 'W' ? ' See it empty (photo view)' : T.empty ? ' Furnished' : ' See it empty';
     q('[data-act="next"]').style.display = T.models.length > 1 ? '' : 'none';
     const nxt = nextPath();
     q('[data-act="switch"]').style.display = nxt ? '' : 'none';
@@ -296,7 +321,7 @@ export function initTour(ctx) {
   stage.addEventListener('pointerdown', (e) => { if (T.path === 'B' || T.path === 'W') { drag = { x: e.clientX, y: e.clientY, moved: 0 }; stage.setPointerCapture(e.pointerId); } });
   stage.addEventListener('pointermove', (e) => {
     if (T.path === 'W') {
-      if (drag) { walk.look((e.clientX - drag.x) * 0.0045, (e.clientY - drag.y) * 0.0045); drag.x = e.clientX; drag.y = e.clientY; }
+      if (drag && document.pointerLockElement !== stage) { walk.look((e.clientX - drag.x) * 0.0045, (e.clientY - drag.y) * 0.0045); drag.x = e.clientX; drag.y = e.clientY; }
       return;
     }
     if (T.path !== 'B') return;
@@ -316,6 +341,19 @@ export function initTour(ctx) {
     drag = null;
     if (moved < 6) { const d = pickDisc(e); if (d) goTo(d.userData.pano); }
   });
+  stage.addEventListener('click', () => {
+    if (T.path === 'W' && document.pointerLockElement !== stage && stage.requestPointerLock) {
+      try { const r = stage.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch { /* not allowed right now */ }
+    }
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (T.path === 'W' && document.pointerLockElement === stage) walk.look(-e.movementX * 0.0023, -e.movementY * 0.0023);
+  });
+  document.addEventListener('pointerlockchange', () => {
+    if (T.path === 'W') hint.textContent = document.pointerLockElement === stage ? 'WASD walk · mouse looks · Shift runs · Esc frees the mouse' : WALK_HINT;
+  });
+  const freeMouse = () => { if (document.pointerLockElement === stage && document.exitPointerLock) document.exitPointerLock(); };
+  const WALK_HINT = 'WASD walk · click to look with the mouse (or drag) · Shift runs · T other views · Esc exits';
   function pickDisc(e) {
     ray.setFromCamera(new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1), cam);
     let best = null, ba = 0.09;
@@ -373,6 +411,9 @@ export function initTour(ctx) {
     if (T.iframe) { T.iframe.remove(); T.iframe = null; }
     T.sdk = null; T.sweeps = null;
     walk.stop();
+    freeMouse();
+    ctx.audio.roomTone(false);
+    q('.rtoast').classList.remove('show');
     root.classList.remove('gal');
   }
 
@@ -456,7 +497,7 @@ export function initTour(ctx) {
     try {
       await walk.load(ctx.world.base, T.meta);
       if (token !== T.token) return true;
-      walk.state.empty = T.empty;
+      T.lastRoom = null;
       if (!(await walk.start(T.pano))) { walk.stop(); return false; }
     } catch (e) {
       console.warn('[tour] walk mode failed:', e.message);
@@ -464,7 +505,8 @@ export function initTour(ctx) {
       return false;
     }
     if (token !== T.token) return true;
-    hint.textContent = 'WASD walk · drag or arrows to look · Shift faster · T other views · Esc exits';
+    hint.textContent = WALK_HINT;
+    ctx.audio.roomTone(true);
     window.__gpa.tour = { path: 'W', panos: T.meta.panos.length };
     updateOverlay();
     return true;
@@ -563,7 +605,15 @@ export function initTour(ctx) {
 
   async function toggleEmpty() {
     if (!T.meta?.panos?.some((p) => p.empty)) return;
-    if (T.path === 'W') { T.empty = !T.empty; walk.setEmpty(T.empty); updateOverlay(); return; }
+    if (T.path === 'W') {
+      // the furniture free panoramas only exist as photos: hop to the photo view at this spot
+      const at = T.pano && T.pano.empty ? T.pano : T.meta.panos.find((x) => x.empty);
+      T.token++;
+      T.empty = true;
+      await startB(at);
+      hint.textContent = 'Empty rooms are shown in the photo view · G furnished · T back to walking';
+      return;
+    }
     if (T.path === 'A') {
       // the furniture free panoramas are ours: hop to the simple viewer at the nearest scan
       T.empty = true;
@@ -646,6 +696,7 @@ export function initTour(ctx) {
       return { active: T.active, path: T.path, room: q('.troom').textContent, hasEmpty: !!T.meta?.panos?.some((p) => p.empty), empty: T.empty, spaces: T.models.length, pano: T.pano?.id || T.sweepId, panos: T.meta?.panos?.length || 0 };
     },
     _state: T, walk,
+    pad(x, y) { if (T.path === 'W') walk.setPad(x, y); },
     _show: (p) => showPano(p, true),
   };
   return api;

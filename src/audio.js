@@ -1,7 +1,7 @@
 // Engine note that rises with speed, tire squeal on drift, and a few UI blips. All Web Audio
 // oscillators and noise: no audio files.
 export function createAudio(ctx) {
-  let ac = null, engine = null, engine2 = null, engineGain = null, squealGain = null, master = null;
+  let ac = null, engine = null, engine2 = null, engineGain = null, squealGain = null, master = null, noiseBuf = null, tone = null;
   let muted = false;
 
   function start() {
@@ -22,6 +22,7 @@ export function createAudio(ctx) {
     const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    noiseBuf = buf;
     const noise = ac.createBufferSource(); noise.buffer = buf; noise.loop = true;
     const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 7;
     squealGain = ac.createGain(); squealGain.gain.value = 0;
@@ -42,8 +43,40 @@ export function createAudio(ctx) {
     o.start(); o.stop(ac.currentTime + dur);
   }
 
+  // a footstep: a short thump of filtered noise, a little different every time
+  function step(speed = 2.4) {
+    if (!ac || muted || !noiseBuf) return;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260 + Math.random() * 380; lp.Q.value = 1.2;
+    const g = ac.createGain();
+    const t = ac.currentTime, vol = 0.1 + Math.min(0.1, speed * 0.025);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    src.connect(lp); lp.connect(g); g.connect(master);
+    src.start(t, Math.random() * 0.8, 0.16);
+  }
+  // the quiet hum of an empty house
+  function roomTone(on) {
+    if (!ac || !noiseBuf) return;
+    if (on && !tone) {
+      const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 170;
+      const g = ac.createGain(); g.gain.value = 0;
+      g.gain.setTargetAtTime(0.05, ac.currentTime, 0.8);
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start();
+      tone = { src, g };
+    } else if (!on && tone) {
+      const old = tone; tone = null;
+      old.g.gain.setTargetAtTime(0, ac.currentTime, 0.2);
+      setTimeout(() => { try { old.src.stop(); } catch { /* already stopped */ } }, 900);
+    }
+  }
+
   return {
-    blip,
+    blip, step, roomTone,
     chime() { blip(660, 0.14); setTimeout(() => blip(880, 0.2), 110); },
     thud() { blip(90, 0.18, 'triangle', 0.35); },
     setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.5; },

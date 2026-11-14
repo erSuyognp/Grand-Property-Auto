@@ -36,7 +36,7 @@ python tools/check_data.py houston la mock
 python tools/check_confidential.py
 ```
 
-Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, G Google 3D city or block city, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, drag or arrow keys to look, Shift to walk faster, G see it empty, T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, G Google 3D city or block city, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, click to look with the mouse (or drag, or arrow keys), Shift to run, G see it empty (photo view), T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
 
 ## Needs you
 
@@ -59,6 +59,12 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Title, intro drop, saved homes compare (Tab), demo mode (0).**
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
+
+## Walk mode (added Nov 14)
+
+- **Inside a home you now walk like in a game:** WASD, click to look with the mouse, Shift runs, stairs and walls work, footsteps and a quiet room tone, a room name and size toast as you enter each room, the floor plan with your position, a vignette. `T` switches to the other viewers, `G` opens the empty rooms in the photo view, `Esc` exits (twice if the mouse is locked).
+- **No textured mesh:** the MatterPak downloads are not generated for any of our scans, so the mesh's base color is baked from the panoramas instead. Near scan points it is the sharp photo (2K on the 8 demo homes); more than about 4 to 6 m from every scan point it turns soft. If you can get MatterPaks generated, see DECISIONS.md.
+- **Checked:** the Playwright walk (forward 3 s, moved 4 to 6.5 m, inside the walls, on a floor) passes in three homes at 56 to 60 fps. Not checked: the mouse lock and the sounds (no pointer or ears in the test), a real phone, and 4K sky boxes.
 
 ## Real 3D city and drone view (added Nov 14)
 

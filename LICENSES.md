@@ -32,6 +32,8 @@ Added for the realism pass: `three-mesh-bvh` 0.9.18, MIT (ray casts against inte
 
 Added for the real 3D city: `3d-tiles-renderer` 0.5.4 (NASA-AMMOS 3DTilesRendererJS), Apache-2.0, and `@mkkellogg/gaussian-splats-3d` 0.4.7, MIT (drone view). The Draco and Basis decoder files served from `/libs/` are copied out of the `three` package at build time (Draco: Apache-2.0, Basis Universal: Apache-2.0). Google Photorealistic 3D Tiles are a paid Google Maps Platform service under Google's terms, not an open source dependency; the attribution and logo are shown whenever they are on screen.
 
+Added for walk mode (dev only, used by the local MatterPak converter): `obj2gltf` 3.2.0 and `gltf-pipeline` 4.3.1, both Cesium, Apache-2.0. They are installed and wired into `tools/sponsor/build_matterpak.py`, but have not run on real data yet because no MatterPak could be downloaded (see DECISIONS.md).
+
 ## Python (tools/requirements.txt)
 
 | Package | License |
