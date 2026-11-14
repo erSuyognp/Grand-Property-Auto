@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Phase 1 Showcase check. Open http://localhost:5173/tools/showcase_test.html?m=<modelId>&base=<showcase base>
+     Embeds one model with the SDK key from /api/config and logs mpSdk.Model.getData(). -->
+<html>
+  <head><meta charset="utf-8" /><title>Showcase check</title>
+    <style>body{margin:0;font:14px system-ui;background:#111;color:#eee}iframe{width:100vw;height:80vh;border:0}pre{margin:8px}</style>
+  </head>
+  <body>
+    <iframe id="showcase" allow="xr-spatial-tracking; fullscreen"></iframe>
+    <pre id="log">starting...</pre>
+    <script src="https://static.matterport.com/showcase-sdk/latest.js"></script>
+    <script type="module">
+      const q = new URLSearchParams(location.search);
+      const log = (s) => { document.getElementById('log').textContent += '\n' + s; console.log('[showcase]', s); };
+      window.__showcase = { status: 'starting' };
+      try {
+        const cfg = await (await fetch('/api/config')).json();
+        const key = cfg.matterportSdkKey;
+        const base = (q.get('base') || cfg.showcaseBase).replace(/\/$/, '');
+        const iframe = document.getElementById('showcase');
+        iframe.src = `${base}/show?m=${q.get('m')}&play=1&qs=1&applicationKey=${key}`;
+        log('iframe ' + base);
+        const sdk = await Promise.race([
+          window.MP_SDK.connect(iframe, key, ''),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('connect timeout 40s')), 40000)),
+        ]);
+        const data = await sdk.Model.getData();
+        window.__showcase = { status: 'connected', sid: data.sid, sweeps: (data.sweeps || []).length };
+        log('connected: ' + JSON.stringify(window.__showcase));
+      } catch (e) {
+        window.__showcase = { status: 'failed', error: String(e && e.message || e) };
+        log('failed: ' + window.__showcase.error);
+      }
+    </script>
+  </body>
+</html>

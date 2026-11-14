@@ -16,7 +16,7 @@ The Sponsor Data agreement (saved at `data/raw/terms.txt`) sets hard limits. In 
 4. **Nothing confidential in public demos.** Anything public (Devpost screenshots, a public video) is made in **mock mode** with the synthetic neighborhood. Real data is shown only live to the judges.
 5. **Delete everything right after the event.** That covers every copy, extract, cache and derivative: `data/`, `public/data/`, `shots/`, browser caches, and the Claude Code session logs for this project. `tools/purge.sh` does it.
 6. **Only permissive open source** (MIT, BSD, Apache 2.0, ISC). No GPL, LGPL or AGPL dependencies without CoStar's written OK.
-7. **No third party sharing.** Whether sending data to the Anthropic API (Claude Code itself, and the in game mission parser and narration) counts as sharing is **unconfirmed**. Until CoStar confirms in writing it's fine, `LLM_ENABLED=false` by default: the game uses the local keyword parser and template narration, and the server sends only the spoken words and a few listing numbers (no addresses, no agent data) when it is turned on.
+7. **Third party APIs are OK.** CoStar answered in the Discord channel (Isaac Miller, Nov 13, 11:52 PM): "All the data is anonymized, you can send to 3rd parties." So Claude Code and the Anthropic API may process the data, and `LLM_ENABLED=true` by default. Still send the LLM only what a request needs, and keep the local keyword parser as the offline fallback. That answer did **not** cover cloud storage or public repos, so rules 2 to 5 still apply until CoStar says otherwise.
 
 ---
 
@@ -31,7 +31,7 @@ Put every key in `.env` (never commit it). Put every file under `data/raw/`.
 | 1 | **Vexcel API key** (have it) | The CoStar bot in Discord, or the CoStar table | `VEXCEL_API_KEY`. Sent as the `X-API-KEY` header |
 | 2 | **Vexcel tutorial PDF + `vexcel_quickstart.py`** (have them) | Hackathon materials | Save both to `data/raw/vexcel/`. Claude Code copies the helpers (`send` with 429 backoff, `to_wkt`, `square_around`) |
 | 3 | **Matterport API key, API token, SDK key** (have them) | The bot's "Matterport GraphQL + SDK" card | `MATTERPORT_API_KEY`, `MATTERPORT_API_TOKEN`, `MATTERPORT_SDK_KEY`. The token is the same `hp_token` that's in the Model Playground link and **expires about Nov 21**, after judging. The `#key=` part at the end of that link is probably the API key; check it matches |
-| 4 | **Matterport quickstart page, saved** | `beta-app.matterport.com/2026-princeton-hackathon/quickstart` | Save the whole page (Print to PDF, or copy the text) to `data/raw/matterport/quickstart.pdf`. Also open the Model Playground link once and copy one working example query into `data/raw/matterport/example_query.graphql`. Claude Code can't log in to read these pages |
+| 4 | **Matterport quickstart files** (in your Downloads) | Pulled from the quickstart page: `matterport_quickstart.py`, `matterport_quickstart.ipynb`, `models_index.csv`, `matterport_reference.html` and `matterport_reference.txt` | Move all five into `data/raw/matterport/`. The script and notebook show the exact GraphQL URL, auth, and queries for model basics, panoramas (skybox faces, stitched 360, defurnished), rooms and floor plan, splat and drone photos, and MatterPak. `models_index.csv` has every model with its lat/lon, because the API has **no geo search**. If any file is missing, Claude Code can download it from `https://static.matterport.com/hackathon/26.15.37-main-37-gd090db8/assets/quickstart/<file name>` (public) |
 | 5 | **CoStar data kit zip + its password** (have it) | The bot's "CoStar Data Extract" card | **Download it now: the link expires 24 hours after it was issued (about 1:27 AM Sunday).** Unzip with the password into `data/raw/costar/` so `data/raw/costar/index.md` exists. Never put the password in git |
 | 5b | **The separate "how to connect to the Matterport models" zip** | The kit's index.md says it is "provided in a separate zip file". Ask the bot or the CoStar table if it isn't on your card | Unzip into `data/raw/matterport/`. This is probably what links a `MatterportModelId` to the GraphQL API and the tour URL |
 | 6 | **LLM API key** | Anthropic console (or a sponsor credit if HackPrinceton gives one) | `ANTHROPIC_API_KEY`. Used only to turn speech into filters and write short arrival narration |
@@ -40,7 +40,7 @@ Put every key in `.env` (never commit it). Put every file under `data/raw/`.
 
 | What | Why | Key |
 |------|-----|-----|
-| ElevenLabs or OpenAI TTS key | Nicer narrator voice. Only for template text with no Sponsor Data in it, unless CoStar OKs third party AI. The browser's built in speech works as a free fallback | `TTS_API_KEY` |
+| ElevenLabs or OpenAI TTS key | Nicer narrator voice (third party APIs are OK per CoStar). The browser's built in speech works as a free fallback | `TTS_API_KEY` |
 
 No tunnel and no hosting account: the agreement keeps the data on your laptop (Part 0).
 
@@ -70,7 +70,7 @@ Base URL `https://api.vexcelgroup.com/v2`. Key in the `X-API-KEY` header. WKT is
 * Per the slides, each model has: 6 skybox faces up to 4K per scan position, scan positions in the house and in the world, a point cloud, a textured OBJ mesh, room boundaries and room types, defurnished panoramas, and for about 232 models an exterior Gaussian splat (PLY).
 
 ### Still unknown (Claude Code handles both cases)
-1. Exactly how the token and API key are sent to GraphQL (query param, `Authorization: Bearer`, or a key header) and the GraphQL URL. Read the saved quickstart and example query, then try each.
+1. Exactly how the token and API key are sent to GraphQL and the GraphQL URL. `matterport_quickstart.py` shows it; copy it from there.
 2. Which Showcase base URL opens hackathon models.
 3. Any Matterport call caps. Cache every response to disk anyway.
 
@@ -83,7 +83,7 @@ MATTERPORT_SDK_KEY=
 MATTERPORT_GRAPHQL_URL=https://beta-app.matterport.com/2026-princeton-hackathon/graphql
 MATTERPORT_SHOWCASE_BASE=https://my.matterport.com
 ANTHROPIC_API_KEY=
-LLM_ENABLED=false
+LLM_ENABLED=true
 GAME_MODE=real
 TTS_API_KEY=
 ```
@@ -144,7 +144,7 @@ Read BUILD_PLAN.md fully. Then set up the project:
 4. Install three, vite, express, ws, dotenv, qrcode, @anthropic-ai/sdk, playwright
    (+ chromium). Python: requests, pillow, shapely, pandas. All are MIT, BSD, Apache or
    similar; confirm and record them in LICENSES.md.
-5. Create .env.example from BUILD_PLAN.md (add LLM_ENABLED=false and GAME_MODE=real|mock).
+5. Create .env.example from BUILD_PLAN.md (add LLM_ENABLED=true and GAME_MODE=real|mock).
    .gitignore: .env, node_modules, dist, shots/, data/ (everything under it, including
    raw, cache, samples and the *_NOTES.md / *_SCHEMA.md files), public/data/ except
    public/data/mock/, test-results/, playwright-report/.
@@ -239,8 +239,14 @@ Phase 1. Goal: understand the real data and pick the best neighborhood to build.
    point and one street point. Write data/VEXCEL_NOTES.md: real field names, whether
    height is available, which of DTM/DSM returns ground (the docs may have them swapped),
    and timing per call.
-5. Matterport discovery: read everything in data/raw/matterport/ (the connection zip,
-   quickstart*, example_query.graphql).
+5. Matterport discovery: read everything in data/raw/matterport/, starting with
+   matterport_reference.txt and matterport_quickstart.py (they walk one example house,
+   model zvKHR9DHNjJ at 5836 La Mirada Ave, LA, through every data type with working
+   queries). Copy the script's auth and request helpers into tools/matterport.py with the
+   same disk cache as tools/vexcel.py. Use models_index.csv (lat/lon per model) for any
+   "models near a point" lookup, since the API has no geo search; use it in pick_area.py
+   too. The public schema docs are at
+   https://static.matterport.com/api-doc/2026.06.68-main-g3a4e710/reference/graphdoc/model/index.html.
    Find the GraphQL endpoint and how auth is sent: try ?hp_token=MATTERPORT_API_TOKEN,
    then Authorization: Bearer <token>, and add MATTERPORT_API_KEY as a header or param if
    the quickstart says so. Run an introspection query and save the schema to
@@ -452,12 +458,11 @@ Phase 7. Goal: talk to the game and it reacts in the world, never a chat window.
 
 1. src/voice.js: hold V (or the mic button) to talk, using the Web Speech API. Show live
    captions at the bottom center while talking. Fallback: press T to type one line.
-2. server /api/mission: send the transcript plus the current filters and the last rated
-   home to Claude (model from env, default a fast Sonnet) ONLY when LLM_ENABLED=true.
-   Send just the spoken words, the current filter values and price, beds, baths and
-   sqft of the last rated home (no address, no ids, no agent data, no photos). When
-   LLM_ENABLED=false (the default), go straight to the local keyword parser, which must
-   handle every demo line in DEMO_SCRIPT.md on its own. Ask Claude for JSON only:
+2. server /api/mission: when LLM_ENABLED=true (the default), send the transcript plus the
+   current filters and the last rated home's key numbers to Claude (model from env,
+   default a fast Sonnet). When LLM_ENABLED=false or the call fails or takes over 3 s,
+   use the local keyword parser, which must handle every demo line in DEMO_SCRIPT.md on
+   its own so the demo survives bad wifi. Ask Claude for JSON only:
    {filters:{kind:"sale"|"rent"|"apartments"|"sold"|null, minPrice, maxPrice, minRent,
     maxRent, minBeds, minBaths, minSqft, minLotAcres, pool, features[]},
    (features[] are matched against the listing's highlights and feature sentences, e.g.
@@ -482,11 +487,11 @@ Phase 7. Goal: talk to the game and it reacts in the world, never a chat window.
    dim), pick the best, and guide the player: a glowing GPS ribbon on the ground toward it
    plus an arrow at the top of the screen with the distance. Speak the "say" line with
    speechSynthesis (or TTS_API_KEY if set).
-5. On arrival, speak a two sentence narration built from the listing data and the Vexcel
-   facts (pool, trees, roof, solar, nearby park). Default: a local template system with
-   several varied phrasings, no API call. Only when LLM_ENABLED=true, /api/narrate may
-   send the same few numbers and Vexcel flags (no address, no ids) to Claude for a
-   livelier line. Show it as a caption too.
+5. On arrival, /api/narrate asks Claude for a two sentence narration from the listing
+   (price, beds, baths, highlights) and the Vexcel facts (pool, trees, roof, solar,
+   nearby park). Prefetch it when the player gets within 150 m so it plays instantly.
+   Fallback: a local template system with several varied phrasings. Speak it and show
+   it as a caption.
 6. After a tour, a thumbs up / thumbs down prompt. Up saves it. Either way the next voice
    line can be relative ("cheaper", "something with a bigger yard") and is applied to the
    last home.
@@ -576,8 +581,8 @@ Phase 10. Goal: everything a judge or teammate needs.
 4. Record the backup video with demo mode (press 0). Record one with real data for judges only (keep it on your laptop), and one in mock mode for anything public.
 5. Show it to a CoStar mentor early. Ask which part they would cut or push further, since they're the judges.
 6. Ask CoStar in the Discord channel, so the answers are in writing:
-   * Is it OK to use Claude Code and the Anthropic API with the Sponsor Data? If yes, set `LLM_ENABLED=true`.
-   * How should we submit code, given the repo must stay private? (Share a private repo, or a zip?)
+   * (Answered: third party APIs and LLMs are OK.)
+   * Is it OK to keep the code (no data) in a private GitHub repo during the event? How should we submit code, given the repo must stay private? (Share a private repo, or a zip?)
    * Can the Devpost page and video show real imagery and tours, or should they be mock only?
 7. **After 4:00 PM Sunday:** run `tools/purge.sh`, clear the browser cache for localhost, delete this project's folder under `~/.claude/projects/`, and remove the kit zip and any downloads.
 

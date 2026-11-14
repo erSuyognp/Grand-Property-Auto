@@ -8,6 +8,8 @@ TARGETS=(
   data
   public/data/la
   public/data/houston
+  tools/sponsor
+  server/sponsor
   dist
   shots
   test-results

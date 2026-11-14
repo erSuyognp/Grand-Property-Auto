@@ -8,6 +8,10 @@
 *_NOTES.md
 *_SCHEMA.md
 
+# pipeline and server code that embeds Sponsor schema / API details (rule 3)
+tools/sponsor/
+server/sponsor/
+
 # processed game data: only the synthetic mock set is committed
 public/data/*
 !public/data/mock/

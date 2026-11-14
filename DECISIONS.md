@@ -14,5 +14,19 @@
 - Licenses: two transitive packages are outside the MIT/BSD/Apache/ISC list. fast-sha256 (Unlicense, public domain, via @anthropic-ai/sdk) and lightningcss (MPL-2.0, Vite build-time only, not bundled, not modified). Neither is GPL/LGPL/AGPL; kept. Flag to CoStar if they want strict compliance.
 - `.env` does not exist yet: all keys are missing, so later phases run on mock data until it is filled in.
 
+## Phase 1
+- **Rule 7 conflict, left for the owner.** BUILD_PLAN.md Part 0 was revised to say CoStar confirmed in Discord that third party APIs are OK and `LLM_ENABLED=true` by default. CLAUDE.md rule 7 (which overrides the plan) still has the old text, and `.env` / `.env.example` still say `LLM_ENABLED=false`. I did not edit CLAUDE.md's rules or the defaults. The LLM path is built and works when `LLM_ENABLED=true`; flipping it is a one line change for the owner (see MORNING.md).
+- The kit is now at `data/raw/costar/` (the Phase 0 note about `costar-hackathon-kit/` is out of date).
+- **Area pick.** `tools/pick_area.py` slides a 1.5 km box over each city. Apartment communities are capped at 10 per box in the score, because with the plain weights LA picked a Koreatown box with 66 apartment towers and one home, which is a poor fit for a home buyer game. Result: Houston = Rice Military / Washington Ave (8 current homes, 15 sold, 10 apartment communities), LA = Downtown / South Park (6 current, 2 sold, 34 apartment communities).
+- **Houston is the hero city** for the demo (more homes for sale); LA is the second city.
+- **Building heights come from DSM minus DTM.** `include=calculated` returned implausible heights and the precomputed height fields were null, so the plan's step (a) is skipped. DTM is ground, DSM is surface (the docs are not swapped).
+- **Matterport API**: production Model API with basic auth (key = user, token = password), as in the quickstart. `MATTERPORT_GRAPHQL_URL` in `.env` is unused.
+- **Showcase base URL: `https://my.matterport.com`** connects with the Embed SDK on localhost (checked with Playwright, 61 sweeps). `beta-app.matterport.com` does not connect. Path A is the main tour path.
+- Skybox links are signed and expire within hours, so Phase 2 downloads the faces it needs.
+- Extra files in the game data format: `scatter.json` (tree and pool positions) and `area.json` (center, bbox, flat flag), so the client never has to guess them.
+- Mock data: 1,389 invented buildings, 80 invented listings, 4 procedural interiors (with an "empty" variant for "See it empty"). 4.8 MB, committed.
+- **Schema-bearing code is local only (rule 3).** Scripts that embed Sponsor field paths, endpoint paths or query shapes live in `tools/sponsor/` (and later `server/sponsor/`), which are gitignored and deleted by `tools/purge.sh`. `tools/pick_area.py` and `tools/build_city.py` are thin tracked wrappers. API hostnames come from env vars. Downside: those scripts are not in git history; they exist only on this laptop.
+- `data/raw/terms.txt` is not present; the rules in CLAUDE.md were followed instead.
+
 ## Needs real data
-- `.env` with VEXCEL_API_KEY, MATTERPORT_API_KEY / _API_TOKEN / _SDK_KEY, ANTHROPIC_API_KEY (none present at Phase 0).
+- (Resolved in Phase 1: `.env` now has every key.)
