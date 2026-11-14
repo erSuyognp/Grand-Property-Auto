@@ -1,0 +1,97 @@
+# Insights progress
+
+Order: 1, 2, 3, 4, 5, 7, 6, 8. Marks: [x] done, [~] partly (what is missing), [-] skipped (why).
+
+Started Sat Nov 14 2026 16:03 EST.
+
+## Prompt 1: Ground rules (paste first, Claude Code adds these to CLAUDE.md)
+- [x] 1-4. Honesty rules in CLAUDE.md
+- [x] 5-8. Fair housing rules in CLAUDE.md
+- [x] 9. Data agreement rule in CLAUDE.md
+- [ ] build, test, shot, commit
+
+## Prompt 2: Enrichment pipeline (data for every listing in the area)
+- [ ] 1. Value vs nearby: price per sqft for this home vs homes within 1 km of the same type
+- [ ] 2. Rent vs buy: for the same bed count, the median asking rent of apartment listings
+- [ ] 3. Home facts from listing features: HOA fee and what it includes, community amenities,
+- [ ] 4. Apartment communities: floor plans, rent ranges, units available, community
+- [ ] 5. Neighborhood activity from commercial data within 1.5 km: number of commercial
+- [ ] 6. Roof material, shape and condition, existing solar, pool, tree cover percent, lot
+- [ ] 7. Places (OpenStreetMap Overpass, one query for the whole bbox plus a 3 km margin):
+- [ ] 8. Drive times: Google Routes API compute route matrix (GOOGLE_SERVER_KEY) from each
+- [ ] 9. Census: tract from the Census geocoder; from ACS 5 year: median household income,
+- [ ] 10. Risk: FEMA National Risk Index for the tract (overall risk and the top 3 hazards,
+- [ ] 11. Energy: EIA average residential electricity price for the state (latest month).
+- [ ] 12. Solar: Google Solar API buildingInsights for the home's lat/lon: max panel count,
+- [ ] 13. Money: 30 year rate from FRED (MORTGAGE30US). Property tax from a small cited table
+- [ ] 14. True monthly cost = principal and interest (default 20% down, slider later) +
+- [ ] 15. Errands (supermarket, pharmacy, cafe drive or walk times), Commute (downtown and
+- [ ] build, test, shot, commit
+
+## Prompt 3: The property reveal (select a property, the world animates)
+- [ ] 1. Camera swoops to a drone view above the home (smooth, about 1.2 s), the rest of the
+- [ ] 2. Drive time rings: the 15, 10 and 5 minute isochrones grow outward from the home on
+- [ ] 3. Places pop up: 3D icons rise with a bounce at the nearest supermarket, school, park,
+- [ ] 4. Solar: if the home has Solar API panels, blue panel tiles drop onto the real roof one
+- [ ] 5. Risk: if the home is in a FEMA flood zone, a gentle blue tint ripples over that area
+- [ ] 6. Panel slides in from the right with cards that animate in one by one with count up
+- [ ] 7. Buttons: Walk inside (E), Save (F), Ask Maya (V), Compare (Tab), Better options (B).
+- [ ] build, test, shot, commit
+
+## Prompt 4: Maya, the voice saleswoman
+- [ ] 1. Speech in: hold V (or the phone mic) uses the Web Speech API with interim results
+- [ ] 2. Brain: server /api/maya streams from Claude (model from env) with tool use. Tools,
+- [ ] 3. Voice out: stream Claude's text sentence by sentence into ElevenLabs streaming TTS
+- [ ] 4. Memory within the session: a running list of the player's stated preferences
+- [ ] 5. Behavior:
+- [ ] 6. Avatar: an original illustrated character in a round frame bottom center (no photo
+- [ ] 7. If LLM or TTS fails, she falls back to scripted lines built from the insight data, so
+- [ ] build, test, shot, commit
+
+## Prompt 5: Missions (real buyer and renter situations, every data type)
+- [ ] 1. "First Home": budget, 2+ beds, under X min drive to a supermarket. Score: fit,
+- [ ] 2. "Room to Grow": 3+ beds, a park within 10 min, lot over 0.15 acres. No family
+- [ ] 3. "Power Bill Hater": lowest estimated electric bill or best solar potential under
+- [ ] 4. "Rent or Buy?": the client pays $X rent. Find a home where the true monthly cost is
+- [ ] 5. "Downtown Commuter": under 20 min drive to downtown or 10 min walk to transit.
+- [ ] 6. "Pool Season": a pool seen from the air (Vexcel), not just listed.
+- [ ] 7. "Low Risk": outside a flood zone, lowest FEMA risk tier, roof in good condition.
+- [ ] 8. "Investor": a small apartment community or home where nearby rents cover the
+- [ ] 9. "Busy Street Life": most shops and restaurants within a 10 minute walk (CoStar
+- [ ] 10. "Price Detective" mini game: show a home's photos and facts, the player guesses the
+- [ ] 11. "Open House Rush": visit and walk inside 3 homes that match a client within 5
+- [ ] build, test, shot, commit
+
+## Prompt 6: Polish pass (modern game feel)
+- [ ] 1. One design system: font pairing, spacing scale, colors per score category, glass
+- [ ] 2. Motion: spring animations on every panel, card stagger, number count ups, marker
+- [ ] 3. Sound: UI clicks, whooshes on reveal, ambient city loop outside, room tone inside,
+- [ ] 4. Onboarding: a 20 second first run tutorial with Maya: drive, select, reveal, walk in,
+- [ ] 5. Plain language everywhere: no jargon (no "cap rate", "ACS", "isochrone" on the main
+- [ ] 6. Settings: units, reduced motion, subtitles size, graphics quality preset.
+- [ ] 7. Performance: 55+ fps on this laptop during reveal and missions; preload the next
+- [ ] 8. Demo mode (key 0) updated: drive, select with reveal, Maya pitch + one question,
+- [ ] build, test, shot, commit
+
+## Prompt 7: Buyer tools (what makes it actually useful)
+- [ ] 1. "Can I afford it?" profile (key A or ask Maya): yearly income, monthly debts,
+- [ ] 2. "My places": the player pins up to 3 places that matter (work, a school, family,
+- [ ] 3. Compare (Tab): up to 4 saved homes side by side: price, true monthly cost, price per
+- [ ] 4. Shortlist report: export the saved homes as a clean one page summary (print to PDF
+- [ ] 5. Sun and light: a time of day slider on the reveal that moves the real sun position
+- [ ] 6. Street noise check: distance to the nearest highway, rail line and airport (OSM),
+- [ ] 7. Room fit inside walk mode: a tape measure tool (key R) that measures between two
+- [ ] 8. "Same money, other city": for a selected LA home, Maya can show what the same
+- [ ] 9. Price changes: if the listing data has price history or status changes, show a tiny
+- [ ] 10. What's included: for apartments, a clear list of community amenities and what the
+- [ ] build, test, shot, commit
+
+## Prompt 8: Final quality and demo readiness
+- [ ] 1. Accessibility: captions for all speech, keyboard only path through every feature,
+- [ ] 2. Empty and error states for every card and tool (no blank boxes, no NaN, no
+- [ ] 3. Data check script tools/check_insights.py: coverage per source per city, outliers
+- [ ] 4. Fair housing check: grep all UI text, prompt templates and Maya's system prompt for
+- [ ] 5. Performance and load: cold start under 6 s on localhost, reveal at 55+ fps, Maya's
+- [ ] 6. Update demo mode and DEMO_SCRIPT.md: open on the problem (scrolling flat listings),
+- [ ] 7. Mock mode screenshots of every screen to docs/mock_shots/ for Devpost.
+- [ ] build, test, shot, commit

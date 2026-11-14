@@ -16,6 +16,25 @@ These come from the CoStar Sponsor Data agreement (`data/raw/terms.txt`) and tak
 6. **Only permissive open source** (MIT, BSD, Apache 2.0, ISC). No GPL, LGPL or AGPL dependencies without CoStar's written OK.
 7. **No third party sharing.** Whether sending data to the Anthropic API (Claude Code itself, and the in game mission parser and narration) counts as sharing is **unconfirmed**. Until CoStar confirms in writing it's fine, `LLM_ENABLED=false` by default: the game uses the local keyword parser and template narration, and the server sends only the spoken words and a few listing numbers (no addresses, no agent data) when it is turned on.
 
+## Insights and voice rules
+
+These override anything else in INSIGHTS_PLAN.md (the data agreement rules above still come first).
+
+### Honesty
+1. Every number shown to the player comes from a named source (CoStar kit, Vexcel, Matterport, Census ACS, FEMA, EIA, FRED, NREL, Google Solar, Google Routes, OpenStreetMap). Every metric card has an "i" button that shows the source, the date of the data, and how it was calculated, in one or two plain sentences.
+2. Anything calculated rather than measured (electric bill, solar savings, monthly cost, insurance pressure, drive time without the Routes API) is labeled "Estimate". Never invent a number. If data is missing, show "Not available" and skip it.
+3. Texas sold homes only have asking prices (non disclosure state): label them so.
+4. Show "Not financial, legal or insurance advice" in small text on cost screens.
+
+### Fair housing (the saleswoman and every label)
+5. Never show or mention race, ethnicity, religion, national origin, sex, disability, or whether families or children live in an area. Never use words like "safe", "unsafe", "good neighborhood", "bad area", "exclusive", "family friendly", "rich", "poor", "up and coming", or "the right kind of people".
+6. Income is shown as a fact: "Median household income $X (Census, 20XX)" with a neutral bar against the city median. No "rich" or "middle class" badges.
+7. Recommendations are based only on what the player asked for (budget, size, features, commute, amenities), never on who lives somewhere.
+8. Schools: show nearby schools with distance and the schools named in the listing's own Schools section. No school ratings unless the listing data includes them.
+
+### Data agreement
+9. All enrichment data is cached locally under `data/` and `public/data/` (gitignored, deleted by `tools/purge.sh`). Server side keys never reach the browser bundle. Check every new library's license (MIT, BSD, Apache 2.0, ISC only) and log it.
+
 ## Working rules
 
 - Never ask the user questions. Make the reasonable call and log it in `DECISIONS.md`.
