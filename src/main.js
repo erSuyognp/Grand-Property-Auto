@@ -7,6 +7,8 @@ import { createCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createAudio } from './audio.js';
 import { initSystems } from './systems.js';
+import { createEnv } from './env.js';
+import { createPost } from './post.js';
 
 const params = new URLSearchParams(location.search);
 const config = await loadConfig();
@@ -18,12 +20,12 @@ const dbg = gl.getExtension('WEBGL_debug_renderer_info');
 const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
 const software = /swiftshader|llvmpipe|software|basic render/i.test(gpu);
 const quality = { low: params.get('q') === 'low' || (software && params.get('q') !== 'high'), gpu };
-renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 1.75));
+renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !quality.low;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 0.62;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -42,10 +44,12 @@ const ctx = {
 };
 window.__gpa = { ready: false, fps: 0, mode: config.mode, car: { x: 0, z: 0, speed: 0 }, ctx, quality };
 
+ctx.env = createEnv(ctx);
 ctx.input = createInput(ctx);
 ctx.car = createCar(ctx);
 ctx.cam = createCamera(ctx);
 ctx.audio = createAudio(ctx);
+ctx.post = createPost(ctx);
 
 const CITIES = config.mode === 'mock' ? ['mock'] : ['houston', 'la'];
 ctx.cities = CITIES;
@@ -78,6 +82,7 @@ addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  ctx.post.resize(window.innerWidth, window.innerHeight, renderer.getPixelRatio());
 });
 
 let stored = null;
@@ -98,9 +103,10 @@ renderer.setAnimationLoop((t) => {
     ctx.emit('update', dt, inp);
     ctx.cam.update(dt);
     focus.set(ctx.car.state.x, ctx.car.state.y, ctx.car.state.z);
-    ctx.world.update(focus);
+    ctx.world.update(focus, dt);
+    ctx.env.update(dt, focus);
     ctx.audio.update(ctx.car, driving);
-    if (!ctx.skipRender) renderer.render(scene, camera);
+    if (!ctx.skipRender) ctx.post.render(dt);
     ctx.emit('post', dt);
   }
   const d = window.__gpa;
@@ -110,12 +116,13 @@ renderer.setAnimationLoop((t) => {
   if (fpsTime >= 0.5) {
     d.fps = Math.round(frames / fpsTime);
     ctx.emit('fps', d.fps);
-    // adaptive quality: drop shadows, then resolution, when the machine can't hold 40 fps
+    // adaptive quality: drop resolution, then shadows, then bloom, when the machine can't hold 40 fps
     if (d.fps < 40 && d.ready) slow++; else slow = 0;
     if (slow >= 4) {
       slow = 0;
-      if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; ctx.world?.setShadows(false); }
-      else if (renderer.getPixelRatio() > 1) renderer.setPixelRatio(1);
+      if (renderer.getPixelRatio() > 1) { renderer.setPixelRatio(1); ctx.post.resize(window.innerWidth, window.innerHeight, 1); }
+      else if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; ctx.env.setShadows(false); }
+      else ctx.post.setBloom(false);
     }
     frames = 0; fpsTime = 0;
   }

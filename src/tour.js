@@ -1,9 +1,11 @@
-// Walk inside. Path A: the real Matterport Showcase in a full screen iframe, driven through
-// the Embed SDK (localhost only). Path B: our own skybox viewer in Three.js, used when
-// Showcase is not available, in mock mode, for "See it empty", or when the iframe does not
-// connect within 8 seconds. If neither has data, a photo gallery keeps the flow going.
+// Walk inside. Path W: free walking with WASD through the scan's 3D mesh with the real photos
+// projected onto it (src/walk.js), the default when a home has a mesh. Path A: the real
+// Matterport Showcase in a full screen iframe, driven through the Embed SDK (localhost only).
+// Path B: our own skybox viewer in Three.js, used in mock mode and when nothing else is
+// available. T cycles between them. If none has data, a photo gallery keeps the flow going.
 import * as THREE from 'three';
 import { priceText, factsText } from './format.js';
+import { createWalk } from './walk.js';
 
 const CONNECT_TIMEOUT = 8000;
 // Skybox face order: 0 up, 1 to 4 around the horizon, 5 down. Each entry maps image
@@ -70,6 +72,8 @@ export function initTour(ctx) {
     active: false, listing: null, models: [], modelIndex: 0, path: null, meta: null, sdk: null, iframe: null,
     pano: null, empty: false, yaw: 0, pitch: 0, sweepId: null, gallery: [], gi: 0, token: 0, startedAt: 0,
   };
+
+  const walk = createWalk(ctx, { onPano(p) { T.pano = p; updateOverlay(); } });
 
   // ---------------------------------------------------------------- Path B scene
   const scene = new THREE.Scene();
@@ -226,15 +230,15 @@ export function initTour(ctx) {
       room = T.pano.roomLabel || r?.label || '';
       if (r?.area) room += ` · ${Math.round(r.area * 10.764)} sqft`;
     }
-    q('.troom').textContent = room ? room : T.path === 'A' ? 'Matterport 3D tour' : '';
+    q('.troom').textContent = room ? room : T.path === 'A' ? 'Matterport 3D tour' : T.path === 'W' ? 'Walking through' : '';
     const hasEmpty = !!T.meta?.panos?.some((p) => p.empty);
     const be = q('[data-act="empty"]');
     be.style.display = hasEmpty ? '' : 'none';
     be.lastChild.textContent = T.empty ? ' Furnished' : ' See it empty';
     q('[data-act="next"]').style.display = T.models.length > 1 ? '' : 'none';
-    const canSwitch = (T.path === 'A' && T.meta) || (T.path === 'B' && canShowcase());
-    q('[data-act="switch"]').style.display = canSwitch ? '' : 'none';
-    q('[data-act="switch"] span').textContent = T.path === 'A' ? 'Simple view' : 'Matterport view';
+    const nxt = nextPath();
+    q('[data-act="switch"]').style.display = nxt ? '' : 'none';
+    q('[data-act="switch"] span').textContent = { W: 'Walk freely', A: 'Matterport view', B: 'Photo spots' }[nxt] || '';
     root.dataset.path = T.path || '';
     fmap.style.display = T.meta && T.meta.panos.length > 1 ? '' : 'none';
     ctx.emit('tour-state', api.info());
@@ -260,7 +264,15 @@ export function initTour(ctx) {
     for (const p of ps) {
       const cur = p === T.pano || (T.path === 'A' && p.id === T.sweepId);
       g.beginPath(); g.arc(X(p), Y(p), cur ? 13 : 8, 0, Math.PI * 2);
-      g.fillStyle = cur ? '#ffc940' : '#fffaf0'; g.fill();
+      g.fillStyle = cur && T.path !== 'W' ? '#ffc940' : '#fffaf0'; g.fill();
+    }
+    if (T.path === 'W') {
+      const w = walk.state, me = { p: [w.pos.x, -w.pos.z] };
+      g.save();
+      g.translate(X(me), Y(me)); g.rotate(-w.yaw);
+      g.beginPath(); g.moveTo(0, -17); g.lineTo(11, 12); g.lineTo(0, 6); g.lineTo(-11, 12); g.closePath();
+      g.fillStyle = '#ffc940'; g.fill();
+      g.restore();
     }
   }
   fmap.addEventListener('click', (e) => {
@@ -281,8 +293,12 @@ export function initTour(ctx) {
 
   // ---------------------------------------------------------------- pointer look (Path B)
   let drag = null;
-  stage.addEventListener('pointerdown', (e) => { if (T.path === 'B') { drag = { x: e.clientX, y: e.clientY, moved: 0 }; stage.setPointerCapture(e.pointerId); } });
+  stage.addEventListener('pointerdown', (e) => { if (T.path === 'B' || T.path === 'W') { drag = { x: e.clientX, y: e.clientY, moved: 0 }; stage.setPointerCapture(e.pointerId); } });
   stage.addEventListener('pointermove', (e) => {
+    if (T.path === 'W') {
+      if (drag) { walk.look((e.clientX - drag.x) * 0.0045, (e.clientY - drag.y) * 0.0045); drag.x = e.clientX; drag.y = e.clientY; }
+      return;
+    }
     if (T.path !== 'B') return;
     if (drag) {
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -294,6 +310,7 @@ export function initTour(ctx) {
     stage.style.cursor = hover ? 'pointer' : 'grab';
   });
   stage.addEventListener('pointerup', (e) => {
+    if (T.path === 'W') { drag = null; return; }
     if (T.path !== 'B' || !drag) return;
     const moved = drag.moved;
     drag = null;
@@ -312,6 +329,7 @@ export function initTour(ctx) {
   // ---------------------------------------------------------------- moving around
   function goTo(pano) {
     if (!pano) return;
+    if (T.path === 'W') { walk.goTo(pano); return; }
     if (T.path === 'A' && T.sdk) {
       T.sdk.Sweep.moveTo(pano.id, { transition: T.sdk.Sweep.Transition.FLY }).catch(() => {});
       return;
@@ -319,6 +337,7 @@ export function initTour(ctx) {
     if (T.path === 'B' && !fading) { ctx.audio.blip(520, 0.08); showPano(pano); }
   }
   function forward() {
+    if (T.path === 'W') { walk.forward(); return; }
     if (T.path === 'B') { const d = discAhead(); if (d) goTo(d.userData.pano); return; }
     if (T.path === 'A') stepSweep(1);
     if (T.path === 'G') galleryStep(1);
@@ -334,7 +353,8 @@ export function initTour(ctx) {
     }
   }
   function look(dx, dy = 0) {
-    if (T.path === 'B') { T.yaw += dx; T.pitch = THREE.MathUtils.clamp(T.pitch + dy, -1.2, 1.2); }
+    if (T.path === 'W') walk.look(dx, dy);
+    else if (T.path === 'B') { T.yaw += dx; T.pitch = THREE.MathUtils.clamp(T.pitch + dy, -1.2, 1.2); }
     else if (T.path === 'A' && T.sdk) T.sdk.Camera.rotate((-dx * 180) / Math.PI, (dy * 180) / Math.PI, { speed: 120 }).catch(() => {});
   }
 
@@ -352,6 +372,7 @@ export function initTour(ctx) {
   function clearStage() {
     if (T.iframe) { T.iframe.remove(); T.iframe = null; }
     T.sdk = null; T.sweeps = null;
+    walk.stop();
     root.classList.remove('gal');
   }
 
@@ -425,6 +446,39 @@ export function initTour(ctx) {
     return true;
   }
 
+  async function startW(startPano) {
+    const token = T.token;
+    clearStage();
+    if (!T.meta || !T.meta.mesh || !T.meta.panos.length) return false;
+    T.path = 'W';
+    T.pano = startPano || T.meta.panos[0];
+    updateOverlay();
+    try {
+      await walk.load(ctx.world.base, T.meta);
+      if (token !== T.token) return true;
+      walk.state.empty = T.empty;
+      if (!(await walk.start(T.pano))) { walk.stop(); return false; }
+    } catch (e) {
+      console.warn('[tour] walk mode failed:', e.message);
+      walk.stop();
+      return false;
+    }
+    if (token !== T.token) return true;
+    hint.textContent = 'WASD walk · drag or arrows to look · Shift faster · T other views · Esc exits';
+    window.__gpa.tour = { path: 'W', panos: T.meta.panos.length };
+    updateOverlay();
+    return true;
+  }
+  // T cycles: walk freely, the Matterport Showcase, the photo spots
+  function nextPath() {
+    const have = { W: !!T.meta?.mesh, A: canShowcase(), B: !!T.meta?.panos?.length };
+    const order = ['W', 'A', 'B'];
+    const i = order.indexOf(T.path);
+    if (i < 0) return null;
+    for (let k = 1; k < 3; k++) { const n = order[(i + k) % 3]; if (have[n]) return n; }
+    return null;
+  }
+
   function startGallery() {
     clearStage();
     const l = T.listing;
@@ -453,6 +507,8 @@ export function initTour(ctx) {
     const id = T.models[index];
     T.empty = false; T.sweepId = null; T.pano = null;
     T.meta = await loadMeta(id);
+    if (token !== T.token) return;
+    if ((!prefer || prefer === 'W') && await startW()) return;
     if (token !== T.token) return;
     const wantA = prefer ? prefer === 'A' : canShowcase();
     if (wantA && canShowcase() && await startA(id)) return;
@@ -483,7 +539,7 @@ export function initTour(ctx) {
     root.classList.add('show');
     ctx.skipRender = true;
     ctx.emit('tour-enter', listing);
-    await openModel(0, ctx.params.get('tour') === 'b' ? 'B' : null);
+    await openModel(0, { b: 'B', a: 'A', w: 'W' }[ctx.params.get('tour')] || null);
     await ctx.hud.fade(false, 500);
   }
 
@@ -507,6 +563,7 @@ export function initTour(ctx) {
 
   async function toggleEmpty() {
     if (!T.meta?.panos?.some((p) => p.empty)) return;
+    if (T.path === 'W') { T.empty = !T.empty; walk.setEmpty(T.empty); updateOverlay(); return; }
     if (T.path === 'A') {
       // the furniture free panoramas are ours: hop to the simple viewer at the nearest scan
       T.empty = true;
@@ -523,8 +580,14 @@ export function initTour(ctx) {
 
   async function switchPath() {
     if (!T.active) return;
-    if (T.path === 'A' && T.meta) { T.token++; T.empty = false; await startB(T.meta.panos.find((x) => x.id === T.sweepId)); }
-    else if (T.path === 'B' && canShowcase()) { T.token++; if (!(await startA(T.models[T.modelIndex]))) await startB(); }
+    const n = nextPath();
+    if (!n) return;
+    const at = T.path === 'A' ? T.meta?.panos?.find((x) => x.id === T.sweepId) : T.pano;
+    T.token++;
+    T.empty = false;
+    if (n === 'W' && await startW(at)) return;
+    if (n === 'A' && await startA(T.models[T.modelIndex])) return;
+    if (!(await startB(at))) startGallery();
   }
   function nextSpace() { if (T.models.length > 1) openModel((T.modelIndex + 1) % T.models.length); }
 
@@ -543,6 +606,7 @@ export function initTour(ctx) {
     else if (code === 'KeyT') switchPath();
     else if (code === 'KeyG') toggleEmpty();
     else if (code === 'KeyN') nextSpace();
+    else if (T.path === 'W') { if (code === 'Enter') forward(); }
     else if (code === 'KeyW' || code === 'Enter') forward();
     else if (code === 'KeyS') stepSweep(-1);
     else if (T.path === 'G' && code === 'ArrowRight') galleryStep(1);
@@ -551,7 +615,11 @@ export function initTour(ctx) {
   // Esc pressed while the iframe has focus never reaches us: watch for focus loss instead
   addEventListener('blur', () => { if (T.active && T.path === 'A') setTimeout(() => window.focus(), 0); });
 
-  ctx.on('post', (dt) => { if (T.active && T.path === 'B') renderB(dt); });
+  ctx.on('post', (dt) => {
+    if (!T.active) return;
+    if (T.path === 'B') renderB(dt);
+    else if (T.path === 'W') { walk.render(dt); drawMap(); }
+  });
 
   // ---------------------------------------------------------------- E on a listing
   ctx.on('key', (code) => {
@@ -577,7 +645,7 @@ export function initTour(ctx) {
     info() {
       return { active: T.active, path: T.path, room: q('.troom').textContent, hasEmpty: !!T.meta?.panos?.some((p) => p.empty), empty: T.empty, spaces: T.models.length, pano: T.pano?.id || T.sweepId, panos: T.meta?.panos?.length || 0 };
     },
-    _state: T,
+    _state: T, walk,
     _show: (p) => showPano(p, true),
   };
   return api;

@@ -28,6 +28,8 @@ All 142 installed packages: 113 MIT, 15 ISC, 7 Apache-2.0, 3 BSD (2- and 3-Claus
 
 No GPL, LGPL or AGPL packages.
 
+Added for the realism pass: `three-mesh-bvh` 0.9.18, MIT (ray casts against interior meshes for walking and collisions). The sky, post-processing and geometry helpers come from `three/addons`, which ship inside `three` (MIT).
+
 ## Python (tools/requirements.txt)
 
 | Package | License |

@@ -11,6 +11,7 @@ import { initTitle } from './title.js';
 import { initCompare } from './compare.js';
 import { initDemo } from './demo.js';
 import { findPath } from './nav.js';
+import { initTraffic } from './traffic.js';
 
 export async function initSystems(ctx) {
   ctx.saved = initSaved(ctx);
@@ -24,6 +25,7 @@ export async function initSystems(ctx) {
   ctx.compare = initCompare(ctx);
   ctx.demoSys = initDemo(ctx);
   ctx.title = initTitle(ctx);
+  ctx.traffic = initTraffic(ctx);
 
   // "Take me there" from the saved homes screen: a mission with one target
   ctx.missions.goTo = (l) => {
@@ -39,6 +41,7 @@ export async function initSystems(ctx) {
     if (code === 'KeyC') ctx.cam.toggleTop();
     if (code === 'KeyR') ctx.car.reset();
     if (code === 'KeyM') ctx.hud.toast(ctx.audio.toggleMute() ? 'Sound off' : 'Sound on');
+    if (code === 'KeyL') ctx.hud.toast({ day: 'Midday', golden: 'Golden hour', night: 'Night' }[ctx.env.cycle()]);
     const digit = /^Digit([1-4])$/.exec(code);
     if (digit) ctx.listingsSys.toggle(ctx.listingsSys.KINDS[Number(digit[1]) - 1]);
     if (code === 'KeyF' && ctx.listingsSys.near) {

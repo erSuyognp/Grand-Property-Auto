@@ -66,6 +66,19 @@
 - README and Devpost images come from `docs/mock_shots/` (mock mode, QR panel hidden so the laptop's network address is not shown).
 - Optional settings were added to `.env.example` (model name, SDK script URL, API base, ports). `LLM_ENABLED` there is unchanged (see Phase 1).
 
+## Realism pass and walkable interiors (Nov 14, asked for in chat)
+- "Like GTA 5" was read as a realistic open world look, not a copy of that game: all art is still original (CLAUDE.md rule) and nothing is taken from it. A browser game built from one aerial photo cannot match a AAA title; this pass closes what it can.
+- Lighting: physically based sky with clouds, sun shadows, reflections from the sky on glass and paint, filmic tone mapping, bloom, vignette, grain, speed blur. `L` cycles midday, golden hour and night (lit windows, street lamps, headlights). `?time=night` sets it from the URL.
+- Sky reflections are kept weak on matte surfaces on purpose: at full strength the blue sky turned every shadow bright blue.
+- Screen space ambient occlusion was left out: it renders the scene twice and puts halos on the listing markers; shadows plus the baked aerial shading carry it.
+- Buildings: houses get sloped roofs with eaves built from the footprint (the aerial photo stays on the roof); other buildings get parapets. Five facade materials with glass that mirrors the sky. Roof shapes are approximations, not the real ridge lines.
+- Ground: there is still no road data. Near the camera the shader reads the aerial photo (dark gray = asphalt, green = planting) and lays a sharp material over it. Lane lines and kerbs are only what the photo shows.
+- Trees are leaf cards with dappled shadows; street lamps stand where road meets non road; 9 ambient cars drive the same routes the gold line uses. No pedestrians (no character art to make them from).
+- Walk inside is now free walking (WASD) by default. The scan API offers a 50k triangle mesh per home (geometry only, no textures), so the game projects the panorama photos onto it from the two nearest scan points, with a visibility test so photos do not land on surfaces that scan point could not see. Close to a scan point it matches the photo tour; between points, surfaces neither point saw are smeared. `T` still switches to the Matterport Showcase and to the photo spots.
+- Walk mode data: `python tools/build_mesh.py --city <city>` (local only script in `tools/sponsor/`). 16 panoramas per home instead of 8. Houston 40 of 47 scans and LA 49 of 65 have a mesh; the rest fall back to the Showcase or photo spots. Mock mode has no meshes and keeps the photo spots.
+- New dependency: `three-mesh-bvh` (MIT), logged in LICENSES.md.
+- Pixel ratio cap went from 1.75 to 1.5 to pay for the HDR pipeline; adaptive quality now drops resolution, then shadows, then bloom.
+
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
 - Listing photos: the photo hosts refuse scripted downloads (403). If CoStar can provide a way to fetch them, rerun `python tools/build_city.py --city houston --steps listings,photos`.

@@ -36,7 +36,7 @@ python tools/check_data.py houston la mock
 python tools/check_confidential.py
 ```
 
-Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: W next spot, G see it empty, T switch viewer, N next space, Esc exit.
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, drag or arrow keys to look, Shift to walk faster, G see it empty, T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
 
 ## Needs you
 
@@ -59,6 +59,12 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, R reset,
 - **Title, intro drop, saved homes compare (Tab), demo mode (0).**
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
+
+## Realism pass (added Nov 14)
+
+- **Look:** physical sky with clouds, sun shadows, sky reflections in glass and car paint, bloom and a film grade; midday, golden hour and night (`L`). Sloped roofs, five facade types, leafy trees with dappled shadows, street lamps, a new car model, 9 traffic cars. Holds 60 fps on this laptop in Houston, LA and mock.
+- **Walk freely inside:** `E` now drops you into the home on foot. WASD walks, walls and furniture stop you, stairs work. It uses the scan's 3D mesh with the real photos projected on it. Houston: 40 of 47 scans; LA: 49 of 65. `python tools/build_mesh.py --city houston` rebuilds that data (inside the event window only).
+- **Not GTA 5:** roads are still the aerial photo (no painted lane lines, kerbs or sidewalks as geometry), there are no pedestrians, and buildings are textured boxes with roofs. Inside homes, surfaces that no scan point saw look smeared when you walk far from the scan points.
 
 ## What is mocked or limited
 
