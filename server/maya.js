@@ -205,20 +205,67 @@ ${JSON.stringify(facts)}` : '',
   // Maya's voice: one sentence in, streamed audio out (ElevenLabs). The browser voice is the fallback.
   const ttsKey = process.env.ELEVENLABS_API_KEY || (String(process.env.TTS_API_KEY || '').startsWith('sk_') ? process.env.TTS_API_KEY : '');
   const ttsReady = () => enabled && !!ttsKey && mode !== 'mock';
+  // The voices on this ElevenLabs account (stock voices plus any added to "My Voices"), for the picker in settings.
+  let voiceCache = null, voiceAt = 0;
+  async function voices(_req, res) {
+    if (!ttsReady()) return res.status(404).json({ error: 'tts off' });
+    try {
+      if (!voiceCache || Date.now() - voiceAt > 120000) {
+        const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': ttsKey }, signal: AbortSignal.timeout(8000) });
+        if (!r.ok) return res.status(502).json({ error: 'voices ' + r.status });
+        voiceCache = ((await r.json()).voices || []).map((v) => ({ id: v.voice_id, name: String(v.name || '').split(' - ')[0], about: String(v.name || '').split(' - ')[1] || [v.labels?.gender, v.labels?.age, v.labels?.accent, v.labels?.descriptive].filter(Boolean).join(', '), kind: v.category === 'premade' ? 'Stock' : 'My voices' }));
+        voiceAt = Date.now();
+      }
+      res.json({ voices: voiceCache, current: process.env.ELEVENLABS_VOICE_ID || process.env.TTS_VOICE || 'hpp4J3VqNfWAUOO0d1Us' });
+    } catch { res.status(504).json({ error: 'voices timeout' }); }
+  }
+  // What the player said: a short recorded clip in, text out (ElevenLabs speech to text). Used when
+  // the browser's own speech recognition cannot reach its service. Only the player's voice is sent.
+  async function stt(req, res) {
+    if (!ttsReady()) return res.status(404).json({ error: 'stt off' });
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || buf.length < 800) return res.status(400).json({ error: 'no audio' });
+    const type = String(req.headers['content-type'] || 'audio/webm').split(';')[0];
+    const started = Date.now();
+    try {
+      const form = new FormData();
+      form.append('model_id', process.env.ELEVENLABS_STT_MODEL || 'scribe_v1');
+      form.append('language_code', 'en');
+      form.append('tag_audio_events', 'false');
+      form.append('file', new Blob([buf], { type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
+      const r = await fetch('https://api.elevenlabs.io/v1/speech-to-text', { method: 'POST', headers: { 'xi-api-key': ttsKey }, body: form, signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return res.status(502).json({ error: 'stt provider ' + r.status });
+      const text = String((await r.json()).text || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+      res.json({ text: text.slice(0, 400), ms: Date.now() - started });
+    } catch { res.status(504).json({ error: 'stt timeout' }); }
+  }
+  // One sentence in, audio streamed out as it is made, so the browser starts playing on the
+  // first bytes. GET (an <audio> element can stream it) or POST. Model: ELEVENLABS_MODEL, default
+  // the expressive eleven_v4_turbo; if the account or voice cannot use it, the fast flash model.
+  const VOICE_SETTINGS = { stability: Number(process.env.ELEVENLABS_STABILITY) || 0.5, similarity_boost: Number(process.env.ELEVENLABS_SIMILARITY) || 0.75, speed: Number(process.env.ELEVENLABS_SPEED) || 1 };
+  let ttsModel = process.env.ELEVENLABS_MODEL || 'eleven_v4_turbo';
   async function tts(req, res) {
     if (!ttsReady()) return res.status(404).json({ error: 'tts off' });
-    const text = String(req.body?.text || '').slice(0, 600);
+    const src = req.method === 'GET' ? req.query : req.body || {};
+    const text = String(src.text || '').slice(0, 600);
     if (!text) return res.status(400).json({ error: 'no text' });
-    const voice = process.env.ELEVENLABS_VOICE_ID || process.env.TTS_VOICE || 'hpp4J3VqNfWAUOO0d1Us';
+    const asked = String(src.voice || '');
+    const voice = /^[A-Za-z0-9]{16,32}$/.test(asked) ? asked : process.env.ELEVENLABS_VOICE_ID || process.env.TTS_VOICE || 'hpp4J3VqNfWAUOO0d1Us';
+    const call = (model) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream?output_format=mp3_44100_64${/flash|turbo_v2/.test(model) ? '&optimize_streaming_latency=3' : ''}`, {
+      method: 'POST', headers: { 'xi-api-key': ttsKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ text, model_id: model, voice_settings: VOICE_SETTINGS }), signal: AbortSignal.timeout(12000),
+    });
     try {
-      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream?output_format=mp3_44100_64&optimize_streaming_latency=3`, {
-        method: 'POST', headers: { 'xi-api-key': ttsKey, 'content-type': 'application/json' },
-        body: JSON.stringify({ text, model_id: process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5' }), signal: AbortSignal.timeout(8000),
-      });
+      let r = await call(ttsModel);
+      if (!r.ok && ttsModel !== 'eleven_flash_v2_5') {
+        console.warn(`[maya] voice model ${ttsModel} answered ${r.status}; using eleven_flash_v2_5`);
+        if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) ttsModel = 'eleven_flash_v2_5';
+        r = await call('eleven_flash_v2_5');
+      }
       if (!r.ok || !r.body) return res.status(502).json({ error: 'tts provider ' + r.status });
-      res.set('content-type', 'audio/mpeg');
+      res.set({ 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
       Readable.fromWeb(r.body).on('error', () => res.end()).pipe(res);
-    } catch { res.status(504).json({ error: 'tts timeout' }); }
+    } catch { if (!res.headersSent) res.status(504).json({ error: 'tts timeout' }); else res.end(); }
   }
-  return { handle, tts, ready, ttsReady, model: MODEL };
+  return { handle, tts, stt, voices, ready, ttsReady, model: MODEL };
 }

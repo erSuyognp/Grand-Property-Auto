@@ -35,7 +35,7 @@ export function initMaya(ctx) {
   const muted = () => ctx.params.has('mute') || ctx.muteVoice || ctx.settings?.voiceOff;
   const S = { state: 'idle', prefs: [], history: [], offered: null, busy: 0, lastLatency: null, lastTools: [], source: null, caption: '', alts: [] };
   try { S.prefs = JSON.parse(sessionStorage.getItem('gpa-maya-prefs') || '[]'); } catch { /* fresh session */ }
-  const pub = () => { window.__gpa.maya = { state: S.state, prefs: S.prefs.map((p) => p.text), tools: S.lastTools, source: S.source, caption: S.caption, latencyMs: S.lastLatency, offered: S.offered?.id || null, alts: S.alts.map((l) => l.id), say: (t) => hear(t) }; };
+  const pub = () => { window.__gpa.maya = { state: S.state, prefs: S.prefs.map((p) => p.text), tools: S.lastTools, source: S.source, voice: S.lastVoice || null, caption: S.caption, latencyMs: S.lastLatency, offered: S.offered?.id || null, alts: S.alts.map((l) => l.id), say: (t) => hear(t) }; };
   function setState(s) { S.state = s; el.dataset.state = s; q('.mstate').innerHTML = { idle: 'Hold <kbd>V</kbd> to talk', listening: 'Listening', thinking: 'Thinking', talking: 'Talking' }[s]; pub(); }
   function renderPrefs() {
     q('.mprefs').innerHTML = S.prefs.slice(-6).map((p, i) => `<li>${p.text}<button data-i="${i}" aria-label="Forget ${p.text}">×</button></li>`).join('');
@@ -93,15 +93,18 @@ export function initMaya(ctx) {
     b.textContent = text; b.dataset.who = who; b.classList.add('show');
     S.caption = text; pub();
   }
-  function fetchAudio(text, token) {
+  function fetchAudio(text) {
     if (muted() || !ctx.config.mayaTts) return null;
-    return fetch('/api/maya/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }), signal: AbortSignal.timeout(9000) })
-      .then((r) => (r.ok && (r.headers.get('content-type') || '').includes('audio') ? r.blob() : null)).then((b) => (b && token === speakToken ? URL.createObjectURL(b) : null)).catch(() => null);
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = `/api/maya/tts?text=${encodeURIComponent(text)}${ctx.settings?.voiceId ? '&voice=' + encodeURIComponent(ctx.settings.voiceId) : ''}`;
+    a.load();
+    return a;
   }
   function enqueue(text, { show = true } = {}) {
     text = text.trim();
     if (!text) return;
-    queue.push({ text, show, audio: fetchAudio(text, speakToken) });
+    queue.push({ text, show, audio: fetchAudio(text) });
     if (!playing) next();
   }
   async function next() {
@@ -109,25 +112,14 @@ export function initMaya(ctx) {
     const item = queue.shift();
     if (!item) { playing = null; if (S.state === 'talking') { setState('idle'); mouth.setAttribute('ry', '2'); setTimeout(() => { if (S.state === 'idle' && !playing) bubble(''); }, 3200); } ctx.emit('maya-quiet'); return; }
     playing = item;
-    const url = item.audio ? await item.audio : null;
+    const a = item.audio || null;
     if (token !== speakToken) return;
     setState('talking');
     if (item.show) bubble(item.text);
-    const started = () => { if (!firstAudioAt && heardAt) { firstAudioAt = performance.now(); S.lastLatency = Math.round(firstAudioAt - heardAt); console.info(`[maya] first spoken word ${S.lastLatency} ms after the question`); pub(); } };
+    const started = () => { S.lastVoice = item.synth || !item.el ? 'browser' : 'stream'; if (!firstAudioAt && heardAt) { firstAudioAt = performance.now(); S.lastLatency = Math.round(firstAudioAt - heardAt); console.info(`[maya] first spoken word ${S.lastLatency} ms after the question`); pub(); } };
     const done = () => { if (token === speakToken && playing === item) { playing = null; next(); } };
-    if (url) {
-      const a = new Audio(url);
-      item.el = a;
-      try {
-        ac = ac || new (window.AudioContext || window.webkitAudioContext)();
-        if (ac.state === 'suspended') ac.resume();
-        if (!analyser) { analyser = ac.createAnalyser(); analyser.fftSize = 256; levelBuf = new Uint8Array(analyser.fftSize); analyser.connect(ac.destination); }
-        ac.createMediaElementSource(a).connect(analyser);
-      } catch { /* plays without the mouth meter */ }
-      a.volume = ctx.settings?.volume ?? 1;
-      a.onplaying = started; a.onended = () => { URL.revokeObjectURL(url); done(); }; a.onerror = done;
-      a.play().catch(() => { started(); setTimeout(done, Math.max(1200, item.text.length * 55)); });
-    } else if (!muted() && window.speechSynthesis) {
+    const browserVoice = () => {
+      if (muted() || !window.speechSynthesis) { started(); item.synth = true; setTimeout(done, ctx.params.has('demofast') ? 60 : Math.max(900, item.text.length * 45)); return; }
       try {
         const u = new SpeechSynthesisUtterance(item.text);
         const voices = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
@@ -139,10 +131,26 @@ export function initMaya(ctx) {
         clearTimeout(synthTimer);
         synthTimer = setTimeout(done, Math.max(2500, item.text.length * 95)); // some browsers never fire onend
       } catch { started(); setTimeout(done, Math.max(1200, item.text.length * 55)); }
-    } else { started(); item.synth = true; setTimeout(done, ctx.params.has('demofast') ? 60 : Math.max(900, item.text.length * 45)); }
+    };
+    if (a) {
+      item.el = a;
+      let failed = false;
+      const fail = () => { if (failed || token !== speakToken) return; failed = true; item.el = null; try { a.pause(); } catch { /* gone */ } browserVoice(); };
+      try {
+        ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+        if (ac.state === 'suspended') ac.resume();
+        if (!analyser) { analyser = ac.createAnalyser(); analyser.fftSize = 256; levelBuf = new Uint8Array(analyser.fftSize); analyser.connect(ac.destination); }
+        ac.createMediaElementSource(a).connect(analyser);
+      } catch { /* plays without the mouth meter */ }
+      a.volume = ctx.settings?.volume ?? 1;
+      a.onplaying = started; a.onended = done; a.onerror = fail;
+      if (a.error) fail(); else a.play().catch(fail);
+      setTimeout(() => { if (!failed && token === speakToken && playing === item && a.readyState < 2 && a.currentTime === 0) fail(); }, 6000); // nothing arrived
+    } else browserVoice();
   }
   function interrupt() {
     speakToken++;
+    for (const it of queue) { if (it.audio) { try { it.audio.removeAttribute('src'); it.audio.load(); } catch { /* gone */ } } }
     queue = [];
     if (playing?.el) { try { playing.el.pause(); } catch { /* gone */ } }
     try { window.speechSynthesis?.cancel(); } catch { /* none */ }

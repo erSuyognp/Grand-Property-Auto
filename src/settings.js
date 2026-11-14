@@ -3,7 +3,7 @@
 // five short steps, about 20 seconds, skippable.
 import { icon } from './icons.js';
 
-const DEFAULTS = { volume: 0.8, voiceOff: false, units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
+const DEFAULTS = { volume: 0.8, voiceOff: false, voiceId: '', units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
 const CAP = { s: '17px', m: '21px', l: '27px' };
 
 export function loadSettings() {
@@ -23,7 +23,7 @@ export function initSettings(ctx) {
   const el = document.createElement('div');
   el.id = 'settings';
   document.body.append(el);
-  let open = false;
+  let open = false, voiceList = null;
   function apply() {
     document.body.classList.toggle('reduced-motion', !!S.reducedMotion);
     document.documentElement.style.setProperty('--cap', CAP[S.capSize] || CAP.m);
@@ -36,6 +36,7 @@ export function initSettings(ctx) {
     el.innerHTML = `<div class="bcard" role="dialog" aria-label="Settings"><h2>${icon('settings', 20)}Settings</h2>
       <div class="srow"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${S.volume}" data-vol aria-label="Volume"/><small><kbd>N</kbd> mutes</small></div>
       <div class="srow"><span>Maya's voice</span>${seg('voiceOff', [['false', 'On'], ['true', 'Captions only']])}</div>
+      <div class="srow voicerow"><span>Which voice</span><select data-voice aria-label="Maya's voice"><option value="">Loading voices...</option></select><button class="act" data-a="hear">Hear it</button></div>
       <div class="srow"><span>Caption size</span>${seg('capSize', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])}</div>
       <div class="srow"><span>Distances</span>${seg('units', [['metric', 'Meters'], ['imperial', 'Feet and miles']])}</div>
       <div class="srow"><span>Motion</span>${seg('reducedMotion', [['false', 'Full'], ['true', 'Reduced']])}</div>
@@ -51,6 +52,18 @@ export function initSettings(ctx) {
     });
     el.querySelector('[data-a="close"]').addEventListener('click', hide);
     el.querySelector('[data-a="tutorial"]').addEventListener('click', () => { hide(); tutorial(true); });
+    // the voices on the ElevenLabs account: stock ones and any added to "My Voices"
+    const sel = el.querySelector('[data-voice]');
+    const fill = (j) => {
+      if (!j?.voices?.length) { sel.innerHTML = '<option value="">Browser voice (no ElevenLabs voice available)</option>'; sel.disabled = true; return; }
+      const cur = S.voiceId || j.current;
+      const group = (kind) => { const list = j.voices.filter((v) => v.kind === kind); return list.length ? `<optgroup label="${kind}">${list.map((v) => `<option value="${v.id}" ${v.id === cur ? 'selected' : ''}>${v.name}${v.about ? ' · ' + v.about : ''}</option>`).join('')}</optgroup>` : ''; };
+      sel.innerHTML = group('My voices') + group('Stock');
+    };
+    if (voiceList) fill(voiceList); else fetch('/api/maya/voices').then((r) => (r.ok ? r.json() : null)).then((j) => { voiceList = j; fill(j); }).catch(() => fill(null));
+    sel.addEventListener('change', () => { S.voiceId = sel.value; apply(); ctx.maya?.say("Hi, I'm Maya. This is how I sound now."); });
+    sel.addEventListener('keydown', (e) => e.stopPropagation());
+    el.querySelector('[data-a="hear"]').addEventListener('click', () => ctx.maya?.say("Hi, I'm Maya. Ask me about any home and I'll tell you what the listing doesn't."));
   }
   function show() { if (ctx.state !== 'play') return; open = true; ctx.state = 'settings'; render(); el.classList.add('show'); }
   function hide() { if (!open) return; open = false; if (el.contains(document.activeElement)) document.activeElement.blur(); el.classList.remove('show'); if (ctx.state === 'settings') ctx.state = 'play'; }
