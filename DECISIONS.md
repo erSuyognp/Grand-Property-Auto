@@ -133,6 +133,12 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - `?kenney` forces the Kenney car; `?carflip` turns a model that comes out backwards.
 - Open question for the owner: whether a non commercial, branded model belongs in a demo for a sponsor's judges. The safe choice for anything recorded or public is the Kenney car.
 
+## The map made real (Nov 14, asked for in chat)
+- The night styled map was replaced, as asked: `M` now shows the real Vexcel aerial photo in its true colors, with nothing animated (it is drawn once when opened and again only when the pointer moves onto or off a dot).
+- Dots: homes for sale and businesses for sale are the large dots (green and orange); homes for rent, apartment communities, recently sold homes and businesses for lease are smaller. Hover any dot for its price, what it is and its address. Clicking a home still sets a route; businesses have no route yet.
+- Businesses on the market come from the kit's commercial listing summaries (`tools/sponsor/build_business.py`, local only, reads the kit files with no network): active listings inside the area that are for sale (asking price) or for lease (asking rate). There are few: LA has 2 for sale (1 with an asking price, the other shows "Price on request") and 3 for lease; Houston has none for sale and 2 for lease. Mock mode has 2 invented ones for sale and 1 for lease.
+- Businesses appear on the map only; they have no marker or card in the 3D world.
+
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
 - MatterPak textured meshes: unlocked but not generated for any of our scans. Ask CoStar or Matterport (track channel) to generate MatterPaks for the 8 demo homes, then run `python tools/sponsor/build_matterpak.py --city houston`; the game still needs a GLB loader for the result.

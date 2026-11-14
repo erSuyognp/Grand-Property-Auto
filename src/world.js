@@ -25,7 +25,7 @@ export async function createWorld(ctx, city) {
   scene.add(group);
   const disposables = [];
 
-  const [area, groundMeta, terrain, buildingsGeo, scatter, listings, commercial, nearby, splats] = await Promise.all([
+  const [area, groundMeta, terrain, buildingsGeo, scatter, listings, commercial, nearby, splats, businessRaw] = await Promise.all([
     loadDataJson(city, 'area.json'),
     loadDataJson(city, 'ground.json'),
     loadDataJson(city, 'terrain.json').catch(() => null),
@@ -35,6 +35,7 @@ export async function createWorld(ctx, city) {
     loadDataJson(city, 'commercial.json').catch(() => []),
     loadDataJson(city, 'nearby.json').catch(() => ({})),
     loadDataJson(city, 'splats.json').catch(() => ({})),
+    loadDataJson(city, 'business.json').catch(() => []),
   ]);
   const base = area.mock ? '/data/mock/' : dataBase(city);
   const proj = makeProjection(area.center);
@@ -480,6 +481,13 @@ export async function createWorld(ctx, city) {
     l.x = q.x; l.z = q.z;
     if (splats && splats[l.id] && !area.mock) l.splat = splats[l.id]; // exterior drone splat (src/drone.js)
   }
+  // businesses on the market (for sale or for lease), shown on the map
+  const business = Array.isArray(businessRaw) ? businessRaw : [];
+  for (const c of business) {
+    const q = proj.toLocal(c.lat, c.lon);
+    c.x = q.x; c.z = q.z;
+  }
+  world.business = business;
   for (const c of commercial) {
     const q = proj.toLocal(c.lat, c.lon);
     c.x = q.x; c.z = q.z;

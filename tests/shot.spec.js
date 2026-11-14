@@ -123,6 +123,19 @@ test('shot: load and drive', async ({ page }) => {
   await page.waitForFunction(() => window.__gpa.map?.open === true, null, { timeout: 10_000 });
   await page.waitForTimeout(900);
   await page.screenshot({ path: `${DIR}/12-map.png` });
+  // hover the first large dot (a home or business for sale): its price shows
+  const dot = await page.evaluate(() => {
+    const pts = window.__gpa.ctx.bigmap.points(), p = pts.find((x) => x.kind === 'sale') || pts.find((x) => x.kind === 'bizsale') || pts[0];
+    const r = document.querySelector('#bigmap canvas').getBoundingClientRect();
+    return p ? { x: r.left + (p.x / 1600) * r.width, y: r.top + (p.y / 1600) * r.height } : null;
+  });
+  if (dot) {
+    await page.mouse.move(dot.x, dot.y);
+    await page.waitForTimeout(300);
+    console.log('map', JSON.stringify(await page.evaluate(() => window.__gpa.map)));
+    await page.screenshot({ path: `${DIR}/13-map-hover.png` });
+    await page.mouse.move(5, 5);
+  }
   await page.keyboard.press('KeyM');
   await page.waitForFunction(() => window.__gpa.state === 'play', null, { timeout: 5_000 });
 

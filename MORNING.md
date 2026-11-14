@@ -67,7 +67,7 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 ## Aerial view and the map (added Nov 14)
 
 - **Default view is now high and tilted** (about 50 m up, looking 50 degrees down). The Google city looks sharp from there and holds 60 fps. `C` cycles aerial, straight down, street view.
-- **`M` opens the map:** a night map of the whole area made from the Vexcel photo, with glowing streets, raised buildings, every listing and the car. Click a home to get a route. `G` now switches the Google 3D city; `N` is sound.
+- **`M` opens the map:** the real Vexcel aerial photo of the whole area, nothing animated, with a dot on every home and every business on the market (large dots: for sale). Hover a dot for the price; click a home to get a route. Houston has no businesses for sale inside its area (2 for lease); LA has 2. `G` now switches the Google 3D city; `N` is sound.
 
 ## Visual quality pass (added Nov 14)
 

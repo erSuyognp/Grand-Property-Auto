@@ -344,6 +344,16 @@ for n, b in enumerate([b for b in buildings if b["type"] in ("shops", "school")]
                        "type": "Retail" if b["type"] == "shops" else "School", "sqft": 54000, "tenants": rng.randint(4, 14) if b["type"] == "shops" else 1,
                        "lastSale": None, "lat": lat, "lon": lon, "buildingId": b["id"]})
 (OUT / "commercial.json").write_text(json.dumps(commercial))
+# invented businesses on the market, for the map (fixed numbers: the random stream is not used,
+# so nothing else in the mock set changes)
+business = []
+for n, c in enumerate([c for c in commercial if c["type"] == "Retail"]):
+    sale = n % 3 != 2
+    business.append({"id": f"B{n}", "name": c["name"], "address": f"{120 + n * 40} Lark Street, Mockingbird Heights", "type": "Retail",
+                     "lat": c["lat"], "lon": c["lon"], "sqft": c["sqft"], "year": 1998 + n * 7,
+                     **({"kind": "bizsale", "price": [1850000, 2400000, 3100000][n % 3], "capRate": 6.1} if sale
+                        else {"kind": "bizlease", "rateLow": 24, "rateHigh": 31, "availableSqft": 6200})})
+(OUT / "business.json").write_text(json.dumps(business))
 
 # ---------------------------------------------------------------- listing "photos": simple drawn houses
 print("drawing photos and interiors")
