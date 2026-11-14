@@ -21,8 +21,10 @@ import { initPanel } from './panel.js';
 import { initMaya } from './maya.js';
 import { initClients } from './clients.js';
 import { initBuyer } from './buyer.js';
+import { loadSettings, initSettings } from './settings.js';
 
 export async function initSystems(ctx) {
+  ctx.settings = loadSettings();
   ctx.saved = initSaved(ctx);
   ctx.listingsSys = initListings(ctx);
   ctx.hud = initHud(ctx);
@@ -44,6 +46,10 @@ export async function initSystems(ctx) {
   ctx.maya = initMaya(ctx);
   ctx.clients = initClients(ctx);
   ctx.buyer = initBuyer(ctx);
+  ctx.settingsUI = initSettings(ctx);
+  ctx.on('hover-listing', (l) => ctx.listingsSys.setHover(l));
+  // a soft click on every button
+  addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button')) ctx.audio.click?.(); }, true);
 
   // "Take me there" from the saved homes screen: a mission with one target
   ctx.missions.goTo = (l, quiet) => {

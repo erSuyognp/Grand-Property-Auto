@@ -42,7 +42,7 @@ export function initListings(ctx) {
   const visible = { sale: true, rent: true, apartments: true, sold: true };
   let group = null, items = [], meshes = null, highlights = null, target = null, near = null, nearCommercial = null;
   const dummy = new THREE.Object3D(), col = new THREE.Color(), gray = new THREE.Color(0x59606b);
-  let t = 0;
+  let t = 0, hover = null, lift = 0;
 
   function build(world) {
     group = new THREE.Group();
@@ -107,6 +107,7 @@ export function initListings(ctx) {
   function update(dt) {
     if (!meshes) return;
     t += dt;
+    lift += ((hover ? 1 : 0) - lift) * Math.min(1, dt * 12);
     const zero = 0.0001;
     items.forEach((it, i) => {
       const on = shown(it);
@@ -115,7 +116,9 @@ export function initListings(ctx) {
       let s = on ? it.size * (highlights && !hl ? 0.45 : 1) : zero;
       if (isTarget) s *= 1.5 + Math.sin(t * 5) * 0.15;
       else if (highlights && hl) s *= 1.15;
-      const y = it.top + 4.5 * it.size + Math.sin(t * 1.6 + i) * 0.5;
+      const hv = hover === it.l ? lift : 0;
+      s *= 1 + hv * 0.4;
+      const y = it.top + 4.5 * it.size + Math.sin(t * 1.6 + i) * 0.5 + hv * 2.5;
       dummy.position.set(it.x, y, it.z);
       dummy.rotation.set(0, t * 0.9 + i, 0);
       const apt = it.l.kind === 'apartments';
@@ -166,6 +169,7 @@ export function initListings(ctx) {
     setVisible(kind, on) { visible[kind] = on; refresh(); ctx.emit('filters', visible); },
     setHighlights(ids, tgt) { highlights = ids ? new Set(ids) : null; target = tgt || null; refresh(); },
     get target() { return target; },
+    setHover(l) { if (l !== hover) { hover = l; if (l) lift = 0; } },
     byId(id) { return ctx.world.listings.find((l) => l.id === id); },
   };
   return api;

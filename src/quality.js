@@ -32,12 +32,14 @@ export function pickQuality(renderer, params) {
   let tier = software ? 'low' : DISCRETE.test(gpu) ? 'ultra' : 'high';
   if (params.get('q') === 'low') tier = 'low';
   if (params.get('q') === 'high' && software) tier = 'high';
-  if (TIERS[params.get('quality')]) tier = params.get('quality');
+  let asked = params.get('quality');
+  try { asked = asked || localStorage.getItem('gpa-quality'); } catch { /* private mode */ }
+  if (TIERS[asked]) tier = asked;
   const t = TIERS[tier];
   const dpr = window.devicePixelRatio || 1;
   // ultra renders above the screen's own resolution when the screen is not already dense
   const pixelRatio = tier === 'low' ? 1 : tier === 'ultra' ? Math.min(2, Math.max(dpr, 1.5)) : Math.min(dpr, 2);
   // "ANGLE (NVIDIA, NVIDIA GeForce RTX 5060 Laptop GPU (0x...) Direct3D11 ...)" -> "GeForce RTX 5060"
   const name = (gpu.split(',')[1] || gpu).replace(/\(0x[0-9a-f]+\).*$/i, '').replace(/\b(NVIDIA|AMD|Intel\(R\)|Laptop GPU|Graphics)\b/g, '').replace(/\s+/g, ' ').trim();
-  return { ...t, tier, gpu, gpuName: name, low: tier === 'low', ultra: tier === 'ultra', pixelRatio };
+  return { ...t, _asked: TIERS[asked] ? asked : 'auto', tier, gpu, gpuName: name, low: tier === 'low', ultra: tier === 'ultra', pixelRatio };
 }

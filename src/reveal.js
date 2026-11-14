@@ -259,6 +259,7 @@ export function initReveal(ctx) {
     ctx.cam.setMode('free');
     ctx.audio.whoosh?.();
     ctx.emit('select', l);
+    ctx.hud.interiorStills(l).then((st) => { if (st[0]) { const im = new Image(); im.src = ctx.world.base + st[0]; } }).catch(() => {});
     const data = await ctx.insights.get(l.id);
     if (my !== token || cur !== l) return false;
     ins = data;
@@ -331,7 +332,9 @@ export function initReveal(ctx) {
       if (c.cat && c.on) { // a place off screen keeps its chip at the edge, in its direction
         if (behind) { x = W - x; y = H * 1.5; }
         const x0 = 140, x1 = W - (ctx.panel?.el.classList.contains('show') ? ctx.panel.el.offsetWidth + 120 : 110), y0 = 96, y1 = H - 150;
-        const cx = Math.max(x0, Math.min(x1, x)), cy = Math.max(y0, Math.min(y1, y));
+        let cx = Math.max(x0, Math.min(x1, x));
+        const cy = Math.max(y0, Math.min(y1, y));
+        if (cy > H - 260 && cx < 340) cx = 340;
         c.el.classList.toggle('edge', cx !== x || cy !== y);
         x = cx; y = cy; vis = true;
         for (let guard = 0; guard < 8 && placed.some((p) => Math.abs(p.x - x) < 210 && Math.abs(p.y - y) < 30); guard++) y += 31;

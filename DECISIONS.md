@@ -239,3 +239,14 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Tape measure** picks two points on the scan's mesh in the walking view and shows feet and inches plus meters. Room fit through Maya uses the room areas in the scan; the wall length it quotes is an estimate from that area and she says so.
 - **Same money, other city** compares monthly cost (within 12%) against the other city's homes and offers fast travel.
 - **Phone controller:** spoken lines from the phone now go to Maya. The phone's buttons already send any key, so every tool above is reachable from it.
+
+### Prompt 6: polish
+- **One design system.** Tokens live in `src/ui.css` (text face, 4 px spacing scale, glass surface, one accent color per score category, spring and ease curves, focus ring). `src/polish.css` loads last and brings the older HUD, title, tour, map and compare screens onto the same face, glass, button states and spring motion. Display headlines keep the original Impact style logo face, so the pairing is one display face plus one text face.
+- **Motion.** Springs on every panel, staggered cards, count up numbers, filling score rings, marker lift on hover, star pops and a short camera shake on mission success. The "Reduced" motion setting (and the system setting) turns all of it into instant changes and skips the reveal animation.
+- **Sound** is all generated in the browser: clicks on every button, whooshes on reveals and sheets, a low city hum outside, room tone inside, and a soft four chord pad on the title and result screens. `N` mutes, the settings sheet has the volume.
+- **Tutorial.** Five steps of four seconds each, with Maya reading them, on the first run from the title screen; `Esc` skips. It does not run in tests (`autostart`) or demo mode, and can be replayed from settings or with `?tutorial=1`.
+- **Settings** are on `U` and the gear in the dock: volume, Maya's voice or captions only, caption size, meters or feet and miles, motion, graphics preset (applies after a reload).
+- **Plain words.** The main screens say "walk time", "similar homes nearby", "natural hazard risk". Source names and method words stay inside the "i" boxes.
+- **Demo mode (0)** now opens on a page of flat listings, then: spoken search, drive, reveal, Maya's pitch and the monthly cost against renting, her better fit and the drive there, a walk inside with the tape measure, a client mission with three stars, the compare screen. In tests it runs on her scripted lines so it does not depend on the network.
+- **Preloading.** Hovering or pulling up to a home fetches its insights; selecting one warms the first photo of its scan.
+- Mock mode screenshots of every screen are in `docs/mock_shots/` (synthetic data only).

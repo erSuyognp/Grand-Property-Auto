@@ -63,15 +63,15 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] build, test, shot, commit
 
 ## Prompt 6: Polish pass (modern game feel)
-- [ ] 1. One design system: font pairing, spacing scale, colors per score category, glass
-- [ ] 2. Motion: spring animations on every panel, card stagger, number count ups, marker
-- [ ] 3. Sound: UI clicks, whooshes on reveal, ambient city loop outside, room tone inside,
-- [ ] 4. Onboarding: a 20 second first run tutorial with Maya: drive, select, reveal, walk in,
-- [ ] 5. Plain language everywhere: no jargon (no "cap rate", "ACS", "isochrone" on the main
-- [ ] 6. Settings: units, reduced motion, subtitles size, graphics quality preset.
-- [ ] 7. Performance: 55+ fps on this laptop during reveal and missions; preload the next
-- [ ] 8. Demo mode (key 0) updated: drive, select with reveal, Maya pitch + one question,
-- [ ] build, test, shot, commit
+- [x] 1. One design system: font pairing, spacing scale, colors per score category, glass
+- [x] 2. Motion: spring animations on every panel, card stagger, number count ups, marker
+- [x] 3. Sound: UI clicks, whooshes on reveal, ambient city loop outside, room tone inside,
+- [x] 4. Onboarding: a 20 second first run tutorial with Maya: drive, select, reveal, walk in,
+- [x] 5. Plain language everywhere: no jargon (no "cap rate", "ACS", "isochrone" on the main
+- [~] 6. Settings (units apply to the panel distances; Maya and the reveal chips speak in minutes). Settings: units, reduced motion, subtitles size, graphics quality preset.
+- [x] 7. Performance: 55+ fps on this laptop during reveal and missions; preload the next
+- [x] 8. Demo mode (key 0) updated: drive, select with reveal, Maya pitch + one question,
+- [x] build, test, shot, commit
 
 ## Prompt 7: Buyer tools (what makes it actually useful)
 - [x] 1. "Can I afford it?" profile (key A or ask Maya): yearly income, monthly debts,

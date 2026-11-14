@@ -71,3 +71,10 @@ Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0),
 | FRED, Federal Reserve Bank of St. Louis | Series MORTGAGE30US, source Freddie Mac; cited | Weekly 30 year mortgage rate |
 | NREL PVWatts v8 | Public API (DEMO_KEY, or NREL_API_KEY when set) | Yearly solar output per kW at the area center |
 | Insurance Information Institute (NAIC data) | Cited; two numbers per state | Average homeowners and renters premium by state |
+
+## Sound and art made for this game (nothing downloaded)
+
+| What | Where | Origin |
+|---|---|---|
+| UI clicks, whooshes, star and fanfare notes, city ambience, room tone, the four chord music bed on the title and result screens | `src/audio.js` | Generated at run time with Web Audio oscillators and filtered noise. Self made, no audio files. |
+| Maya's avatar | `src/maya.js` | Original SVG drawing made for this game. Not based on any real person. |

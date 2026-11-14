@@ -119,16 +119,16 @@ test('phone controller: steer and gas from a second page move the car', async ({
 });
 
 test('demo mode runs a full loop', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(420_000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(game('&demofast=1&demoloops=2'));
+  await page.goto(game('&demofast=1&demoloops=2&mayascript=1'));
   await ready(page);
   await page.keyboard.press('Digit0');
-  await page.waitForFunction(() => window.__gpa.demo && window.__gpa.demo.step === 'done', null, { timeout: 220_000 });
+  await page.waitForFunction(() => window.__gpa.demo && window.__gpa.demo.step === 'done', null, { timeout: 400_000 });
   const d = await page.evaluate(() => window.__gpa.demo);
   expect(d.loops).toBe(2);
-  for (const step of ['mission', 'drive', 'arrive', 'tour', 'rate', 'compare']) expect(d.log).toContain(step);
+  for (const step of ['problem', 'mission', 'drive', 'arrive', 'reveal', 'maya', 'better', 'tour', 'rate', 'client', 'compare']) expect(d.log).toContain(step);
   expect(errors, errors.join('\n')).toEqual([]);
 });
 

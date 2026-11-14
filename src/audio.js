@@ -2,7 +2,7 @@
 // oscillators and noise: no audio files.
 export function createAudio(ctx) {
   let ac = null, engine = null, engine2 = null, engineGain = null, squealGain = null, master = null, noiseBuf = null, tone = null;
-  let muted = false;
+  let muted = false, volume = 1, amb = null, music = null;
 
   function start() {
     if (ac) return;
@@ -10,7 +10,7 @@ export function createAudio(ctx) {
       ac = new (window.AudioContext || window.webkitAudioContext)();
     } catch { return; }
     master = ac.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = muted ? 0 : 0.5 * volume;
     master.connect(ac.destination);
     engine = ac.createOscillator(); engine.type = 'sawtooth';
     engine2 = ac.createOscillator(); engine2.type = 'square';
@@ -95,10 +95,61 @@ export function createAudio(ctx) {
     click() { blip(1100, 0.035, 'sine', 0.07); },
     chime() { blip(660, 0.14); setTimeout(() => blip(880, 0.2), 110); },
     thud() { blip(90, 0.18, 'triangle', 0.35); },
-    setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.5; },
+    setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.5 * volume; },
+    setVolume(v) { volume = Math.max(0, Math.min(1, v)); if (master && !muted) master.gain.setTargetAtTime(0.5 * volume, ac.currentTime, 0.05); },
+    // a low city hum while outside: filtered noise that swells and fades slowly (self made)
+    ambient(on) {
+      if (!ac || !noiseBuf) return;
+      if (on && !amb) {
+        const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380;
+        const g = ac.createGain(); g.gain.value = 0;
+        const lfo = ac.createOscillator(), lg = ac.createGain();
+        lfo.frequency.value = 0.07; lg.gain.value = 0.012;
+        lfo.connect(lg); lg.connect(g.gain);
+        g.gain.setTargetAtTime(0.03, ac.currentTime, 1.5);
+        src.connect(lp); lp.connect(g); g.connect(master);
+        src.start(); lfo.start();
+        amb = { src, g, lfo };
+      } else if (!on && amb) {
+        const old = amb; amb = null;
+        old.g.gain.setTargetAtTime(0, ac.currentTime, 0.4);
+        setTimeout(() => { try { old.src.stop(); old.lfo.stop(); } catch { /* already stopped */ } }, 1500);
+      }
+    },
+    // a soft four chord pad for the title and result screens (self made, generated here)
+    music(on) {
+      if (!ac) return;
+      if (on && !music) {
+        const g = ac.createGain(); g.gain.value = 0;
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+        lp.connect(g); g.connect(master);
+        g.gain.setTargetAtTime(0.05, ac.currentTime, 1.2);
+        const CH = [[220, 261.63, 329.63], [174.61, 220, 261.63], [261.63, 329.63, 392], [196, 246.94, 293.66]];
+        let i = 0;
+        const play = () => {
+          const t = ac.currentTime;
+          for (const f of CH[i % CH.length]) for (const det of [-3, 3]) {
+            const o = ac.createOscillator(), og = ac.createGain();
+            o.type = 'triangle'; o.frequency.value = f; o.detune.value = det;
+            og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.16, t + 0.7); og.gain.exponentialRampToValueAtTime(0.0001, t + 3.3);
+            o.connect(og); og.connect(lp); o.start(t); o.stop(t + 3.4);
+          }
+          i++;
+        };
+        play();
+        music = { g, timer: setInterval(play, 2800) };
+      } else if (!on && music) {
+        const old = music; music = null;
+        clearInterval(old.timer);
+        old.g.gain.setTargetAtTime(0, ac.currentTime, 0.5);
+      }
+    },
     toggleMute() { this.setMuted(!muted); return muted; },
     update(car, active) {
       if (!ac) return;
+      this.ambient(active || ctx.state === 'inbox');
+      this.music(ctx.state === 'title' || ctx.state === 'result');
       const sp = Math.abs(car.state.speed);
       const f = 48 + sp * 4.6;
       engine.frequency.setTargetAtTime(f, ac.currentTime, 0.05);

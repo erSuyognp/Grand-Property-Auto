@@ -4,11 +4,12 @@
 import { KIND_COLOR, KIND_LABEL, factsText, money, priceText } from './format.js';
 import { icon, PLACE_ICON, PLACE_LABEL } from './icons.js';
 import { costFor, affordTier } from './costmath.js';
+import { formatDistance } from './settings.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (n) => (n == null || !Number.isFinite(n) ? 'Not available' : '$' + Math.round(n).toLocaleString('en-US'));
 const NA = '<span class="na">Not available</span>';
-const dist = (m) => (m == null ? '' : m >= 1000 ? (m / 1609.34).toFixed(1) + ' mi' : Math.round(m / 10) * 10 + ' m');
+
 export const SCORE_COLOR = { value: '#ffc940', cost: '#ff8f5a', errands: '#ffb020', commute: '#4cc9f0', outdoors: '#3ddc84', energy: '#ffe14d', risk: '#ff6b6b', activity: '#c59bff', schools: '#7c9cff', hoa: '#9be7ff', income: '#b8c4d6', noise: '#a3b1c6', rent: '#3aa0ff', light: '#ffd27a' };
 const COST_PARTS = [['mortgage', 'Loan payment', '#ff8f5a'], ['tax', 'Property tax', '#ffc940'], ['insurance', 'Insurance', '#4cc9f0'], ['hoa', 'HOA', '#c59bff'], ['electric', 'Electric', '#3ddc84']];
 
@@ -24,6 +25,7 @@ export function initPanel(ctx) {
   el.setAttribute('aria-label', 'Home insights');
   ctx.hud.root.append(el);
   let cur = null, ins = null, opts = { downPct: 20, solarOn: false }, openInfo = new Set();
+  const dist = (m) => formatDistance(m, ctx.settings?.units);
   try { const d = Number(localStorage.getItem('gpa-down')); if ([3.5, 10, 20].includes(d)) opts.downPct = d; } catch { /* private mode */ }
 
   const src = (...keys) => keys.map((k) => { const s = ctx.insights.source(k); return s ? `<p><b>${esc(s.name)}</b>${s.date ? ` · ${esc(s.date)}` : ''}<br>${esc(s.how)}</p>` : ''; }).join('');

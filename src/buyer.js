@@ -43,8 +43,9 @@ export function initBuyer(ctx) {
     dock.innerHTML = `<button data-a="inbox" title="Client inbox (I)">${icon('inbox', 15)}<span>Clients</span><kbd>I</kbd></button>
       <button data-a="profile" class="${a ? 'set' : ''}" title="Can I afford it? (P)">${icon('calculator', 15)}<span>${a ? `Budget ${usd(a.budget)}/mo` : 'Can I afford it?'}</span><kbd>P</kbd></button>
       <button data-a="places" class="${B.places.length ? 'set' : ''}" title="My places (O)">${icon('map-pin', 15)}<span>${B.places.length ? B.places.map((p) => esc(p.name)).join(', ') : 'My places'}</span><kbd>O</kbd></button>
+      <button data-a="settings" title="Settings (U)" aria-label="Settings">${icon('settings', 15)}<kbd>U</kbd></button>
       ${a || B.places.length ? `<button data-a="rings" title="What the rings under the markers show">${icon('activity', 15)}<span>Rings: ${B.ringMode === 'afford' ? 'budget' : B.ringMode === 'drive' ? 'weekly drive' : 'off'}</span></button>` : ''}`;
-    for (const b of dock.children) b.addEventListener('click', () => { b.blur(); ({ inbox: () => ctx.clients?.open(), profile: openProfile, places: openPlaces, rings: cycleRings })[b.dataset.a](); });
+    for (const b of dock.children) b.addEventListener('click', () => { b.blur(); ({ inbox: () => ctx.clients?.open(), profile: openProfile, places: openPlaces, rings: cycleRings, settings: () => ctx.settingsUI?.open() })[b.dataset.a](); });
     legend();
   }
   function cycleRings() {
@@ -113,7 +114,7 @@ export function initBuyer(ctx) {
     setTimeout(() => sheet.querySelector('input,button')?.focus(), 60);
     return true;
   }
-  function closeSheet() { if (!sheet.classList.contains('show')) return; sheet.classList.remove('show'); if (ctx.state === 'sheet') ctx.state = 'play'; B.sheet = null; }
+  function closeSheet() { if (!sheet.classList.contains('show')) return; if (sheet.contains(document.activeElement)) document.activeElement.blur(); sheet.classList.remove('show'); if (ctx.state === 'sheet') ctx.state = 'play'; B.sheet = null; }
   const num = (v) => Number(String(v).replace(/[^\d.]/g, '')) || 0;
   function openProfile() {
     const p = B.profile || {};
@@ -192,7 +193,7 @@ export function initBuyer(ctx) {
       <ul class="plist">${list.map((p, i) => `<li>${icon('map-pin', 15)}<b>${esc(p.name)}</b><span>${esc(p.label || `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}`)}</span><button class="act ghost" data-rm="${i}" aria-label="Remove ${esc(p.name)}">Remove</button></li>`).join('') || '<li class="empty">Nothing pinned yet.</li>'}</ul>
       <form class="padd"><select id="pl-name" aria-label="What is it">${['Work', 'School', 'Gym', 'Family', 'Other'].map((n) => `<option>${n}</option>`).join('')}</select><input id="pl-where" placeholder="${ctx.city === 'houston' ? 'Medical Center, or 1000 Main St' : 'Union Station, or 200 N Spring St'}" autocomplete="off" aria-label="Name or address"/><button class="act primary" type="submit">Find</button></form>
       <div class="ract"><button type="button" class="act" data-a="map">${icon('map-pin', 15)}Click the map instead</button><button type="button" class="act" data-a="cancel">Done <kbd>Esc</kbd></button></div>
-      <p class="fine">You can also tell Maya: "my work is near ${ctx.city === 'houston' ? 'the Medical Center' : 'Union Station'}". Addresses are looked up with the Census geocoder. Drive times are estimates from distance at 25 mph.</p>`, (root) => {
+      <p class="fine">You can also tell Maya: "my work is near ${ctx.city === 'houston' ? 'the Medical Center' : 'Union Station'}". Addresses are looked up with the Census Bureau's address search. Drive times are estimates from distance at 25 mph.</p>`, (root) => {
       const inp = root.querySelector('#pl-where');
       inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') closeSheet(); });
       root.querySelector('.padd').addEventListener('submit', async (e) => { e.preventDefault(); if (!inp.value.trim()) return; const ok = await pinByName(root.querySelector('#pl-name').value, inp.value.trim()); if (ok) openPlaces(); });
