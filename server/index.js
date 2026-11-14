@@ -7,9 +7,12 @@ import { WebSocketServer } from 'ws';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dataWindowGuard, inDataWindow } from './dataWindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
+const GAME_MODE = process.env.GAME_MODE === 'mock' ? 'mock' : 'real';
+const LLM_ENABLED = process.env.LLM_ENABLED === 'true';
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -17,6 +20,9 @@ app.use(express.json({ limit: '1mb' }));
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
+    mode: GAME_MODE,
+    llm: LLM_ENABLED,
+    dataWindow: inDataWindow(),
     keys: {
       vexcel: !!process.env.VEXCEL_API_KEY,
       matterport: !!process.env.MATTERPORT_SDK_KEY,
@@ -25,10 +31,24 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Client config. GAME_MODE=mock means the client loads only public/data/mock/.
+// MATTERPORT_SDK_KEY is the only key ever sent to the browser (domain locked public key).
+app.get('/api/config', (_req, res) => {
+  res.json({
+    mode: GAME_MODE,
+    llm: LLM_ENABLED,
+    matterportSdkKey: GAME_MODE === 'mock' ? '' : process.env.MATTERPORT_SDK_KEY || '',
+    showcaseBase: process.env.MATTERPORT_SHOWCASE_BASE || 'https://my.matterport.com',
+  });
+});
+
 // Filled in by Phase 7.
 app.post('/api/mission', (_req, res) => res.status(501).json({ error: 'not implemented' }));
 app.post('/api/narrate', (_req, res) => res.status(501).json({ error: 'not implemented' }));
 // Filled in by Phase 7 (semantic search proxy).
+// Every Sponsor API route refuses to run outside the data window (rule 1).
+app.use('/api/vexcel', dataWindowGuard('vexcel'));
+app.use('/api/matterport', dataWindowGuard('matterport'));
 app.all('/api/vexcel/*splat', (_req, res) => res.status(501).json({ error: 'not implemented' }));
 
 // Serve the production build when it exists (Phase 10 runs everything from here).
@@ -56,4 +76,5 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-server.listen(PORT, () => console.log(`[server] http://localhost:${PORT}`));
+server.listen(PORT, () =>
+  console.log(`[server] http://localhost:${PORT} mode=${GAME_MODE} llm=${LLM_ENABLED} dataWindow=${inDataWindow()}`));

@@ -1,10 +1,23 @@
+# secrets
 .env
-data/raw/
-data/cache/
+.env.*
+!.env.example
+
+# Sponsor Data: everything under data/ (raw, cache, samples, *_NOTES.md, *_SCHEMA.md, areas.json)
+/data/
+*_NOTES.md
+*_SCHEMA.md
+
+# processed game data: only the synthetic mock set is committed
+public/data/*
+!public/data/mock/
+
+# build and test output
 node_modules/
 dist/
 shots/
 test-results/
 playwright-report/
+.playwright-profile/
 __pycache__/
 *.pyc

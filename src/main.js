@@ -1,6 +1,9 @@
 // Grand Property Auto entry point.
 // Phase 0: placeholder scene (flat ground + box car) so the build and shot pipeline work.
 import * as THREE from 'three';
+import { loadConfig } from './data.js';
+
+const config = await loadConfig();
 
 const app = document.getElementById('app');
 const fpsEl = document.getElementById('fps');
@@ -64,7 +67,7 @@ addEventListener('resize', () => {
 });
 
 // Test hook read by Playwright.
-const debug = (window.__gpa = { ready: false, fps: 0, car: { x: 0, z: 0 } });
+const debug = (window.__gpa = { ready: false, fps: 0, mode: config.mode, car: { x: 0, z: 0 } });
 
 const timer = new THREE.Timer();
 let frames = 0, fpsTime = 0;
@@ -79,7 +82,7 @@ renderer.setAnimationLoop((t) => {
   frames++; fpsTime += dt;
   if (fpsTime >= 0.5) {
     debug.fps = Math.round(frames / fpsTime);
-    fpsEl.textContent = `${debug.fps} fps`;
+    fpsEl.textContent = `${debug.fps} fps${config.mode === 'mock' ? ' · MOCK' : ''}`;
     frames = 0; fpsTime = 0;
   }
   debug.ready = true;
