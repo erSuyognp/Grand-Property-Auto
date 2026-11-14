@@ -10,7 +10,7 @@ const COLORS = [0xd9dde0, 0x1d2126, 0x8e9499, 0x2f4f7a, 0x7a1f1f, 0xe9e4d6, 0x39
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export function initTraffic(ctx) {
-  const count = ctx.params.has('notraffic') ? 0 : ctx.quality.low ? 4 : 9;
+  const count = ctx.params.has('notraffic') ? 0 : ctx.quality.traffic;
   const cars = [];
   let roadCells = [], queue = [], clock = 0;
 

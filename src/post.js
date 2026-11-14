@@ -8,6 +8,22 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+
+// Ambient occlusion from solid geometry only: markers, beams, glass, sprites and the sky are
+// see-through or flat and would leave dark outlines around themselves.
+class SolidAOPass extends GTAOPass {
+  _overrideVisibility() {
+    const cache = this._visibilityCache;
+    this.scene.traverse((o) => {
+      if (!o.visible) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      const skip = o.isPoints || o.isLine || o.isSprite || o.userData.noAO
+        || (m && (m.transparent || m.depthWrite === false || m.isShadowMaterial || m.isShaderMaterial));
+      if (skip && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.visible = false; cache.push(o); }
+    });
+  }
+}
 
 const GradeShader = {
   name: 'GradeShader',
@@ -42,23 +58,31 @@ const GradeShader = {
 
 export function createPost(ctx) {
   const { renderer, scene, camera } = ctx;
-  const low = ctx.quality.low;
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-  // no multisampling on the HDR target (it was the single most expensive thing in the frame):
-  // SMAA after tone mapping smooths the edges instead
-  const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 0 });
+  // On integrated graphics there is no multisampling on the HDR target (it was the single most
+  // expensive thing in the frame): SMAA after tone mapping smooths the edges instead. A
+  // discrete card gets both, and ambient occlusion on top.
+  const Q = ctx.quality;
+  const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: Q.msaa });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
+  let ao = null;
+  if (Q.ao) {
+    ao = new SolidAOPass(scene, camera, size.x, size.y);
+    ao.updateGtaoMaterial({ radius: 2.2, distanceExponent: 1.2, thickness: 1.4, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+    composer.addPass(ao);
+  }
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.22, 0.7, 1.0);
-  bloom.enabled = !low;
+  bloom.enabled = Q.bloom;
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const smaa = new SMAAPass();
-  smaa.enabled = !low;
+  smaa.enabled = Q.smaa;
   composer.addPass(smaa);
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
-  let blur = 0, neutral = 0, bloomOn = !low;
+  let blur = 0, neutral = 0, bloomOn = Q.bloom;
 
   return {
     composer, bloom,
@@ -73,6 +97,8 @@ export function createPost(ctx) {
       grade.uniforms.uNeutral.value = neutral;
       renderer.getDrawingBufferSize(size);
       grade.uniforms.uTexel.value.set(1 / size.x, 1 / size.y);
+      // the photo city already holds its own soft shadows: only a light touch there
+      if (ao) ao.blendIntensity = neutral ? 0.55 : 1.0;
       bloom.enabled = bloomOn && !neutral; // bloom would lift the brightest photo pixels
       // the daytime sky and sunlit walls sit well above 1.0 in HDR, so only the sun, chrome
       // glints and lamps should pass the threshold
@@ -82,6 +108,9 @@ export function createPost(ctx) {
       composer.render(dt);
     },
     resize(w, h, pr) { composer.setPixelRatio(pr); composer.setSize(w, h); },
+    // returns true when it changed something
+    setAO(on) { if (!ao || ao.enabled === on) return false; ao.enabled = on; return true; },
+    get ao() { return ao; },
     setBloom(on) { bloomOn = on; bloom.enabled = on; },
     setNeutral(on) { neutral = on ? 1 : 0; },
   };

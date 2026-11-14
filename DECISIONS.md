@@ -158,6 +158,14 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - "Pause Part B (splats)": nothing was changed in the drone view.
 - Not tested: A/D branch choice by hand, mouse look inside the Showcase frame, the phone, and a full 45 second tour to its end (the test checks that it starts and moves).
 
+## Ultra tier on the laptop's RTX (Nov 14, asked for in chat: "like the Iron Man game")
+- **What Iron Glove did, carried over:** read the graphics card the page actually landed on (WebGL renderer string), pick a tier from it, and let `?quality=` force one. Here: `low` (software), `high` (integrated: exactly the earlier tuning) and `ultra` (GeForce, RTX, Radeon RX, Arc). All in `src/quality.js`; the tier shows next to the frame rate.
+- **Finding:** Chrome on this laptop already runs on the RTX 5060 (`node tools/gpu_probe.mjs` prints the card). The earlier tuning and every earlier screenshot were made on the Radeon 780M, because the test browser landed there. The test browser now gets `--force_high_performance_gpu`, so shots and tests use the RTX too.
+- **Ultra adds:** at least 1.5x resolution (supersampled on a plain screen), 4x multisampling on the HDR frame on top of SMAA, ambient occlusion (three's GTAO pass, solid geometry only, at about half strength over the Google photos), a 4096 px sun shadow covering 260 m instead of 190 m, 16x anisotropy on the ground photo, 14 traffic cars, Google tiles starting at errorTarget 10 with a floor of 3 (was 24 and 6), a 3 GB tile cache and twice the tile download and parse jobs. 4K panoramas inside homes were already switched on by a discrete card.
+- **Measured (Houston, RTX 5060, 1280 x 720 window):** 60 fps standing and driving with the Google city at errorTarget 3, and 60 fps in the block city and the walk through. Not measured at full screen on the laptop's own display. If it sags there, the guard in `main.js` turns ambient occlusion off first, then resolution, shadows and bloom as before.
+- **Matterport's GitHub** was checked for anything to add: the SDK bundle examples (already used for the spline walk) and their fork of the 3D tiles renderer we already use from NASA. Nothing new was taken, no new dependency.
+- No Windows graphics setting was changed.
+
 ## Needs real data
 - (Resolved in Phase 1: `.env` now has every key.)
 - MatterPak textured meshes: unlocked but not generated for any of our scans. Ask CoStar or Matterport (track channel) to generate MatterPaks for the 8 demo homes, then run `python tools/sponsor/build_matterpak.py --city houston`; the game still needs a GLB loader for the result.

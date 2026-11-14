@@ -27,7 +27,7 @@ export function initTiles(ctx) {
 
   const S = {
     on: false, loading: false, failed: '', tiles: null, holder: null, models: 0, calibrated: 0,
-    errorTarget: 24, city: null, timer: 0, materials: new Set(), startedAt: 0,
+    errorTarget: ctx.quality.tileStart, city: null, timer: 0, materials: new Set(), startedAt: 0,
   };
   const ray = new THREE.Raycaster();
   ray.firstHitOnly = true;
@@ -144,8 +144,11 @@ export function initTiles(ctx) {
     tiles.registerPlugin(new TileCompressionPlugin());
     tiles.errorTarget = S.errorTarget;
     // keep what is around the car in memory so nearby blocks do not drop out and reload
-    tiles.lruCache.minSize = 9000; tiles.lruCache.maxSize = 12000;
-    tiles.lruCache.minBytesSize = 0.8 * 2 ** 30; tiles.lruCache.maxBytesSize = 1.0 * 2 ** 30;
+    // (a discrete card has the memory for three times as much)
+    const Q = ctx.quality;
+    tiles.lruCache.minSize = Q.tileCount * 0.75; tiles.lruCache.maxSize = Q.tileCount;
+    tiles.lruCache.minBytesSize = Q.tileCacheGB * 0.8 * 2 ** 30; tiles.lruCache.maxBytesSize = Q.tileCacheGB * 2 ** 30;
+    tiles.downloadQueue.maxJobsPerOrigin = 25 * Q.tileJobs; tiles.parseQueue.maxJobs = 5 * Q.tileJobs; // shared queues: set, not scaled
     tiles.setCamera(ctx.camera);
     tiles.setResolutionFromRenderer(ctx.camera, ctx.renderer);
     tiles.addEventListener('load-model', (e) => { S.models++; prepare(e.scene); });
@@ -293,7 +296,7 @@ export function initTiles(ctx) {
       slow = 0;
       if (fps < 52 && S.errorTarget < 40) S.errorTarget += 4;
       else if (fps < 55 && S.errorTarget < 40) S.errorTarget += 1;
-      else if (fps >= 57 && S.errorTarget > 6) S.errorTarget -= 2;
+      else if (fps >= 57 && S.errorTarget > ctx.quality.tileFloor) S.errorTarget = Math.max(ctx.quality.tileFloor, S.errorTarget - 2);
       S.tiles.errorTarget = S.errorTarget;
     }
     const now = performance.now();

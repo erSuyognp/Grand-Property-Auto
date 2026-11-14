@@ -55,7 +55,7 @@ export function initHud(ctx) {
     for (const b of el.cityBar.children) b.classList.toggle('on', b.dataset.city === ctx.city);
     renderLegend();
   });
-  ctx.on('fps', (v) => { el.fps.textContent = `${v} fps${ctx.mock ? ' · MOCK DATA' : ''}`; });
+  ctx.on('fps', (v) => { el.fps.textContent = `${v} fps · ${ctx.quality.label}${ctx.mock ? ' · MOCK DATA' : ''}`; });
 
   // ---- speedometer
   const num = el.speedo.querySelector('b');

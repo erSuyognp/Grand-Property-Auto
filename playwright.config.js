@@ -6,7 +6,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
     viewport: { width: 1280, height: 720 },
-    launchOptions: { args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
+    // --force_high_performance_gpu: test pages land on the discrete card (the RTX), like Chrome does here
+    launchOptions: { args: ['--use-angle=d3d11', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--force_high_performance_gpu'] },
   },
   webServer: [
     { command: 'node server/index.js', url: 'http://localhost:8787/api/health', reuseExistingServer: true, timeout: 30_000 },

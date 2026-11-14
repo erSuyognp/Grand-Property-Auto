@@ -65,9 +65,10 @@ export function createEnv(ctx) {
   const hemi = new THREE.HemisphereLight(0xffffff, 0x888888, 0.5);
   const sun = new THREE.DirectionalLight(0xffffff, 3);
   sun.castShadow = !low;
-  sun.shadow.mapSize.set(low ? 1024 : 2048, low ? 1024 : 2048);
+  sun.shadow.mapSize.set(ctx.quality.shadowMap, ctx.quality.shadowMap);
   const sc = sun.shadow.camera;
-  sc.left = -95; sc.right = 95; sc.top = 95; sc.bottom = -95; sc.near = 10; sc.far = 800;
+  const span = ctx.quality.shadowSpan;
+  sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 10; sc.far = 800;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.45;
   scene.add(hemi, sun, sun.target);

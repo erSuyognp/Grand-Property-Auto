@@ -9,18 +9,16 @@ import { createAudio } from './audio.js';
 import { initSystems } from './systems.js';
 import { createEnv } from './env.js';
 import { createPost } from './post.js';
+import { pickQuality } from './quality.js';
 
 const params = new URLSearchParams(location.search);
 const config = await loadConfig();
 const app = document.getElementById('app');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-const gl = renderer.getContext();
-const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
-const software = /swiftshader|llvmpipe|software|basic render/i.test(gpu);
-const quality = { low: params.get('q') === 'low' || (software && params.get('q') !== 'high'), gpu };
-renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 2));
+const quality = pickQuality(renderer, params);
+console.info(`[gpa] graphics: ${quality.gpu || 'unknown'}: ${quality.label} quality`);
+renderer.setPixelRatio(quality.pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = !quality.low;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -120,7 +118,8 @@ renderer.setAnimationLoop((t) => {
     if (d.fps < 40 && d.ready) slow++; else slow = 0;
     if (slow >= 4) {
       slow = 0;
-      if (renderer.getPixelRatio() > 1) { renderer.setPixelRatio(1); ctx.post.resize(window.innerWidth, window.innerHeight, 1); }
+      if (ctx.post.setAO(false)) { /* ambient occlusion goes first */ }
+      else if (renderer.getPixelRatio() > 1) { renderer.setPixelRatio(1); ctx.post.resize(window.innerWidth, window.innerHeight, 1); }
       else if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; ctx.env.setShadows(false); }
       else ctx.post.setBloom(false);
     }

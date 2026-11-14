@@ -54,7 +54,7 @@ export async function createWorld(ctx, city) {
   }
   const groundTex = new THREE.Texture(img);
   groundTex.colorSpace = THREE.SRGBColorSpace;
-  groundTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  groundTex.anisotropy = Math.min(ctx.quality.aniso, renderer.capabilities.getMaxAnisotropy());
   groundTex.needsUpdate = true;
   disposables.push(groundTex);
   const [gw, gs, ge, gn] = groundMeta.bounds;
