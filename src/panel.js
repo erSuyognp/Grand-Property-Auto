@@ -261,7 +261,8 @@ export function initPanel(ctx) {
   function animateIn(instant) {
     const cards = [...el.querySelectorAll('.icard')];
     cards.forEach((c, i) => {
-      const delay = instant ? 0 : 140 + i * 110;
+      const slow = (ctx.params.get('pace') || ctx.settings?.revealPace || 'guided') !== 'quick';
+      const delay = instant ? 0 : slow ? 250 + i * 480 : 140 + i * 110;
       c.style.setProperty('--d', delay + 'ms');
       setTimeout(() => { if (c.isConnected) { c.classList.add('in'); countUp(c); } }, delay);
     });

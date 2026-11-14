@@ -3,7 +3,7 @@
 // five short steps, about 20 seconds, skippable.
 import { icon } from './icons.js';
 
-const DEFAULTS = { volume: 0.8, voiceOff: false, liveVoice: true, voiceId: '', units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
+const DEFAULTS = { volume: 0.8, voiceOff: false, liveVoice: true, revealPace: 'guided', voiceId: '', units: 'metric', reducedMotion: null, capSize: 'm', quality: 'auto' };
 const CAP = { s: '17px', m: '21px', l: '27px' };
 
 export function loadSettings() {
@@ -40,6 +40,7 @@ export function initSettings(ctx) {
       <div class="srow voicerow"><span>Which voice</span><select data-voice aria-label="Maya's voice"><option value="">Loading voices...</option></select><button class="act" data-a="hear">Hear it</button></div>
       <div class="srow"><span>Caption size</span>${seg('capSize', [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])}</div>
       <div class="srow"><span>Distances</span>${seg('units', [['metric', 'Meters'], ['imperial', 'Feet and miles']])}</div>
+      <div class="srow"><span>Home reveal</span>${seg('revealPace', [['guided', 'Step by step'], ['quick', 'Quick']])}</div>
       <div class="srow"><span>Motion</span>${seg('reducedMotion', [['false', 'Full'], ['true', 'Reduced']])}</div>
       <div class="srow"><span>Graphics</span>${seg('quality', [['auto', 'Auto'], ['low', 'Low'], ['high', 'High'], ['ultra', 'Ultra']])}<small>${ctx.quality.label} now${S.quality !== (ctx.quality._asked || 'auto') ? ' · reloads to apply' : ''}</small></div>
       <div class="ract"><button class="act" data-a="tutorial">${icon('sparkles', 15)}Replay the tutorial</button><button class="act primary" data-a="close">Done <kbd>Esc</kbd></button></div></div>`;

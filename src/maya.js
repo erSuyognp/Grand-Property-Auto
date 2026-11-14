@@ -279,7 +279,7 @@ export function initMaya(ctx) {
   }
   // a line the game itself wants said in her voice (mission narration, tutorial)
   function say(text, opts = {}) {
-    if (!text || live?.state.conv) return;
+    if (!text || (live?.state.conv && !opts.force)) return;
     if (opts.interrupt !== false) interrupt();
     el.classList.add('show');
     const sp = splitter((s) => enqueue(s, { show: opts.caption !== false }));

@@ -45,7 +45,7 @@ for (const city of process.env.SHOT_MODE === 'mock' ? ['mock'] : ['houston', 'la
 test('performance: cold start, reveal frame rate, Maya first word', async ({ page }) => {
   test.setTimeout(180_000);
   const t0 = Date.now();
-  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0${MODE}`);
+  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0&pace=quick${MODE}`);
   await page.waitForFunction(() => window.__gpa?.ready === true, null, { timeout: 60_000 });
   const cold = (Date.now() - t0) / 1000;
   await page.waitForFunction(() => window.__gpa.ctx.insights.ready, null, { timeout: 15_000 });

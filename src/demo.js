@@ -134,7 +134,7 @@ export function initDemo(ctx) {
       mark('reveal');
       await ctx.reveal.select(first, { instant: fast() });
       const r0 = performance.now();
-      while (alive() && ctx.reveal.stage < 3 && performance.now() - r0 < 9000) await wait(100);
+      while (alive() && ctx.reveal.stage < 3 && performance.now() - r0 < 26000) await wait(100);
       await T(1500, 100);
       if (!alive()) return;
       if (rowsOk()) {
@@ -176,6 +176,15 @@ export function initDemo(ctx) {
         let n = 0;
         const gliding = ctx.tour.active && ctx.tour.autoTour(fast() ? 6 : 45);
         while (alive() && performance.now() < end) { await wait(fast() ? 400 : 2400); if (!gliding && ctx.tour.active && ++n <= 3) { ctx.tour.look(0.5); ctx.tour.forward(); } }
+        if (alive() && ctx.tour.active && ctx.guide?.stops.length >= 2) {
+          mark('guide');
+          if (gliding) ctx.tour.autoTour();
+          await ctx.guide.start();
+          await T(6500, 150);
+          if (alive() && ctx.guide.active) { ctx.guide.answer(0); await T(4500, 150); }
+          if (alive() && ctx.guide.active) { ctx.guide.next(); await T(6500, 150); }
+          ctx.guide.end(true);
+        }
         if (alive() && ctx.tour.active && ctx.tour.path === 'W' && ctx.tour.walk.ready) {
           mark('measure');
           if (gliding) ctx.tour.autoTour();

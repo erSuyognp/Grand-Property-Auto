@@ -88,7 +88,36 @@ export function initReveal(ctx) {
 
   const add = (t0, dur, fn, ease = spring) => anims.push({ t0, dur, fn, ease, done: false });
 
+  // The reveal is told one step at a time so it can be followed: the home, how far you can walk,
+  // each nearest place in turn, the roof, any flood zone, then the cards. Space moves to the
+  // next step, Shift+Space (or the Skip button) jumps to the end. "Quick" keeps the short version.
+  let P = null, beats = [];
+  const guided = () => (ctx.params.get('pace') || ctx.settings?.revealPace || 'guided') !== 'quick';
+  function plan(data) {
+    const nPlaces = PLACES.filter((c) => data?.places?.[c]?.[0]).length;
+    const nRings = (data?.rings?.walk || []).length;
+    const solar = !!(data?.solar?.panels || data?.aerial?.solar), flood = !!data?.risk?.flood?.sfha;
+    if (!guided()) return { outline: 0.5, ring: (i) => 1.0 + i * 0.32, place: (n) => 1.9 + n * 0.16, solar: 2.9, flood: 3.2, panel: 2.5, end: 4.2, wideIn: 0.9, wideOut: 3.3, guided: false };
+    const ring0 = 2.2, place0 = ring0 + nRings * 1.0 + 0.5, gap = 1.25;
+    const solarT = place0 + nPlaces * gap + 0.3, floodT = solarT + (solar ? 2.2 : 0), panelT = floodT + (flood ? 2.2 : 0) + 0.4;
+    return { outline: 0.5, ring: (i) => ring0 + i * 1.0, place: (n) => place0 + n * gap, solar: solarT, flood: floodT, panel: panelT, end: panelT + 1.6, wideIn: ring0 - 0.4, wideOut: solarT - 0.5, guided: true };
+  }
+  const capEl = document.createElement('div');
+  capEl.id = 'reveal-cap';
+  ctx.hud.root.append(capEl);
+  function caption(i, title, text) {
+    if (!P?.guided || !cur) { capEl.classList.remove('show'); return; }
+    const n = beats.length;
+    capEl.innerHTML = `<div class="rc-top"><b>${title}</b><span>${beats.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</span></div><p>${text}</p><div class="rc-keys"><span><kbd>Space</kbd> next</span><button class="linkbtn" data-skip>Skip to the end</button></div>`;
+    capEl.classList.add('show');
+    capEl.querySelector('[data-skip]').addEventListener('click', () => skip());
+    window.__gpa.revealStep = { i: i + 1, n, title };
+  }
+  // a beat: a moment in the story, with its caption
+  const beat = (t, title, text) => { const i = beats.length; beats.push(t); add(t, 0.05, () => caption(i, title, text), smooth); };
+
   function build(l, data) {
+    P = plan(data); beats = [];
     const world = ctx.world;
     group = new THREE.Group();
     ctx.scene.add(group);
@@ -115,12 +144,13 @@ export function initReveal(ctx) {
       const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(ring.map((p) => new THREE.Vector3(p.x, top + 1, p.z))), new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0, depthTest: false, toneMapped: false }));
       outline.renderOrder = 9;
       group.add(walls, outline);
-      add(0.5, 0.8, (k) => { walls.userData.o = 0.3 * k; outline.material.opacity = k; }, smooth);
+      add(P.outline, 0.8, (k) => { walls.userData.o = 0.3 * k; outline.material.opacity = k; }, smooth);
       group.userData.walls = walls;
     }
 
-    // 2. walk time rings: 15, 10, 5 minutes, one after another
-    const rings = [...(data?.rings?.walk || [])].sort((a, c) => c.min - a.min);
+    beat(0.2, 'This home', `${l.price != null ? '$' + Math.round(l.price).toLocaleString('en-US') : 'For rent'}${l.beds != null ? ` · ${l.beds} bed` : ''}${l.sqft ? ` · ${Number(l.sqft).toLocaleString('en-US')} sq ft` : ''}. Here is what living here is like.`);
+    // 2. walk time rings: 5, 10, 15 minutes, growing outward one after another
+    const rings = [...(data?.rings?.walk || [])].sort((a, c) => (P.guided ? a.min - c.min : c.min - a.min));
     rings.forEach((r, i) => {
       const fill = new THREE.Mesh(new THREE.CircleGeometry(r.radiusM, 72), basic(RING_COLORS[i], 0.1));
       const edge = new THREE.Mesh(new THREE.RingGeometry(r.radiusM - 1.6, r.radiusM, 96), basic(RING_COLORS[i], 0.75));
@@ -128,7 +158,10 @@ export function initReveal(ctx) {
       const c = chip(`${icon('footprints', 13)}${r.min} min walk`, 'ring');
       c.el.style.setProperty('--c', '#' + RING_COLORS[i].toString(16).padStart(6, '0'));
       c.ringR = r.radiusM;
-      add(1.0 + i * 0.32, 0.9, (k) => { fill.scale.setScalar(Math.max(0.001, k)); edge.scale.setScalar(Math.max(0.001, k)); c.on = k > 0.6; });
+      const ci = P.guided ? rings.length - 1 - i : i;
+      fill.material.color.setHex(RING_COLORS[ci]); edge.material.color.setHex(RING_COLORS[ci]); c.el.style.setProperty('--c', '#' + RING_COLORS[ci].toString(16).padStart(6, '0'));
+      beat(P.ring(i), 'How far you can walk', `Everything inside this ring is within a ${r.min} minute walk.`.replace('a 8 ', 'an 8 '));
+      add(P.ring(i), 0.9, (k) => { fill.scale.setScalar(Math.max(0.001, k)); edge.scale.setScalar(Math.max(0.001, k)); c.on = k > 0.6; });
     });
 
     // 3. nearest places: pins, routes, time chips
@@ -156,7 +189,8 @@ export function initReveal(ctx) {
       const c = chip(`${icon(PLACE_ICON[cat], 14)}<b>${useWalk ? p.walkMin + ' min walk' : p.driveMin + ' min drive'}</b><span>${p.name && p.name !== PLACE_LABEL[cat] ? p.name : PLACE_LABEL[cat]}${far ? ' →' : ''}</span>`, 'place');
       c.el.style.setProperty('--c', CAT_COLOR[cat]);
       c.cat = cat;
-      const t0 = 1.9 + n * 0.16;
+      const t0 = P.place(n);
+      beat(t0, PLACE_LABEL[cat], `${p.name && p.name !== PLACE_LABEL[cat] ? p.name : 'The nearest ' + PLACE_LABEL[cat].toLowerCase()} is ${useWalk ? `${/^(8|11|18)$/.test(String(p.walkMin)) ? 'an' : 'a'} ${p.walkMin} minute walk` : `about ${/^(8|11|18)$/.test(String(p.driveMin)) ? 'an' : 'a'} ${p.driveMin} minute drive`}.`);
       // the route: along the streets when the place is on the map, straight otherwise
       let line = null;
       const makeLine = () => {
@@ -195,15 +229,17 @@ export function initReveal(ctx) {
           mesh.setMatrixAt(i, dm.matrix);
         };
         tiles.forEach((_, i) => place(i, 0));
-        tiles.forEach((_, i) => add(2.9 + i * 0.022, 0.42, (k) => { place(i, Math.min(1, k)); mesh.instanceMatrix.needsUpdate = true; }, (k) => 1 - (1 - k) * (1 - k)));
+        beat(P.solar, 'The roof', `It fits about ${solar.panels} solar panels, which could save an estimated $${solar.savingsYear.toLocaleString('en-US')} a year.`);
+        tiles.forEach((_, i) => add(P.solar + i * 0.022, 0.42, (k) => { place(i, Math.min(1, k)); mesh.instanceMatrix.needsUpdate = true; }, (k) => 1 - (1 - k) * (1 - k)));
         const c = chip(`${icon('sun', 15)}<b>about $${solar.savingsYear.toLocaleString('en-US')} a year</b><span>Solar estimate</span>`, 'solar');
         c.pos.set(hx, top + 9, hz);
-        add(3.2, 0.5, (k) => { c.on = k > 0.3; });
+        add(P.solar + 0.3, 0.5, (k) => { c.on = k > 0.3; });
       }
     } else if (data?.aerial?.solar) {
       const c = chip(`${icon('sun', 15)}<b>Solar panels on the roof</b><span>Seen from the air</span>`, 'solar');
       c.pos.set(hx, top + 9, hz);
-      add(3.0, 0.4, (k) => { c.on = k > 0.3; });
+      beat(P.solar, 'The roof', 'Solar panels are already on the roof, seen from the air.');
+      add(P.solar + 0.1, 0.4, (k) => { c.on = k > 0.3; });
     }
 
     // 5. flood zone: a gentle blue ripple
@@ -214,12 +250,15 @@ export function initReveal(ctx) {
       group.userData.water = water;
       const c = chip(`${icon('waves', 14)}<b>${data.risk.flood.label}</b><span>FEMA flood map</span>`, 'flood');
       c.pos.set(hx - 60, ground + 4, hz + 60);
-      add(3.2, 0.9, (k) => { water.material.opacity = 0.22 * k; c.on = k > 0.4; }, smooth);
+      beat(P.flood, 'Flood zone', `${data.risk.flood.label}. A lender will likely require flood insurance.`);
+      add(P.flood, 0.9, (k) => { water.material.opacity = 0.22 * k; c.on = k > 0.4; }, smooth);
     }
     // a little dimmer, so the highlights read
     baseExposure = 1;
     add(0.1, 1.0, (k) => { ctx.env.setDim(1 - 0.2 * k); }, smooth);
-    add(2.5, 0.1, () => { if (stage < 2) { stage = 2; ctx.emit('reveal-panel', l, data); } }, smooth);
+    beat(P.panel, 'The details', 'Price against similar homes, the true monthly cost, energy, risk and more are on the right. Every card has an i for its source.');
+    add(P.panel, 0.1, () => { if (stage < 2) { stage = 2; ctx.emit('reveal-panel', l, data); } }, smooth);
+    add(P.end + 2.5, 0.05, () => capEl.classList.remove('show'), smooth);
   }
 
   // rows of panels inside the roof outline, aligned with the building's longest wall
@@ -245,7 +284,7 @@ export function initReveal(ctx) {
       group = null;
     }
     for (const c of chips) c.el.remove();
-    chips = []; anims = [];
+    chips = []; anims = []; capEl.classList.remove('show');
     if (baseExposure != null) { ctx.env.setDim(1); baseExposure = null; }
   }
 
@@ -269,7 +308,9 @@ export function initReveal(ctx) {
     return true;
   }
   function replay() { if (!cur) return; const l = cur, d = ins; teardown(); T = 0; stage = 2; build(l, d); }
-  function skip() { if (cur) T = Math.max(T, 99); }
+  function skip() { if (cur) { T = Math.max(T, 99); capEl.classList.remove('show'); } }
+  // jump to the next step of the story
+  function nextBeat() { if (!cur) return; const nx = beats.find((t) => t > T + 0.05); if (nx == null) skip(); else T = nx; }
   function close() {
     if (!cur) return;
     token++;
@@ -291,7 +332,7 @@ export function initReveal(ctx) {
       a.fn(a.ease(k));
       if (k >= 1) a.done = true;
     }
-    if (stage === 2 && T > 4.2) { stage = 3; if (window.__gpa.reveal) window.__gpa.reveal.stage = 3; ctx.emit('reveal-done', cur, ins); }
+    if (stage === 2 && T > (P ? P.end : 4.2)) { stage = 3; if (window.__gpa.reveal) window.__gpa.reveal.stage = 3; ctx.emit('reveal-done', cur, ins); }
     else if (window.__gpa.reveal) window.__gpa.reveal.stage = stage;
     const w = group?.userData;
     if (w?.walls) w.walls.material.opacity = (w.walls.userData.o || 0) * (0.75 + 0.25 * Math.sin(T * 3));
@@ -302,8 +343,9 @@ export function initReveal(ctx) {
       // close on the home first, pull out wide while the rings and places arrive, then settle
       // at a middle distance; the mouse wheel zooms
       const cl = (v) => Math.max(0, Math.min(1, v));
-      const wide = smooth(cl((T - 0.9) / 0.9)) * (1 - smooth(cl((T - 3.3) / 1.1)));
-      const rest = smooth(cl((T - 3.3) / 1.1));
+      const wi = P ? P.wideIn : 0.9, wo = P ? P.wideOut : 3.3;
+      const wide = smooth(cl((T - wi) / 0.9)) * (1 - smooth(cl((T - wo) / 1.1)));
+      const rest = smooth(cl((T - wo) / 1.1));
       const closeR = Math.max(74, home.size * 2.0), closeH = Math.max(58, home.size * 1.3);
       const mix = (a, b, k) => a + (b - a) * k;
       const R = mix(mix(closeR, Math.max(150, closeR * 1.6), rest), 330, wide) * zoom;
@@ -390,10 +432,10 @@ export function initReveal(ctx) {
       if (best) select(best);
     });
   }
-  ctx.on('key', (code) => {
+  ctx.on('key', (code, e) => {
     if (ctx.state !== 'play' || ctx.hud.choosing) return;
     if (code === 'KeyE') { const l = ctx.listingsSys.near; if (l && cur !== l) select(l); }
-    else if (code === 'Space' && cur && stage < 3) skip();
+    else if (code === 'Space' && cur && stage < 3) { if (P?.guided && !e?.shiftKey) nextBeat(); else skip(); }
     else if (code === 'Escape' && cur) close();
     else if (cur && /^(KeyW|KeyS|ArrowUp|ArrowDown)$/.test(code) && !ctx.input.auto.active) close(); // drive away
   });

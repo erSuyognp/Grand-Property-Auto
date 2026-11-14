@@ -30,6 +30,7 @@ export function initMayaLive(ctx, ui) {
     const saved = ctx.saved.list().map((x) => T.alias(x.id));
     if (saved.length) lines.push(`Saved homes: ${saved.join(', ')}.`);
     if (ctx.clients?.active) lines.push(`Active client mission: ${ctx.clients.brief()}`);
+    if (ctx.tour?.active) lines.push(ctx.guide?.brief() || 'The player is walking through the home in 3D.');
     return `[game state]\n${lines.join('\n')}`;
   }
   let noteTimer = 0;

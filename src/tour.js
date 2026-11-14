@@ -703,6 +703,7 @@ export function initTour(ctx) {
     else if (code === 'KeyP') autoTour();
     else if (code === 'KeyF' && T.path === 'W') { hint.textContent = walk.toggleRail() ? WALK_HINT : FREE_HINT; }
     else if (T.path === 'A' && T.rail) { /* W, S, A and D are read by the rail every frame */ }
+    else if (ctx.guide?.active && /^(Enter|Digit[1-4])$/.test(code)) { /* the guided tour takes these */ }
     else if (code === 'KeyR' && T.path === 'W') toggleTape();
     else if (T.path === 'W') { if (code === 'Enter') forward(); }
     else if (code === 'KeyW' || code === 'Enter') forward();

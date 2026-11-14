@@ -12,7 +12,7 @@ test('reveal: select a home, the world animates and the panel slides in', async 
   fs.mkdirSync(DIR, { recursive: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0${MODE}${CITY}`);
+  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0&pace=quick${MODE}${CITY}`);
   await ready(page);
   await page.waitForFunction(() => window.__gpa.ctx.insights.ready, null, { timeout: 15_000 });
   const id = await page.evaluate(() => {
@@ -52,5 +52,36 @@ test('reveal: select a home, the world animates and the panel slides in', async 
   // Esc closes and the car is back
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !window.__gpa.reveal, null, { timeout: 5_000 });
+  expect(errors, errors.join('\n')).toEqual([]);
+});
+
+test('reveal, step by step: one thing at a time with a caption, Space moves on', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`/?autostart=1&mute=1&noshowcase=1&tiles=0${MODE}${CITY}`);
+  await ready(page);
+  await page.waitForFunction(() => window.__gpa.ctx.insights.ready, null, { timeout: 15_000 });
+  const id = await page.evaluate(() => { const g = window.__gpa, r = g.ctx.insights.rows().find((x) => x.kind === 'sale' && x.solarSave) || g.ctx.insights.rows()[0]; g.teleportNear(r.id, 12); return r.id; });
+  await page.evaluate((i) => { window.__gpa.select(i); }, id);
+  // the story starts with the home, then the walk rings, then places one at a time
+  await page.waitForFunction(() => window.__gpa.revealStep?.i >= 2, null, { timeout: 10_000 });
+  await expect(page.locator('#reveal-cap.show p')).toBeVisible();
+  const total = await page.evaluate(() => window.__gpa.revealStep.n);
+  expect(total).toBeGreaterThanOrEqual(6);
+  // the panel has not arrived yet: the world is shown first
+  expect(await page.locator('#ipanel.show').count()).toBe(0);
+  await page.waitForFunction(() => window.__gpa.revealStep.i >= 6, null, { timeout: 20_000 });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${DIR}/24-reveal-step.png` });
+  console.log('step', JSON.stringify(await page.evaluate(() => window.__gpa.revealStep)), await page.locator('#reveal-cap p').innerText());
+  // Space jumps to the next step
+  const before = await page.evaluate(() => window.__gpa.revealStep.i);
+  await page.keyboard.press('Space');
+  await page.waitForFunction((b) => window.__gpa.revealStep.i > b, before, { timeout: 5000 });
+  // Shift+Space skips to the end
+  await page.keyboard.press('Shift+Space');
+  await page.waitForFunction(() => window.__gpa.reveal?.stage === 3, null, { timeout: 8000 });
+  await expect(page.locator('#ipanel.show')).toBeVisible();
   expect(errors, errors.join('\n')).toEqual([]);
 });

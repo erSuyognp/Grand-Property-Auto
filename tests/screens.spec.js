@@ -42,7 +42,7 @@ test('keyboard only: select, sources, down payment, save, inbox, accept, submit,
   // . selects the next home without a mouse
   await page.keyboard.press('Period');
   await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
-  await page.keyboard.press('Space'); // skip the animation
+  await page.keyboard.press('Shift+Space'); // skip the step by step reveal
   await page.waitForFunction(() => window.__gpa.panel?.id, null, { timeout: 10_000 });
   await page.keyboard.press('KeyH'); // every source box
   await expect(page.locator('#ipanel .isrc:not([hidden])').first()).toBeVisible();
@@ -69,6 +69,8 @@ test('keyboard only: select, sources, down payment, save, inbox, accept, submit,
   await page.waitForFunction(() => !!window.__gpa.clients.active, null, { timeout: 5000 });
   // select any home and submit with Enter: a result screen with stars and text appears
   await page.keyboard.press('Period');
+  await page.waitForFunction(() => window.__gpa.reveal?.hasInsights, null, { timeout: 10_000 });
+  await page.keyboard.press('Shift+Space'); // skip the step by step reveal
   await page.waitForSelector('#ipanel.show [data-act="submit"]', { timeout: 10_000 });
   await page.waitForTimeout(300);
   await page.keyboard.press('Enter');
