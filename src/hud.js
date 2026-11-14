@@ -37,7 +37,7 @@ export function initHud(ctx) {
     toast: $('<div id="toast"></div>'),
     chooser: $('<div id="chooser" class="panel"></div>'),
     lightbox: $('<div id="lightbox" class="clickable"><img alt=""/></div>'),
-    help: $('<div id="help" class="chip">WASD drive · Space handbrake · Shift boost · V talk · C view · L time of day · G 3D city · R reset · 0 demo</div>'),
+    help: $('<div id="help" class="chip">WASD drive · Space handbrake · Shift boost · V talk · C view · L time of day · M Google 3D map · N sound · R reset · 0 demo</div>'),
     fade: $('<div id="fade"></div>'),
     typebox: $('<form id="typebox"><input type="text" maxlength="140" placeholder="Say what you are looking for" autocomplete="off"/></form>'),
   };

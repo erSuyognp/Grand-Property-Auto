@@ -36,7 +36,7 @@ python tools/check_data.py houston la mock
 python tools/check_confidential.py
 ```
 
-Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, G Google 3D city or block city, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, click to look with the mouse (or drag, or arrow keys), Shift to run, G see it empty (photo view), T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, M (or G) Google 3D map or block city, N sound on or off, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, click to look with the mouse (or drag, or arrow keys), Shift to run, G see it empty (photo view), T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
 
 ## Needs you
 
@@ -68,7 +68,7 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 
 ## Real 3D city and drone view (added Nov 14)
 
-- **Google 3D city: built, but Google refuses the key, so I have not seen it on screen.** Every request came back HTTP 403. In the Google Cloud console for the key's project: enable **Map Tiles API**, make sure billing is on, and if the key has API restrictions add Map Tiles API to them (referrers to allow: `http://localhost:8787/*` and `http://localhost:5173/*`). Then reload; `G` switches between the Google city and the block city. Until then the game falls back to the block city after 6 seconds by itself (that part I did see work). Expect to tune brightness and ground height once tiles load: `SHOT_TILES=1 npm run shot` writes screenshots to compare with `shots/`.
+- **Google 3D city: working since the Map Tiles API was enabled** (the car sits on the real streets, the height offset calibrates itself, about 52 to 56 fps). The notes that follow describe the earlier 403 and are kept for reference. Every request used to come back HTTP 403. In the Google Cloud console for the key's project: enable **Map Tiles API**, make sure billing is on, and if the key has API restrictions add Map Tiles API to them (referrers to allow: `http://localhost:8787/*` and `http://localhost:5173/*`). Then reload; `G` switches between the Google city and the block city. Until then the game falls back to the block city after 6 seconds by itself (that part I did see work). Expect to tune brightness and ground height once tiles load: `SHOT_TILES=1 npm run shot` writes screenshots to compare with `shots/`.
 - **Drone view works:** park at either of the two Houston homes that have a drone splat (their cards show `Q Drone view`), press `Q`, `Esc` to return. About 41 to 45 fps.
 
 ## Realism pass (added Nov 14)

@@ -27,11 +27,11 @@ export function initTiles(ctx) {
 
   const S = {
     on: false, loading: false, failed: '', tiles: null, holder: null, models: 0, calibrated: 0,
-    errorTarget: 16, city: null, timer: 0, materials: new Set(), startedAt: 0,
+    errorTarget: 20, city: null, timer: 0, materials: new Set(), startedAt: 0,
   };
   const ray = new THREE.Raycaster();
   ray.firstHitOnly = true;
-  const DOWN = new THREE.Vector3(0, -1, 0), origin = new THREE.Vector3();
+  const DOWN = new THREE.Vector3(0, -1, 0), origin = new THREE.Vector3(), view = new THREE.Vector3();
   const cache = new Map();
   let budget = RAY_BUDGET, terrainAt = null;
   const gain = new THREE.Color(1, 1, 1);
@@ -64,7 +64,7 @@ export function initTiles(ctx) {
     // unlit photos through the HDR pipeline: undo the exposure, then follow the time of day
     const e = ctx.env.state;
     const night = e.night || 0;
-    const k = (1.18 / (e.exposure || 0.46)) * (1 - 0.86 * THREE.MathUtils.smoothstep(night, 0.3, 1));
+    const k = (0.74 / (e.exposure || 0.46)) * (1 - 0.86 * THREE.MathUtils.smoothstep(night, 0.3, 1));
     const t = e.tint || { r: 1, g: 1, b: 1 }, m = Math.max(t.r, t.g, t.b) || 1;
     const warm = night > 0.1 ? 0.75 : 0.12;
     gain.setRGB(k * (1 - warm + warm * (t.r / m)), k * (1 - warm + warm * (t.g / m)), k * (1 - warm + warm * (t.b / m)));
@@ -241,8 +241,8 @@ export function initTiles(ctx) {
     slow += dt;
     if (slow > 2 && fps) {
       slow = 0;
-      if (fps < 50 && S.errorTarget < 40) S.errorTarget += 4;
-      else if (fps >= 58 && S.errorTarget > 14) S.errorTarget -= 1;
+      if (fps < 55 && S.errorTarget < 40) S.errorTarget += 4;
+      else if (fps >= 59 && S.errorTarget > 16) S.errorTarget -= 1;
       S.tiles.errorTarget = S.errorTarget;
     }
     const now = performance.now();
@@ -254,7 +254,8 @@ export function initTiles(ctx) {
   });
 
   ctx.on('key', (code) => {
-    if (code !== 'KeyG' || ctx.state !== 'play' || ctx.hud.choosing) return;
+    // M (maps) and G both switch between the Google 3D city and the block city
+    if ((code !== 'KeyG' && code !== 'KeyM') || ctx.state !== 'play' || ctx.hud.choosing) return;
     if (!allowed) { ctx.hud.toast(ctx.mock ? 'Google 3D city is off in mock mode' : 'No Google Maps key: block city only'); return; }
     wanted = !(S.on || S.loading);
     try { localStorage.setItem('gpa-city3d', wanted ? 'on' : 'off'); } catch { /* private mode */ }
@@ -267,6 +268,19 @@ export function initTiles(ctx) {
     get allowed() { return allowed; },
     info() { return { on: S.on, loading: S.loading, failed: S.failed, tiles: S.models, errorTarget: S.errorTarget, offset: S.offset || 0, calibrated: S.calibrated }; },
     setVisible(v) { if (S.holder) S.holder.visible = v && S.on; },
+    // chase camera: if the photo mesh stands between the car and the camera, bring the camera
+    // in front of it (the footprints' heights do not match the photo mesh closely enough)
+    clearView(from, cam) {
+      if (!S.on || !S.calibrated) return;
+      origin.copy(from);
+      view.copy(cam).sub(from);
+      const dist = view.length();
+      if (dist < 1) return;
+      view.multiplyScalar(1 / dist);
+      ray.set(origin, view); ray.far = dist + 0.6;
+      const h = ray.intersectObject(S.tiles.group, true);
+      if (h.length) cam.copy(from).addScaledVector(view, Math.max(2.2, h[0].distance - 0.8));
+    },
   };
   window.__gpa.tiles = () => api.info();
   return api;

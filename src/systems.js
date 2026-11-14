@@ -44,7 +44,7 @@ export async function initSystems(ctx) {
     if (ctx.state !== 'play' || ctx.hud.choosing) return;
     if (code === 'KeyC') ctx.cam.toggleTop();
     if (code === 'KeyR') ctx.car.reset();
-    if (code === 'KeyM') ctx.hud.toast(ctx.audio.toggleMute() ? 'Sound off' : 'Sound on');
+    if (code === 'KeyN') ctx.hud.toast(ctx.audio.toggleMute() ? 'Sound off' : 'Sound on'); // M now loads the Google map
     if (code === 'KeyL') ctx.hud.toast({ day: 'Midday', golden: 'Golden hour', night: 'Night' }[ctx.env.cycle()]);
     const digit = /^Digit([1-4])$/.exec(code);
     if (digit) ctx.listingsSys.toggle(ctx.listingsSys.KINDS[Number(digit[1]) - 1]);

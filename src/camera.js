@@ -6,7 +6,7 @@ import * as THREE from 'three';
 export function createCamera(ctx) {
   const cam = ctx.camera;
   const pos = new THREE.Vector3(0, 60, 60), look = new THREE.Vector3();
-  const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
+  const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3(), tmpFrom = new THREE.Vector3();
   let mode = 'chase';
   let topDown = false;
   let orbit = 0, orbitPitch = 0, dragging = false, lastX = 0, lastY = 0, releaseT = 0;
@@ -40,8 +40,12 @@ export function createCamera(ctx) {
     if (world) {
       out.y = Math.max(out.y, world.heightAt(out.x, out.z) + 1.5);
       // never sit inside a building: lift the camera over the roof it would be in
-      const b = !topDown && world.buildingAt(out.x, out.z);
-      if (b && out.y < b.top + 2) out.y = Math.min(b.top + 2.5, s.y + 60);
+      if (ctx.tiles && ctx.tiles.on) {
+        if (!topDown) ctx.tiles.clearView(tmpFrom.set(s.x, s.y + 1.5, s.z), out);
+      } else {
+        const b = !topDown && world.buildingAt(out.x, out.z);
+        if (b && out.y < b.top + 2) out.y = Math.min(b.top + 2.5, s.y + 60);
+      }
     }
   }
 
