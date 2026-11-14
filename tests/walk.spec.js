@@ -32,7 +32,9 @@ test('walk mode: walk forward 3 s, moved, stayed inside', async ({ page }) => {
   expect(id, 'a listing with an interior mesh').toBeTruthy();
   await page.evaluate((x) => window.__gpa.teleportNear(x, 10), id);
   await page.waitForFunction((x) => window.__gpa.ctx.listingsSys.near?.id === x, id, { timeout: 10_000 });
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE'); // select the home (the reveal)
+  await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
+  await page.keyboard.press('KeyE'); // walk inside
   await page.waitForFunction(() => window.__gpa.tour && window.__gpa.tour.path, null, { timeout: 40_000 });
   const tour = await page.evaluate(() => window.__gpa.tour);
   console.log('path', JSON.stringify(tour));

@@ -148,7 +148,9 @@ test('offline: no server and no internet, the game still drives, shows cards and
   await expect(page.locator('#card.show')).toBeVisible();
   await page.waitForFunction(() => !!window.__gpa.lastSpoken && window.__gpa.ctx.missions.state.arrived, null, { timeout: 10_000 });
   // walk in with no network: walk mode, built in viewer or the photo gallery, never a dead end
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE'); // select the home (the reveal)
+  await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
+  await page.keyboard.press('KeyE'); // walk inside
   await page.waitForFunction(() => window.__gpa.tour && ['W', 'B', 'G'].includes(window.__gpa.tour.path), null, { timeout: 30_000 });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => window.__gpa.state === 'play', null, { timeout: 10_000 });

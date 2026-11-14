@@ -29,7 +29,9 @@ test('walk inside: Showcase, own viewer, empty view, exit', async ({ page }) => 
   await page.waitForFunction((x) => window.__gpa.ctx.listingsSys.near?.id === x, id, { timeout: 10_000 });
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${DIR}/20-curb.png` });
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE'); // select the home (the reveal)
+  await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
+  await page.keyboard.press('KeyE'); // walk inside
   await page.waitForFunction(() => window.__gpa.tour && window.__gpa.tour.path, null, { timeout: 40_000 });
   const first = await page.evaluate(() => window.__gpa.tour);
   console.log('first path', JSON.stringify(first));

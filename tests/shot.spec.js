@@ -88,7 +88,9 @@ test('shot: load and drive', async ({ page }) => {
   });
   await page.waitForFunction(() => window.__gpa.ctx.listingsSys.near?.id === window.__gpa.mission().target, null, { timeout: 10_000 });
   await page.waitForTimeout(600);
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE'); // select the home (the reveal)
+  await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
+  await page.keyboard.press('KeyE'); // walk inside
   await page.waitForTimeout(700);
   // an apartment community asks which space to walk into first: take the community itself
   await page.evaluate(() => {

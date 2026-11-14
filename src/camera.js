@@ -84,6 +84,7 @@ export function createCamera(ctx) {
       pos.lerp(wantPos, Math.min(1, dt * (topDown ? 5 : 4.2)));
       look.lerp(wantLook, Math.min(1, dt * 9));
     }
+    // 'free' mode: another system (the property reveal) moves pos and look itself
     cam.position.copy(pos);
     if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
     else cam.up.set(0, 1, 0);

@@ -198,3 +198,11 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - `ORS_API_KEY` missing: no true drive time isochrones.
 - Confirm with Vexcel which end of the roof condition scale is good (we assume 5).
 - The insurance averages are 2022 data, the newest in the public table.
+
+### Prompt 3: property reveal
+- **E now selects first.** Pulling up and pressing `E` opens the reveal; `E` again (or the panel button) walks inside. The older tests press E twice. Clicking a marker in any view, or a dot on the minimap, selects too. Driving off (W or S) or `Esc` closes it.
+- **Camera.** Close on the home, out wide while the rings and places arrive, then a middle distance; the mouse wheel zooms the drone view. Places that end up off screen keep their time chip at the screen edge.
+- **Solar panels** are drawn in rows inside the roof outline, aligned with the longest wall, as many as the estimate uses (up to 44 drawn). They are an illustration of the count, not a surveyed layout: Google Solar's positions were not available.
+- **Dimming** is a 20% exposure drop while a home is selected; highlights are drawn unlit so they stay bright.
+- **Icons** are Lucide (ISC), inlined at build time by `src/icons.js`.
+- New files: `src/insights.js` (loader), `src/reveal.js` (3D sequence), `src/panel.js` (cards), `src/ui.css` (design system), `src/costmath.js` (shared money math), `tests/reveal.spec.js`.

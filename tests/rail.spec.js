@@ -24,7 +24,9 @@ async function enterHome(page, query) {
   expect(id, 'a prepared home').toBeTruthy();
   await page.evaluate((x) => window.__gpa.teleportNear(x, 10), id);
   await page.waitForFunction((x) => window.__gpa.ctx.listingsSys.near?.id === x, id, { timeout: 10_000 });
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE'); // select the home (the reveal)
+  await page.waitForFunction(() => window.__gpa.reveal?.id, null, { timeout: 10_000 });
+  await page.keyboard.press('KeyE'); // walk inside
 }
 
 const rail = (page) => page.evaluate(() => window.__gpa.ctx.tour.rail());

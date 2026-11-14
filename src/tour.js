@@ -720,8 +720,10 @@ export function initTour(ctx) {
   // ---------------------------------------------------------------- E on a listing
   ctx.on('key', (code) => {
     if (code !== 'KeyE' || ctx.state !== 'play' || ctx.hud.choosing) return;
-    const l = ctx.listingsSys.near;
+    // E first selects a home (the reveal); E again, with its panel open, walks inside
+    const l = ctx.reveal?.listing || ctx.listingsSys.near;
     if (!l || !(l.matterportIds || []).length) return;
+    if (ctx.reveal && !ctx.reveal.isOpenFor(l)) return;
     request(l);
   });
   function request(l) {

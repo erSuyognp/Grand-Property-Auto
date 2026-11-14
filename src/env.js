@@ -77,7 +77,7 @@ export function createEnv(ctx) {
   const tmpA = new THREE.Color(), tmpB = new THREE.Color();
   const sunDir = new THREE.Vector3(), skyDir = new THREE.Vector3();
   const state = { name: 'day', night: 0, t: 1 };
-  let envDirty = true, envClock = 0, time = 0, haze = null;
+  let envDirty = true, envClock = 0, time = 0, haze = null, dim = 1, sunOverride = null;
 
   function copyPreset(dst, p) {
     for (const k of NUM) dst[k] = p[k];
@@ -91,10 +91,15 @@ export function createEnv(ctx) {
     U.sunPosition.value.copy(skyDir);
     sunDir.setFromSphericalCoords(1, rad(90 - cur.lightElev), rad(cur.azim));
     sun.color.copy(cur.sun); sun.intensity = cur.sunI;
+    if (sunOverride) { // the sun slider on a selected home: the real sun position for a time of day
+      sunDir.setFromSphericalCoords(1, rad(90 - Math.max(2, sunOverride.elev)), rad(sunOverride.azim));
+      U.sunPosition.value.copy(sunDir);
+      sun.intensity = cur.sunI * sunOverride.strength;
+    }
     hemi.color.copy(cur.hemiSky); hemi.groundColor.copy(cur.hemiGround); hemi.intensity = cur.hemiI;
     scene.fog.color.copy(cur.fog); scene.fog.near = haze ? haze[0] : cur.fogNear; scene.fog.far = haze ? haze[1] : cur.fogFar;
     scene.environmentIntensity = cur.envI;
-    renderer.toneMappingExposure = cur.exposure;
+    renderer.toneMappingExposure = cur.exposure * dim;
     stars.material.opacity = Math.max(0, cur.night - 0.45) * 1.8;
     stars.visible = stars.material.opacity > 0.01;
     state.night = cur.night;
@@ -155,6 +160,9 @@ export function createEnv(ctx) {
       return next;
     },
     setShadows(on) { sun.castShadow = on; },
+    // the property reveal dims the scene a little so its highlights read
+    setDim(v) { dim = v; renderer.toneMappingExposure = cur.exposure * dim; },
+    setSunOverride(o) { sunOverride = o; apply(); },
     // the Google city wants clear air nearby and haze only in the distance
     setHaze(near, far) { haze = near == null ? null : [near, far]; apply(); },
   };

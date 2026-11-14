@@ -29,14 +29,14 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] build, test, shot, commit
 
 ## Prompt 3: The property reveal (select a property, the world animates)
-- [ ] 1. Camera swoops to a drone view above the home (smooth, about 1.2 s), the rest of the
-- [ ] 2. Drive time rings: the 15, 10 and 5 minute isochrones grow outward from the home on
-- [ ] 3. Places pop up: 3D icons rise with a bounce at the nearest supermarket, school, park,
-- [ ] 4. Solar: if the home has Solar API panels, blue panel tiles drop onto the real roof one
-- [ ] 5. Risk: if the home is in a FEMA flood zone, a gentle blue tint ripples over that area
-- [ ] 6. Panel slides in from the right with cards that animate in one by one with count up
-- [ ] 7. Buttons: Walk inside (E), Save (F), Ask Maya (V), Compare (Tab), Better options (B).
-- [ ] build, test, shot, commit
+- [x] 1. Camera swoops to a drone view above the home (smooth, about 1.2 s), the rest of the
+- [~] 2. Rings are 5/10/15 minute walk rings from distance (no ORS key; drive rings are bigger than the map). Drive time rings: the 15, 10 and 5 minute isochrones grow outward from the home on
+- [x] 3. Places pop up: 3D icons rise with a bounce at the nearest supermarket, school, park,
+- [~] 4. Solar: panels are laid out in rows inside the roof outline (no Google Solar positions); original: if the home has Solar API panels, blue panel tiles drop onto the real roof one
+- [x] 5. Risk: if the home is in a FEMA flood zone, a gentle blue tint ripples over that area
+- [x] 6. Panel slides in from the right with cards that animate in one by one with count up
+- [x] 7. Buttons: Walk inside (E), Save (F), Ask Maya (V), Compare (Tab), Better options (B).
+- [x] build, test, shot, commit
 
 ## Prompt 4: Maya, the voice saleswoman
 - [ ] 1. Speech in: hold V (or the phone mic) uses the Web Speech API with interim results

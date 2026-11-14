@@ -15,6 +15,9 @@ import { initTraffic } from './traffic.js';
 import { initTiles } from './tiles.js';
 import { initDrone } from './drone.js';
 import { initBigMap } from './bigmap.js';
+import { initInsights } from './insights.js';
+import { initReveal } from './reveal.js';
+import { initPanel } from './panel.js';
 
 export async function initSystems(ctx) {
   ctx.saved = initSaved(ctx);
@@ -32,6 +35,9 @@ export async function initSystems(ctx) {
   ctx.tiles = initTiles(ctx);
   ctx.drone = initDrone(ctx);
   ctx.bigmap = initBigMap(ctx);
+  ctx.insights = initInsights(ctx);
+  ctx.reveal = initReveal(ctx);
+  ctx.panel = initPanel(ctx);
 
   // "Take me there" from the saved homes screen: a mission with one target
   ctx.missions.goTo = (l) => {
@@ -45,13 +51,13 @@ export async function initSystems(ctx) {
   ctx.on('key', (code) => {
     if (ctx.state !== 'play' || ctx.hud.choosing) return;
     if (code === 'KeyC') ctx.hud.toast({ aerial: 'Aerial view', top: 'Straight down', street: 'Street view' }[ctx.cam.toggleTop()], 1200);
-    if (code === 'KeyR') ctx.car.reset();
+    if (code === 'KeyR' && !ctx.reveal?.open) ctx.car.reset();
     if (code === 'KeyN') ctx.hud.toast(ctx.audio.toggleMute() ? 'Sound off' : 'Sound on')
     if (code === 'KeyL') ctx.hud.toast({ day: 'Midday', golden: 'Golden hour', night: 'Night' }[ctx.env.cycle()]);
     const digit = /^Digit([1-4])$/.exec(code);
     if (digit) ctx.listingsSys.toggle(ctx.listingsSys.KINDS[Number(digit[1]) - 1]);
-    if (code === 'KeyF' && ctx.listingsSys.near) {
-      const l = ctx.listingsSys.near;
+    if (code === 'KeyF' && (ctx.reveal?.listing || ctx.listingsSys.near)) {
+      const l = ctx.reveal?.listing || ctx.listingsSys.near;
       const on = ctx.saved.toggle(l);
       ctx.hud.toast(on ? 'Saved to your list' : 'Removed from your list');
       ctx.audio.blip(on ? 880 : 440, 0.12);
