@@ -412,6 +412,13 @@ export function initTour(ctx) {
     const p = startPano || T.meta.panos[0];
     const ok = await showPano(p, true);
     if (!ok) return false;
+    // start out facing into the home: toward the middle of the other scan positions
+    const others = T.meta.panos.filter((x) => x !== p);
+    if (others.length) {
+      const c = [0, 1, 2].map((k) => others.reduce((a, x) => a + x.p[k], 0) / others.length - p.p[k]);
+      const v = modelToView(p, c);
+      if (Math.hypot(v.x, v.z) > 0.3) T.yaw = Math.atan2(-v.x, -v.z);
+    }
     hint.textContent = 'Drag to look · W or click a ring to walk · G empty · Esc exits';
     window.__gpa.tour = { path: 'B', panos: T.meta.panos.length };
     updateOverlay();

@@ -210,10 +210,10 @@ export function narrate(l, seed = 0) {
   const near = l.nearby || {};
   if (near.park != null && near.park <= 500) facts.push(`a park is about ${Math.max(50, Math.round(near.park / 50) * 50)} meters away`);
   else if (near.school != null && near.school <= 500) facts.push(`a school is about ${Math.max(50, Math.round(near.school / 50) * 50)} meters away`);
-  const hl = (l.highlights || []).slice(0, 2).map((h) => h.toLowerCase());
+  const hl = (l.highlights || []).filter((h) => h.length < 48).slice(0, 2);
   let second = '';
   if (facts.length) second = facts.slice(0, 2).join(', and ') + '.';
-  else if (hl.length) second = `It comes with ${hl.join(' and ')}.`;
+  else if (hl.length) second = `Highlights: ${hl.join(', and ')}.`;
   else second = 'Pull up and take a look inside.';
   second = second.charAt(0).toUpperCase() + second.slice(1);
   const first = firsts[Math.abs(seed) % firsts.length]().replace(/\s+/g, ' ').replace(' ,', ',');

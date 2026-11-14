@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: 'tests',
   timeout: 60_000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
     viewport: { width: 1280, height: 720 },
     launchOptions: { args: ['--use-gl=angle', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },

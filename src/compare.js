@@ -27,7 +27,7 @@ export function initCompare(ctx) {
         ${row('Beds / baths', (h) => (h.beds != null ? `${h.beds} / ${h.baths ?? '?'}` : h.floorPlans?.length ? `${h.floorPlans.length} floor plans` : null))}
         ${row('Size', (h) => (h.sqft ? `<span class="${h.sqft === biggest && homes.length > 1 ? 'win' : ''}">${Number(h.sqft).toLocaleString('en-US')} sqft</span>` : null))}
         ${row('Price per sqft', (h) => (h.price && h.sqft ? money(h.price / h.sqft) : null))}
-        ${row('Lot', (h) => (h.lotAcres ? `${h.lotAcres} acres` : null))}
+        ${row('Lot', (h) => (h.lotAcres ? `${Math.round(h.lotAcres * 100) / 100} acres` : null))}
         ${row('Built', (h) => h.yearBuilt || null)}
         ${row('HOA', (h) => (h.hoa ? `${money(h.hoa)} /mo` : h.kind === 'apartments' ? null : 'None listed'))}
         ${row('Seen from above', (h) => aerialBadges(h).slice(0, 4).map((b) => esc(b.text)).join('<br>') || null)}

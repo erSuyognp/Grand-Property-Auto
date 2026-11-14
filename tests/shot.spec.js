@@ -13,6 +13,8 @@ test('shot: title screen', async ({ page }) => {
   fs.mkdirSync(DIR, { recursive: true });
   await page.goto(`/?mute=1${MODE}${CITY}`);
   await ready(page);
+  // public (mock) shots: do not show the laptop's network address or a scannable code
+  if (process.env.SHOT_MODE === 'mock') await page.addStyleTag({ content: '#qr .inner { display: none !important; }' });
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${DIR}/00-title.png` });
   await page.keyboard.press('Enter');

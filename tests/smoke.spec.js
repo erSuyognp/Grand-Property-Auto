@@ -128,3 +128,29 @@ test('demo mode runs a full loop', async ({ page }) => {
   for (const step of ['mission', 'drive', 'arrive', 'tour', 'rate', 'compare']) expect(d.log).toContain(step);
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+test('offline: no server and no internet, the game still drives, shows cards and runs missions', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // cut the Node server and everything that is not this machine
+  await page.route('**/*', (route) => {
+    const u = new URL(route.request().url());
+    if (u.pathname.startsWith('/api/') || !/^(localhost|127\.0\.0\.1)$/.test(u.hostname)) return route.abort();
+    return route.continue();
+  });
+  await page.goto(game());
+  await ready(page);
+  await page.evaluate(() => window.__gpa.say('three bedrooms under 900k with a pool'));
+  await page.waitForFunction(() => window.__gpa.mission().ribbon === true, null, { timeout: 15_000 });
+  const target = await page.evaluate(() => window.__gpa.teleportNear(window.__gpa.mission().target, 10));
+  await page.waitForFunction((t) => window.__gpa.ctx.listingsSys.near?.id === t, target, { timeout: 10_000 });
+  await expect(page.locator('#card.show')).toBeVisible();
+  await page.waitForFunction(() => !!window.__gpa.lastSpoken && window.__gpa.ctx.missions.state.arrived, null, { timeout: 10_000 });
+  // walk in with no network: built in viewer or the photo gallery, never a dead end
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => window.__gpa.tour && ['B', 'G'].includes(window.__gpa.tour.path), null, { timeout: 30_000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__gpa.state === 'play', null, { timeout: 10_000 });
+  expect(errors, errors.join('\n')).toEqual([]);
+});
