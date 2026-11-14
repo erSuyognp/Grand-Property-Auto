@@ -1,64 +1,78 @@
-// Grand Property Auto entry point.
-// Phase 0: placeholder scene (flat ground + box car) so the build and shot pipeline work.
+// Grand Property Auto entry point: renderer, game loop and the wiring between systems.
 import * as THREE from 'three';
 import { loadConfig } from './data.js';
+import { createWorld } from './world.js';
+import { createCar } from './car.js';
+import { createCamera } from './camera.js';
+import { createInput } from './input.js';
+import { createAudio } from './audio.js';
+import { initSystems } from './systems.js';
 
+const params = new URLSearchParams(location.search);
 const config = await loadConfig();
-
 const app = document.getElementById('app');
-const fpsEl = document.getElementById('fps');
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+const gl = renderer.getContext();
+const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+const software = /swiftshader|llvmpipe|software|basic render/i.test(gpu);
+const quality = { low: params.get('q') === 'low' || (software && params.get('q') !== 'high'), gpu };
+renderer.setPixelRatio(quality.low ? 1 : Math.min(window.devicePixelRatio, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = !quality.low;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9cc9ee);
-scene.fog = new THREE.Fog(0x9cc9ee, 200, 900);
+scene.background = new THREE.Color(0xa9d3f2);
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.4, 4000);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 3000);
+// tiny event bus shared by every system
+const handlers = new Map();
+const ctx = {
+  config, params, renderer, scene, camera, quality,
+  state: 'loading', // loading | title | play | tour | compare
+  world: null, car: null,
+  on(name, fn) { if (!handlers.has(name)) handlers.set(name, []); handlers.get(name).push(fn); return ctx; },
+  emit(name, ...args) { for (const fn of handlers.get(name) || []) fn(...args); },
+  mock: config.mode === 'mock',
+};
+window.__gpa = { ready: false, fps: 0, mode: config.mode, car: { x: 0, z: 0, speed: 0 }, ctx, quality };
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x556644, 0.9));
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(100, 200, 50);
-scene.add(sun);
+ctx.input = createInput(ctx);
+ctx.car = createCar(ctx);
+ctx.cam = createCamera(ctx);
+ctx.audio = createAudio(ctx);
 
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(1500, 1500, 1, 1),
-  new THREE.MeshLambertMaterial({ color: 0x6d8f5a }),
-);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
-const grid = new THREE.GridHelper(1500, 60, 0x445533, 0x557744);
-grid.position.y = 0.02;
-scene.add(grid);
+const CITIES = config.mode === 'mock' ? ['mock'] : ['houston', 'la'];
+ctx.cities = CITIES;
+let loadToken = 0;
+ctx.loadCity = async function loadCity(city) {
+  const token = ++loadToken;
+  if (!CITIES.includes(city)) city = CITIES[0];
+  document.body.classList.add('loading');
+  ctx.emit('city-unload');
+  if (ctx.world) { ctx.world.dispose(); ctx.world = null; }
+  const world = await createWorld(ctx, city);
+  if (token !== loadToken) { world.dispose(); return; }
+  ctx.world = world;
+  ctx.city = city;
+  ctx.car.setWorld(world);
+  const spawn = world.findSpawn(0, 0);
+  ctx.car.place(spawn.x, spawn.z, 0);
+  ctx.cam.snap();
+  try { localStorage.setItem('gpa-city', city); } catch { /* private mode */ }
+  document.body.classList.remove('loading');
+  ctx.emit('city', world);
+  window.__gpa.city = city;
+  window.__gpa.buildings = world.buildings.length;
+  window.__gpa.listings = world.listings.length;
+};
 
-const car = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 4.2), new THREE.MeshLambertMaterial({ color: 0xe8442e }));
-car.position.y = 0.6;
-scene.add(car);
-
-const keys = new Set();
-addEventListener('keydown', (e) => keys.add(e.code));
-addEventListener('keyup', (e) => keys.delete(e.code));
-
-let speed = 0;
-function updateCar(dt) {
-  const fwd = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
-  const steer = (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) - (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0);
-  speed += fwd * 25 * dt;
-  speed *= 1 - 1.5 * dt;
-  car.rotation.y += steer * dt * 2 * Math.sign(speed || 1) * Math.min(1, Math.abs(speed) / 5);
-  car.position.x -= Math.sin(car.rotation.y) * speed * dt;
-  car.position.z -= Math.cos(car.rotation.y) * speed * dt;
-}
-
-const camOffset = new THREE.Vector3();
-function updateCamera() {
-  camOffset.set(Math.sin(car.rotation.y) * 12, 6, Math.cos(car.rotation.y) * 12);
-  camera.position.copy(car.position).add(camOffset);
-  camera.lookAt(car.position.x, car.position.y + 1, car.position.z);
-}
+await initSystems(ctx);
 
 addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -66,24 +80,44 @@ addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Test hook read by Playwright.
-const debug = (window.__gpa = { ready: false, fps: 0, mode: config.mode, car: { x: 0, z: 0 } });
+let stored = null;
+try { stored = localStorage.getItem('gpa-city'); } catch { /* ignore */ }
+await ctx.loadCity(params.get('city') || stored || CITIES[0]);
+ctx.emit('boot');
 
 const timer = new THREE.Timer();
-let frames = 0, fpsTime = 0;
+let frames = 0, fpsTime = 0, slow = 0;
+const focus = new THREE.Vector3();
 renderer.setAnimationLoop((t) => {
   timer.update(t);
   const dt = Math.min(timer.getDelta(), 0.05);
-  updateCar(dt);
-  updateCamera();
-  renderer.render(scene, camera);
-  debug.car.x = car.position.x;
-  debug.car.z = car.position.z;
+  const driving = ctx.state === 'play';
+  if (ctx.world) {
+    const inp = driving ? ctx.input.get() : { throttle: 0, steer: 0, handbrake: true, boost: false };
+    if (ctx.state !== 'tour') ctx.car.update(dt, inp);
+    ctx.emit('update', dt, inp);
+    ctx.cam.update(dt);
+    focus.set(ctx.car.state.x, ctx.car.state.y, ctx.car.state.z);
+    ctx.world.update(focus);
+    ctx.audio.update(ctx.car, driving);
+    if (!ctx.skipRender) renderer.render(scene, camera);
+    ctx.emit('post', dt);
+  }
+  const d = window.__gpa;
+  d.car.x = ctx.car.state.x; d.car.z = ctx.car.state.z; d.car.speed = ctx.car.state.speed;
+  d.state = ctx.state;
   frames++; fpsTime += dt;
   if (fpsTime >= 0.5) {
-    debug.fps = Math.round(frames / fpsTime);
-    fpsEl.textContent = `${debug.fps} fps${config.mode === 'mock' ? ' · MOCK' : ''}`;
+    d.fps = Math.round(frames / fpsTime);
+    ctx.emit('fps', d.fps);
+    // adaptive quality: drop shadows, then resolution, when the machine can't hold 40 fps
+    if (d.fps < 40 && d.ready) slow++; else slow = 0;
+    if (slow >= 4) {
+      slow = 0;
+      if (renderer.shadowMap.enabled) { renderer.shadowMap.enabled = false; ctx.world?.setShadows(false); }
+      else if (renderer.getPixelRatio() > 1) renderer.setPixelRatio(1);
+    }
     frames = 0; fpsTime = 0;
   }
-  debug.ready = true;
+  if (ctx.world) d.ready = true;
 });

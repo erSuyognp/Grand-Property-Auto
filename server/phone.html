@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#14181f" />
+<title>Grand Property Auto controller</title>
+<style>
+  :root { --ink: #14181f; --paper: #fffaf0; --accent: #ff5a2c; --gold: #ffc940; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: var(--paper); font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); gap: 10px; }
+  header { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  header b { font: 18px Impact, 'Arial Black', sans-serif; letter-spacing: 0.03em; }
+  header i { width: 10px; height: 10px; border-radius: 50%; background: #68717d; margin-left: auto; }
+  header i.on { background: #2fd46b; }
+  nav { display: flex; gap: 6px; }
+  nav button { flex: 1; border: 0; border-radius: 999px; padding: 9px; font: 700 13px inherit; color: var(--paper); background: rgba(255, 250, 240, 0.1); }
+  nav button.on { background: var(--accent); }
+  .page { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 10px; }
+  .page.on { display: flex; }
+  #card { background: rgba(255, 250, 240, 0.08); border-radius: 16px; padding: 12px 14px; min-height: 96px; font-size: 14px; }
+  #card .k { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; background: var(--gold); color: var(--ink); padding: 2px 8px; border-radius: 999px; }
+  #card .p { font: 26px/1.1 Impact, 'Arial Black', sans-serif; margin-top: 6px; }
+  #card .f { font-weight: 700; margin-top: 2px; }
+  #card .a, #card .b { opacity: 0.75; font-size: 12.500px; margin-top: 2px; }
+  #card .idle { opacity: 0.6; line-height: 1.4; }
+  #wheel { height: 54px; border-radius: 999px; background: rgba(255, 250, 240, 0.08); position: relative; overflow: hidden; }
+  #wheel span { position: absolute; top: 6px; bottom: 6px; width: 42px; left: calc(50% - 21px); border-radius: 999px; background: var(--paper); transition: transform 0.05s linear; }
+  #wheel em { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; opacity: 0.55; pointer-events: none; }
+  .row { display: flex; gap: 10px; }
+  .act { flex: 1; border: 0; border-radius: 16px; padding: 16px 8px; font: 700 16px inherit; color: var(--ink); background: var(--paper); }
+  .act.alt { background: rgba(255, 250, 240, 0.14); color: var(--paper); }
+  .act:disabled { opacity: 0.35; }
+  #mic { background: var(--gold); }
+  #mic.on { background: #ff3b30; color: #fff; }
+  .pedals { flex: 1; min-height: 120px; display: flex; gap: 10px; }
+  .pedal { flex: 1; border: 0; border-radius: 22px; font: 26px Impact, 'Arial Black', sans-serif; letter-spacing: 0.04em; color: var(--paper); }
+  #brake { background: #7a2a2a; }
+  #gas { background: #1f7a45; flex: 1.5; }
+  .pedal.down { filter: brightness(1.5); transform: scale(0.98); }
+  #caption { min-height: 34px; font-size: 13.500px; line-height: 1.3; text-align: center; opacity: 0.9; }
+  #tiltbtn { border: 0; border-radius: 999px; padding: 10px; font: 700 13px inherit; background: var(--gold); color: var(--ink); }
+  #saved { overflow-y: auto; touch-action: pan-y; display: flex; flex-direction: column; gap: 8px; }
+  #saved, #saved * { touch-action: pan-y; }
+  .s { background: rgba(255, 250, 240, 0.08); border-radius: 14px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+  .s div { flex: 1; min-width: 0; }
+  .s b { font: 20px Impact, 'Arial Black', sans-serif; display: block; }
+  .s span { font-size: 12.500px; opacity: 0.8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s button { border: 0; border-radius: 999px; width: 34px; height: 34px; background: rgba(255, 250, 240, 0.14); color: var(--paper); font-size: 18px; }
+  #typed { display: flex; gap: 6px; }
+  #typed input { flex: 1; min-width: 0; border-radius: 999px; border: 1px solid rgba(255, 250, 240, 0.3); background: transparent; color: var(--paper); padding: 9px 14px; font: 14px inherit; user-select: text; -webkit-user-select: text; touch-action: auto; }
+  #typed button { border: 0; border-radius: 999px; padding: 0 14px; background: var(--paper); color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><b>GRAND PROPERTY AUTO</b><span id="where"></span><i id="link"></i></header>
+  <nav><button data-p="drive" class="on">Drive</button><button data-p="list">My saved homes <span id="count"></span></button></nav>
+  <section class="page on" id="drive">
+    <div id="card"><div class="idle">Tilt to steer. Hold the mic and say what you want, like "three beds under 900K with a pool".</div></div>
+    <div id="caption"></div>
+    <button id="tiltbtn">Turn on tilt steering</button>
+    <div id="wheel"><span></span><em>drag here to steer</em></div>
+    <div class="row">
+      <button class="act alt" id="b2">F Save</button>
+      <button class="act" id="mic">Hold to talk</button>
+      <button class="act" id="b1">E Walk inside</button>
+    </div>
+    <form id="typed"><input placeholder="or type it" autocomplete="off" /><button>Go</button></form>
+    <div class="pedals"><button class="pedal" id="brake">BRAKE</button><button class="pedal" id="gas">GAS</button></div>
+  </section>
+  <section class="page" id="list"><div id="saved"></div></section>
+</div>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const room = new URLSearchParams(location.search).get('room') || 'default';
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let ws = null, state = null, steer = 0, tilt = null, touchSteer = null, gas = 0, brake = 0, tiltOn = false;
+  const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+  window.__phone = { send, get state() { return state; }, set(v) { if ('steer' in v) touchSteer = v.steer; if ('gas' in v) gas = v.gas; if ('brake' in v) brake = v.brake; } };
+
+  function connect() {
+    ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?room=${encodeURIComponent(room)}&role=phone`);
+    ws.onopen = () => { $('#link').classList.add('on'); send({ t: 'hello' }); };
+    ws.onclose = () => { $('#link').classList.remove('on'); setTimeout(connect, 1500); };
+    ws.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.t === 'state') { state = m; render(); }
+      else if (m.t === 'buzz' && navigator.vibrate) navigator.vibrate(m.ms);
+      else if (m.t === 'caption') { $('#caption').textContent = m.text; clearTimeout(window.__ct); window.__ct = setTimeout(() => ($('#caption').textContent = ''), 7000); }
+    };
+  }
+  connect();
+
+  // 30 Hz drive messages
+  setInterval(() => {
+    steer = touchSteer != null ? touchSteer : tilt != null ? tilt : 0;
+    $('#wheel span').style.transform = `translateX(${-steer * 110}px)`;
+    send({ t: 'drive', steer, gas, brake });
+  }, 33);
+
+  // ---- tilt steering (landscape or portrait): roll the phone like a wheel
+  function onOrient(e) {
+    if (e.gamma == null) return;
+    const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    let roll = angle === 90 ? e.beta : angle === 270 || angle === -90 ? -e.beta : e.gamma;
+    const v = Math.max(-1, Math.min(1, roll / 32));
+    tilt = Math.abs(v) < 0.08 ? 0 : -v; // tilt left = steer left (positive steer is left in the game)
+  }
+  async function enableTilt() {
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission(); // iOS asks once
+        if (r !== 'granted') throw new Error('denied');
+      }
+      addEventListener('deviceorientation', onOrient);
+      tiltOn = true;
+      $('#tiltbtn').style.display = 'none';
+    } catch { $('#tiltbtn').textContent = 'Tilt blocked. Drag the bar to steer'; }
+  }
+  $('#tiltbtn').addEventListener('click', enableTilt);
+  if (!window.isSecureContext) $('#tiltbtn').textContent = 'Tilt needs the https link. Drag the bar to steer';
+
+  // ---- drag bar steering (fallback, and handy on a desk)
+  const wheel = $('#wheel');
+  const setTouch = (e) => { const r = wheel.getBoundingClientRect(); touchSteer = -Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - 0.5) * 2.4)); };
+  wheel.addEventListener('pointerdown', (e) => { wheel.setPointerCapture(e.pointerId); setTouch(e); });
+  wheel.addEventListener('pointermove', (e) => { if (touchSteer != null) setTouch(e); });
+  const endTouch = () => { touchSteer = null; };
+  wheel.addEventListener('pointerup', endTouch); wheel.addEventListener('pointercancel', endTouch);
+
+  // ---- pedals
+  for (const [id, set] of [['gas', (v) => (gas = v)], ['brake', (v) => (brake = v)]]) {
+    const b = $('#' + id);
+    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); b.classList.add('down'); set(1); });
+    for (const ev of ['pointerup', 'pointercancel']) b.addEventListener(ev, () => { b.classList.remove('down'); set(0); });
+  }
+
+  // ---- action buttons follow what is on the big screen
+  let a1 = null, a2 = null;
+  $('#b1').addEventListener('click', () => a1 && send(a1));
+  $('#b2').addEventListener('click', () => a2 && send(a2));
+  function render() {
+    const s = state;
+    $('#where').textContent = s.city || '';
+    const c = s.card;
+    const card = $('#card');
+    if (s.tour && s.tour.active) {
+      card.innerHTML = `<span class="k">Inside</span><div class="p">${esc(s.tour.room || 'Walking through')}</div><div class="a">Tilt to look around. Tap Walk to move to the next spot.</div>`;
+      $('#b1').textContent = 'Walk'; a1 = { t: 'tour', act: 'forward' }; $('#b1').disabled = false;
+      $('#b2').textContent = s.tour.hasEmpty ? (s.tour.empty ? 'Furnished' : 'See it empty') : 'Exit'; a2 = s.tour.hasEmpty ? { t: 'tour', act: 'empty' } : { t: 'tour', act: 'exit' }; $('#b2').disabled = false;
+      $('#brake').textContent = 'EXIT'; $('#gas').textContent = 'WALK';
+    } else {
+      $('#brake').textContent = 'BRAKE'; $('#gas').textContent = 'GAS';
+      if (c) {
+        card.innerHTML = `<span class="k">${esc(c.kindLabel)}</span><div class="p">${esc(c.price)}</div><div class="f">${esc(c.facts)}</div><div class="a">${esc(c.address)}</div>${c.badges.length ? `<div class="b">${esc(c.badges.slice(0, 3).join(' · '))}</div>` : ''}`;
+        $('#b1').textContent = 'E Walk inside'; a1 = { t: 'key', code: 'KeyE' }; $('#b1').disabled = !c.canTour;
+        $('#b2').textContent = c.saved ? 'Saved' : 'F Save'; a2 = { t: 'key', code: 'KeyF' }; $('#b2').disabled = false;
+      } else {
+        card.innerHTML = s.mission ? `<span class="k">Mission</span><div class="p">Follow the gold line</div><div class="a">${esc(s.mission.target || '')}</div>` : '<div class="idle">Tilt to steer. Hold the mic and say what you want, like "three beds under 900K with a pool".</div>';
+        $('#b1').textContent = 'E Walk inside'; a1 = null; $('#b1').disabled = true;
+        $('#b2').textContent = 'F Save'; a2 = null; $('#b2').disabled = true;
+      }
+    }
+    $('#count').textContent = s.saved.length ? `(${s.saved.length})` : '';
+    $('#saved').innerHTML = s.saved.length ? s.saved.map((h) => `<div class="s"><div><b>${esc(h.price)}</b><span>${esc(h.facts)}</span><span>${esc(h.address)}</span></div><button data-id="${esc(h.id)}">&times;</button></div>`).join('') : '<div class="s"><div><span>Nothing saved yet. Pull up to a home and tap Save.</span></div></div>';
+    for (const b of document.querySelectorAll('#saved button')) b.addEventListener('click', () => send({ t: 'unsave', id: b.dataset.id }));
+  }
+  // in a tour the pedals walk and exit
+  $('#gas').addEventListener('click', () => { if (state?.tour?.active) send({ t: 'tour', act: 'forward' }); });
+  $('#brake').addEventListener('click', () => { if (state?.tour?.active) send({ t: 'tour', act: 'exit' }); });
+
+  // ---- tabs
+  for (const b of document.querySelectorAll('nav button')) b.addEventListener('click', () => {
+    for (const x of document.querySelectorAll('nav button')) x.classList.toggle('on', x === b);
+    $('#drive').classList.toggle('on', b.dataset.p === 'drive'); $('#list').classList.toggle('on', b.dataset.p === 'list');
+  });
+
+  // ---- hold to talk
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const mic = $('#mic');
+  let rec = null, text = '';
+  function startTalk() {
+    if (!SR) { $('#typed input').focus(); return; }
+    text = '';
+    try {
+      rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
+      rec.onresult = (e) => { text = ''; for (const r of e.results) text += r[0].transcript + ' '; send({ t: 'live', text: text.trim() }); };
+      rec.onend = () => { mic.classList.remove('on'); send({ t: 'live', text: null }); if (text.trim()) send({ t: 'say', text: text.trim() }); rec = null; };
+      rec.onerror = () => {};
+      rec.start(); mic.classList.add('on'); send({ t: 'live', text: '' });
+      if (navigator.vibrate) navigator.vibrate(20);
+    } catch { rec = null; }
+  }
+  const stopTalk = () => { if (rec) setTimeout(() => { try { rec.stop(); } catch {} }, 300); };
+  mic.addEventListener('pointerdown', (e) => { mic.setPointerCapture(e.pointerId); startTalk(); });
+  mic.addEventListener('pointerup', stopTalk); mic.addEventListener('pointercancel', stopTalk);
+  if (!SR) mic.textContent = 'Type below';
+  $('#typed').addEventListener('submit', (e) => { e.preventDefault(); const i = $('#typed input'); if (i.value.trim()) send({ t: 'say', text: i.value.trim() }); i.value = ''; i.blur(); });
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,61 @@
-// audio system. Placeholder from Phase 0; filled in by later phases.
-export function initAudio(ctx) {
-  return { update(dt) {} };
+// Engine note that rises with speed, tire squeal on drift, and a few UI blips. All Web Audio
+// oscillators and noise: no audio files.
+export function createAudio(ctx) {
+  let ac = null, engine = null, engine2 = null, engineGain = null, squealGain = null, master = null;
+  let muted = false;
+
+  function start() {
+    if (ac) return;
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+    } catch { return; }
+    master = ac.createGain();
+    master.gain.value = 0.5;
+    master.connect(ac.destination);
+    engine = ac.createOscillator(); engine.type = 'sawtooth';
+    engine2 = ac.createOscillator(); engine2.type = 'square';
+    const filter = ac.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 520;
+    engineGain = ac.createGain(); engineGain.gain.value = 0;
+    engine.connect(filter); engine2.connect(filter); filter.connect(engineGain); engineGain.connect(master);
+    engine.start(); engine2.start();
+    // squeal: band passed noise
+    const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource(); noise.buffer = buf; noise.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 7;
+    squealGain = ac.createGain(); squealGain.gain.value = 0;
+    noise.connect(bp); bp.connect(squealGain); squealGain.connect(master);
+    noise.start();
+  }
+  const unlock = () => { start(); if (ac && ac.state === 'suspended') ac.resume(); };
+  addEventListener('pointerdown', unlock);
+  addEventListener('keydown', unlock);
+
+  function blip(freq = 660, dur = 0.12, type = 'sine', vol = 0.18) {
+    if (!ac || muted) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    o.connect(g); g.connect(master);
+    o.start(); o.stop(ac.currentTime + dur);
+  }
+
+  return {
+    blip,
+    chime() { blip(660, 0.14); setTimeout(() => blip(880, 0.2), 110); },
+    thud() { blip(90, 0.18, 'triangle', 0.35); },
+    setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.5; },
+    toggleMute() { this.setMuted(!muted); return muted; },
+    update(car, active) {
+      if (!ac) return;
+      const sp = Math.abs(car.state.speed);
+      const f = 48 + sp * 4.6;
+      engine.frequency.setTargetAtTime(f, ac.currentTime, 0.05);
+      engine2.frequency.setTargetAtTime(f * 0.5, ac.currentTime, 0.05);
+      engineGain.gain.setTargetAtTime(active ? 0.05 + Math.min(0.08, sp * 0.003) : 0, ac.currentTime, 0.08);
+      squealGain.gain.setTargetAtTime(active ? car.state.drift * 0.16 : 0, ac.currentTime, 0.06);
+    },
+  };
 }

@@ -24,15 +24,28 @@ export function dataBase(city) {
   return config.mode === 'mock' ? '/data/mock/' : `/data/${city}/`;
 }
 
+// Fetch and parse JSON; null when the file is missing (a dev server may answer 200 with HTML).
+async function tryJson(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const type = res.headers.get('content-type') || '';
+    if (type.includes('text/html')) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 // Fetch a JSON data file, falling back to the mock set if the real one is missing.
 export async function loadDataJson(city, file) {
   const base = dataBase(city);
-  const res = await fetch(base + file);
-  if (res.ok) return res.json();
+  const got = await tryJson(base + file);
+  if (got !== null) return got;
   if (base !== '/data/mock/') {
     console.warn(`[data] ${base}${file} missing, using mock`);
-    const mock = await fetch('/data/mock/' + file);
-    if (mock.ok) return mock.json();
+    const mock = await tryJson('/data/mock/' + file);
+    if (mock !== null) return mock;
   }
   throw new Error(`[data] no ${file} for ${city}`);
 }

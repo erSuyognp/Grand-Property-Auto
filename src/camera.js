@@ -1,4 +1,102 @@
-// camera system. Placeholder from Phase 0; filled in by later phases.
-export function initCamera(ctx) {
-  return { update(dt) {} };
+// Chase camera with a little lag that pulls back as speed rises. C toggles a top down view,
+// mouse drag orbits briefly and springs back. Also runs the scripted shots: title flyover,
+// the spawn drop from the sky, and the swoop to a front door before a tour.
+import * as THREE from 'three';
+
+export function createCamera(ctx) {
+  const cam = ctx.camera;
+  const pos = new THREE.Vector3(0, 60, 60), look = new THREE.Vector3();
+  const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
+  let mode = 'chase';
+  let topDown = false;
+  let orbit = 0, orbitPitch = 0, dragging = false, lastX = 0, lastY = 0, releaseT = 0;
+  let script = null; // {t, dur, fn(k), done}
+  let t = 0;
+
+  const el = ctx.renderer.domElement;
+  el.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  addEventListener('pointerup', () => { dragging = false; releaseT = 0; });
+  addEventListener('pointermove', (e) => {
+    if (!dragging || mode !== 'chase') return;
+    orbit -= (e.clientX - lastX) * 0.006;
+    orbitPitch = THREE.MathUtils.clamp(orbitPitch + (e.clientY - lastY) * 0.004, -0.25, 0.9);
+    lastX = e.clientX; lastY = e.clientY;
+  });
+
+  const ease = (k) => k * k * (3 - 2 * k);
+
+  function chaseTarget(car, out, outLook) {
+    const s = car.state;
+    const speed = Math.abs(s.speed);
+    const dist = 8.5 + speed * 0.17, height = 3.6 + speed * 0.05 + orbitPitch * 9;
+    const a = s.heading + orbit;
+    out.set(s.x + Math.sin(a) * dist, s.y + height, s.z + Math.cos(a) * dist);
+    outLook.set(s.x - Math.sin(s.heading) * 4, s.y + 1.3, s.z - Math.cos(s.heading) * 4);
+    if (topDown) {
+      out.set(s.x + Math.sin(s.heading) * 0.01, s.y + 95 + speed, s.z + Math.cos(s.heading) * 0.01);
+      outLook.set(s.x, s.y, s.z);
+    }
+    const world = ctx.world;
+    if (world) {
+      out.y = Math.max(out.y, world.heightAt(out.x, out.z) + 1.5);
+      // never sit inside a building: lift the camera over the roof it would be in
+      const b = !topDown && world.buildingAt(out.x, out.z);
+      if (b && out.y < b.top + 2) out.y = Math.min(b.top + 2.5, s.y + 60);
+    }
+  }
+
+  function update(dt) {
+    t += dt;
+    const car = ctx.car;
+    if (script) {
+      script.t += dt;
+      const k = Math.min(1, script.t / script.dur);
+      script.fn(ease(k), k);
+      if (k >= 1) { const d = script.done; script = null; d && d(); }
+    } else if (mode === 'title') {
+      const w = ctx.world;
+      const a = t * 0.05;
+      const r = 330;
+      pos.set(Math.cos(a) * r, 150 + Math.sin(t * 0.13) * 18, Math.sin(a) * r);
+      look.set(Math.cos(a + 1.2) * 60, w ? w.heightAt(0, 0) : 0, Math.sin(a + 1.2) * 60);
+    } else if (mode === 'chase' && car) {
+      if (!dragging) {
+        releaseT += dt;
+        if (releaseT > 0.6) { orbit *= Math.max(0, 1 - dt * 4); orbitPitch *= Math.max(0, 1 - dt * 4); }
+      }
+      chaseTarget(car, wantPos, wantLook);
+      pos.lerp(wantPos, Math.min(1, dt * (topDown ? 5 : 4.2)));
+      look.lerp(wantLook, Math.min(1, dt * 9));
+    }
+    cam.position.copy(pos);
+    if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
+    else cam.up.set(0, 1, 0);
+    cam.lookAt(look);
+    const targetFov = mode === 'chase' && car ? 62 + Math.min(14, Math.abs(car.state.speed) * 0.32) : 58;
+    if (Math.abs(cam.fov - targetFov) > 0.05) { cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 3); cam.updateProjectionMatrix(); }
+  }
+
+  return {
+    update, pos, look,
+    get mode() { return mode; },
+    setMode(m) { mode = m; script = null; },
+    toggleTop() { topDown = !topDown; },
+    snap() { if (ctx.car) { chaseTarget(ctx.car, pos, look); } },
+    // drop from the sky to the car
+    intro(done) {
+      mode = 'chase';
+      const from = new THREE.Vector3(ctx.car.state.x + 40, 420, ctx.car.state.z + 120), fromLook = new THREE.Vector3(ctx.car.state.x, 0, ctx.car.state.z);
+      pos.copy(from); look.copy(fromLook);
+      script = { t: 0, dur: 3.2, done, fn: (k) => { chaseTarget(ctx.car, wantPos, wantLook); pos.lerpVectors(from, wantPos, k); look.lerpVectors(fromLook, wantLook, k); } };
+    },
+    // swoop toward a point (the front door) before a tour
+    swoop(target, done, dur = 1.25) {
+      const from = pos.clone(), fromLook = look.clone();
+      const to = new THREE.Vector3(target.x, target.y + 1.7, target.z);
+      const dir = to.clone().sub(from).setY(0).normalize();
+      const end = to.clone().addScaledVector(dir, -3);
+      script = { t: 0, dur, done, fn: (k) => { pos.lerpVectors(from, end, k); look.lerpVectors(fromLook, to, Math.min(1, k * 1.6)); } };
+    },
+    isScripted() { return !!script; },
+  };
 }
