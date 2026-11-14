@@ -154,6 +154,8 @@ if (fs.existsSync(dist)) {
   app.use(express.static(dist, { maxAge: 0 }));
   // real city data is not copied into dist: serve it straight from public/data (never in mock mode)
   if (GAME_MODE !== 'mock') app.use('/data', express.static(path.join(ROOT, 'public', 'data')));
+  // Matterport's Showcase SDK bundle, if it has been downloaded (local only, see MORNING.md)
+  if (GAME_MODE !== 'mock' && fs.existsSync(path.join(ROOT, 'public', 'mp-bundle'))) app.use('/mp-bundle', express.static(path.join(ROOT, 'public', 'mp-bundle')));
 }
 
 // ---- websocket relay with rooms: every message goes to everyone else in the room

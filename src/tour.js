@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { priceText, factsText } from './format.js';
 import { createWalk } from './walk.js';
+import { attachRail } from './showcaseRail.js';
 
 const CONNECT_TIMEOUT = 8000;
 // Skybox face order: 0 up, 1 to 4 around the horizon, 5 down. Each entry maps image
@@ -60,6 +61,7 @@ export function initTour(ctx) {
     <div class="rtoast"></div>
     <canvas class="fmap" width="320" height="320"></canvas>
     <div class="bar">
+      <button data-act="auto"><kbd>P</kbd> <span>Tour</span></button>
       <button data-act="empty"><kbd>G</kbd> See it empty</button>
       <button data-act="next"><kbd>N</kbd> Next space</button>
       <button data-act="switch"><kbd>T</kbd> <span>Switch view</span></button>
@@ -261,6 +263,7 @@ export function initTour(ctx) {
     be.style.display = hasEmpty ? '' : 'none';
     be.lastChild.textContent = T.path === 'W' ? ' See it empty (photo view)' : T.empty ? ' Furnished' : ' See it empty';
     q('[data-act="next"]').style.display = T.models.length > 1 ? '' : 'none';
+    q('[data-act="auto"]').style.display = (T.path === 'A' && T.rail) || T.path === 'W' ? '' : 'none';
     const nxt = nextPath();
     q('[data-act="switch"]').style.display = nxt ? '' : 'none';
     q('[data-act="switch"] span').textContent = { W: 'Walk freely', A: 'Matterport view', B: 'Photo spots' }[nxt] || '';
@@ -353,7 +356,9 @@ export function initTour(ctx) {
     if (T.path === 'W') hint.textContent = document.pointerLockElement === stage ? 'WASD walk · mouse looks · Shift runs · Esc frees the mouse' : WALK_HINT;
   });
   const freeMouse = () => { if (document.pointerLockElement === stage && document.exitPointerLock) document.exitPointerLock(); };
-  const WALK_HINT = 'WASD walk · click to look with the mouse (or drag) · Shift runs · T other views · Esc exits';
+  const WALK_HINT = 'W S along the route · A D pick a branch · drag to look · Shift faster · P tour · F free walk · T other views';
+  const FREE_HINT = 'WASD walk · click to look with the mouse (or drag) · Shift runs · F back on the route · T other views';
+  const RAIL_HINT = 'W S along the route · A D pick a branch · drag to look · Shift faster · P tour · T other views · Esc exits';
   function pickDisc(e) {
     ray.setFromCamera(new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1), cam);
     let best = null, ba = 0.09;
@@ -375,6 +380,7 @@ export function initTour(ctx) {
     if (T.path === 'B' && !fading) { ctx.audio.blip(520, 0.08); showPano(pano); }
   }
   function forward() {
+    if (T.path === 'A' && T.rail) return; // on rails W itself walks on
     if (T.path === 'W') { walk.forward(); return; }
     if (T.path === 'B') { const d = discAhead(); if (d) goTo(d.userData.pano); return; }
     if (T.path === 'A') stepSweep(1);
@@ -391,7 +397,8 @@ export function initTour(ctx) {
     }
   }
   function look(dx, dy = 0) {
-    if (T.path === 'W') walk.look(dx, dy);
+    if (T.path === 'A' && T.rail) T.rail.look(dx, dy);
+    else if (T.path === 'W') walk.look(dx, dy);
     else if (T.path === 'B') { T.yaw += dx; T.pitch = THREE.MathUtils.clamp(T.pitch + dy, -1.2, 1.2); }
     else if (T.path === 'A' && T.sdk) T.sdk.Camera.rotate((-dx * 180) / Math.PI, (dy * 180) / Math.PI, { speed: 120 }).catch(() => {});
   }
@@ -408,6 +415,8 @@ export function initTour(ctx) {
   }
 
   function clearStage() {
+    if (T.rail) { T.rail.dispose(); T.rail = null; }
+    delete root.dataset.rail;
     if (T.iframe) { T.iframe.remove(); T.iframe = null; }
     T.sdk = null; T.sweeps = null;
     walk.stop();
@@ -426,18 +435,45 @@ export function initTour(ctx) {
     const key = ctx.config.matterportSdkKey;
     const iframe = document.createElement('iframe');
     iframe.allow = 'xr-spatial-tracking; fullscreen';
-    iframe.src = `${ctx.config.showcaseBase.replace(/\/$/, '')}/show?m=${encodeURIComponent(id)}&play=1&qs=1&brand=0&help=0&title=0&search=0&applicationKey=${encodeURIComponent(key)}`;
+    // With the Showcase SDK bundle on our own origin (public/mp-bundle/, local only) the scene
+    // API is there and our camera can ride rails through the home. Without it: the embed.
+    if (T.bundle === undefined) {
+      // version.txt is a small file in the bundle; a dev server answers unknown paths with a web page
+      T.bundle = !ctx.params.has('nobundle') && await fetch('/mp-bundle/version.txt').then((r) => (r.ok ? r.text() : ''), () => '').then((t) => !!t && t.length < 200 && !/</.test(t));
+    }
+    const params = `m=${encodeURIComponent(id)}&play=1&qs=1&brand=0&help=0&title=0&search=0&applicationKey=${encodeURIComponent(key)}`;
+    iframe.src = T.bundle ? `/mp-bundle/showcase.html?${params}` : `${ctx.config.showcaseBase.replace(/\/$/, '')}/show?${params}`;
     stage.append(iframe);
     T.iframe = iframe;
     try {
-      await loadScript(ctx.config.sdkUrl || 'https://static.matterport.com/showcase-sdk/latest.js');
+      if (!T.bundle) await loadScript(ctx.config.sdkUrl || 'https://static.matterport.com/showcase-sdk/latest.js');
+      const connectBundle = async () => {
+        for (let i = 0; i < 200 && !(iframe.contentWindow && iframe.contentWindow.MP_SDK); i++) await new Promise((r) => setTimeout(r, 50));
+        return iframe.contentWindow.MP_SDK.connect(iframe.contentWindow);
+      };
       const sdk = await Promise.race([
-        window.MP_SDK.connect(iframe, key, ''),
+        T.bundle ? connectBundle() : window.MP_SDK.connect(iframe, key, ''),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), CONNECT_TIMEOUT)),
       ]);
       if (token !== T.token) return true;
       T.sdk = sdk;
       window.__gpa.tour = { path: 'A', connected: true };
+      if (T.bundle) {
+        try {
+          await sdk.App.state.waitUntil((s) => s.phase === sdk.App.Phase.PLAYING);
+          if (token !== T.token) return true;
+          T.rail = await attachRail(ctx, sdk, iframe.contentWindow, {
+            onMode(m) { root.dataset.rail = m; },
+            onTourEnd() { updateOverlay(); },
+          });
+          if (token !== T.token) { T.rail.dispose(); T.rail = null; return true; }
+          hint.textContent = RAIL_HINT;
+          window.__gpa.tour = { path: 'A', connected: true, rail: true, sweeps: T.rail.info().sweeps };
+          updateOverlay();
+        } catch (e) {
+          console.warn('[tour] rails are not available in this Showcase:', e.message);
+        }
+      }
       try {
         const data = await sdk.Model.getData();
         T.sweeps = (data.sweeps || []).map((s) => ({ id: s.uuid || s.sid || s.id }));
@@ -505,7 +541,7 @@ export function initTour(ctx) {
       return false;
     }
     if (token !== T.token) return true;
-    hint.textContent = WALK_HINT;
+    hint.textContent = walk.onRails ? WALK_HINT : FREE_HINT;
     ctx.audio.roomTone(true);
     window.__gpa.tour = { path: 'W', panos: T.meta.panos.length };
     updateOverlay();
@@ -639,11 +675,18 @@ export function initTour(ctx) {
     if (n === 'A' && await startA(T.models[T.modelIndex])) return;
     if (!(await startB(at))) startGallery();
   }
+  // P: glide the whole route in about 45 seconds with a gentle look around, then back to the start
+  function autoTour(seconds = 45) {
+    if (T.path === 'A' && T.rail) { T.rail.tour(seconds); return true; }
+    if (T.path === 'W') { walk.tour(seconds); return true; }
+    return false;
+  }
   function nextSpace() { if (T.models.length > 1) openModel((T.modelIndex + 1) % T.models.length); }
 
   root.querySelector('.bar').addEventListener('click', (e) => {
     const act = e.target.closest('button')?.dataset.act;
     if (act === 'exit') exit();
+    if (act === 'auto') autoTour();
     if (act === 'empty') toggleEmpty();
     if (act === 'next') nextSpace();
     if (act === 'switch') switchPath();
@@ -656,6 +699,9 @@ export function initTour(ctx) {
     else if (code === 'KeyT') switchPath();
     else if (code === 'KeyG') toggleEmpty();
     else if (code === 'KeyN') nextSpace();
+    else if (code === 'KeyP') autoTour();
+    else if (code === 'KeyF' && T.path === 'W') { hint.textContent = walk.toggleRail() ? WALK_HINT : FREE_HINT; }
+    else if (T.path === 'A' && T.rail) { /* W, S, A and D are read by the rail every frame */ }
     else if (T.path === 'W') { if (code === 'Enter') forward(); }
     else if (code === 'KeyW' || code === 'Enter') forward();
     else if (code === 'KeyS') stepSweep(-1);
@@ -696,7 +742,9 @@ export function initTour(ctx) {
       return { active: T.active, path: T.path, room: q('.troom').textContent, hasEmpty: !!T.meta?.panos?.some((p) => p.empty), empty: T.empty, spaces: T.models.length, pano: T.pano?.id || T.sweepId, panos: T.meta?.panos?.length || 0 };
     },
     _state: T, walk,
-    pad(x, y) { if (T.path === 'W') walk.setPad(x, y); },
+    pad(x, y) { if (T.path === 'W') walk.setPad(x, y); else if (T.path === 'A' && T.rail) T.rail.setPad(y); },
+    autoTour,
+    rail() { return T.path === 'A' && T.rail ? T.rail.info() : T.path === 'W' ? walk.info().rail : null; },
     _show: (p) => showPano(p, true),
   };
   return api;

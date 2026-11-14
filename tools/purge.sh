@@ -8,6 +8,9 @@ TARGETS=(
   data
   public/data/la
   public/data/houston
+  public/data/la_downtown
+  public/mp-bundle
+  public/models/local
   tools/sponsor
   server/sponsor
   dist

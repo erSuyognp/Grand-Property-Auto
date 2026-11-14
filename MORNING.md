@@ -60,6 +60,13 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
 
+## Spline walk (added Nov 14)
+
+- **Inside a home you now ride a smooth route through the scan positions**, in the real Matterport Showcase: W/S move, A/D choose a branch, drag to look, Shift faster. Stop for a moment and it settles onto the nearest scan position at full sharpness. `P` glides a 45 second tour and returns to the start. `T` switches to our own viewer, which has the same rails (`F` there switches to free walking).
+- **This needs `public/mp-bundle/`** (the Matterport Showcase SDK bundle, downloaded today, not in git). Without that folder the Showcase still opens but without rails. To get it again: download `https://static.matterport.com/showcase-sdk/bundle/26.8.2_webgl-1213-g82b2d5ae51/showcase-bundle.zip` and unzip it into `public/mp-bundle/`.
+- **Between scan positions the Showcase picture is softer** (it stretches the nearest panorama over the mesh); it is sharp whenever you stop.
+- The example repo the mentor pointed to is licensed for evaluation only: I read it, copied nothing, and deleted it.
+
 ## Your car model (added Nov 14)
 
 - The Lamborghini model you gave me is the player's car on this laptop. It is **CC BY-NC-ND 4.0** (non commercial, no modifications, credit required) and carries the Lamborghini logo, so it is kept out of git and out of mock mode, and credited on the title screen. For anything public or recorded, add `?kenney` to the address to use the free Kenney car instead.

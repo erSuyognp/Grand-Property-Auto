@@ -38,6 +38,10 @@ Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0),
 
 **Local only, not in the repo, NOT permissively licensed:** `public/models/local/car.glb` is "Lamborghini Aventador LP700-4" by Gonzalit (sketchfab.com/Gonzalit), **CC BY-NC-ND 4.0**: attribution required, non commercial use only, no modified versions. It is gitignored, loaded only if present, never used in mock mode, used unmodified (fitted and oriented at run time only), and credited on the title screen. It also carries Lamborghini's name and logo. Do not ship it, do not use it in public or commercial material, and delete it with the rest after the event.
 
+**Reference only, nothing copied:** `github.com/matterport/showcase-sdk-examples` (the inspector package and its `SplineCamera.ts`) is under the *Matterport Sample SDK Code License Agreement*: internal evaluation only, no distribution of the code or anything derived from it. It was read to learn how the public SDK calls fit together, no code from it is in this repo, and the clone was deleted. `src/showcaseRail.js` and `src/rails.js` are written from scratch against the SDK typings.
+
+**Local only, not in the repo:** `public/mp-bundle/` is the Matterport Showcase SDK bundle (version 26.8.2), downloaded from static.matterport.com. Its `LICENSE.md` ties use to the Matterport Terms of Service, the Platform Subscription Agreement and its SDK License, and needs an active account and developer key. It is gitignored, served only by the local server, and removed by `tools/purge.sh`.
+
 ## Python (tools/requirements.txt)
 
 | Package | License |

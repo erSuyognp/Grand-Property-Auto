@@ -10,6 +10,7 @@
 // mesh (three-mesh-bvh), sliding along walls, gravity, steps up to 0.35 m, a light head bob.
 import * as THREE from 'three';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
+import { buildGraph, createRider, components } from './rails.js';
 
 const EYE = 1.6, RADIUS = 0.3, STEP_UP = 0.35;
 const WALK = 2.4, RUN = 4.3, ACCEL = 14, BRAKE = 18;
@@ -21,7 +22,7 @@ const toWorld = (p, out = new THREE.Vector3()) => out.set(p[0], p[2], -p[1]);
 const FRAG = `
   uniform sampler2D atlasA; uniform sampler2D atlasB;
   uniform vec3 posA; uniform vec3 posB; uniform mat3 rotA; uniform mat3 rotB;
-  uniform float mixB; uniform float camA; uniform float camB; uniform float useBase;
+  uniform float mixB; uniform float camA; uniform float camB; uniform float useBase; uniform float solo;
   uniform samplerCube depthA; uniform samplerCube depthB; uniform vec3 wposA; uniform vec3 wposB; uniform float useDepth;
   varying vec3 vModel; varying vec3 vWorld; varying vec3 vBase;
   vec3 pano(sampler2D atlas, vec3 pos, mat3 rot) {
@@ -50,8 +51,10 @@ const FRAG = `
     float va = 1.0, vb = 1.0;
     if (useDepth > 0.5) { va = seen(depthA, wposA); vb = seen(depthB, wposB); }
     // camA and camB fade a scan out as the player walks more than about 4 m away from it
-    float wa = va * camA * (1.0 - mixB), wb = vb * camB * max(mixB, 0.06);
-    float cover = clamp(max(va * camA, vb * camB), 0.0, 1.0);
+    // on rails only the nearest scan is projected (solo); the second one shows just while
+    // the view crosses over from one scan to the next
+    float wa = va * camA * (1.0 - mixB), wb = vb * camB * max(mixB, 0.06 * (1.0 - solo));
+    float cover = clamp(max(va * camA, vb * camB * mix(1.0, step(0.001, mixB), solo)), 0.0, 1.0);
     vec3 proj = (ca * wa + cb * wb) / max(wa + wb, 0.0001);
     vec3 base = mix(ca * 0.82, vBase, useBase);   // no baked colors: fall back to the nearer photo
     gl_FragColor = vec4(mix(base, proj, cover), 1.0);
@@ -81,7 +84,7 @@ export function createWalk(ctx, hooks = {}) {
     side: THREE.DoubleSide, vertexShader: VERT, fragmentShader: FRAG, vertexColors: true,
     uniforms: {
       atlasA: { value: blank }, atlasB: { value: blank }, posA: { value: new THREE.Vector3() }, posB: { value: new THREE.Vector3() },
-      rotA: { value: new THREE.Matrix3() }, rotB: { value: new THREE.Matrix3() }, mixB: { value: 0 }, camA: { value: 1 }, camB: { value: 1 }, useBase: { value: 0 },
+      rotA: { value: new THREE.Matrix3() }, rotB: { value: new THREE.Matrix3() }, mixB: { value: 0 }, camA: { value: 1 }, camB: { value: 1 }, useBase: { value: 0 }, solo: { value: 0 },
       depthA: { value: null }, depthB: { value: null }, wposA: { value: new THREE.Vector3() }, wposB: { value: new THREE.Vector3() }, useDepth: { value: 0 },
     },
   });
@@ -91,6 +94,7 @@ export function createWalk(ctx, hooks = {}) {
     ready: false, mesh: null, meta: null, base: '', panos: [], hiTier: '',
     pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: 0, a: null, b: null, glide: null, losClock: 0, near: null,
     grounded: true, onFloor: true, phase: 0, bob: 0, speed: 0, pad: null, hi: null, hiWait: 0, blocked: 0,
+    graph: null, rider: null, railOn: false, touring: false, home: null,
   };
   const atlases = new Map(); // "<faces>|<tier>" -> { tex, promise, used, failed, depth }
   let useClock = 0;
@@ -208,6 +212,17 @@ export function createWalk(ctx, hooks = {}) {
     // on a discrete GPU, because a 4K panorama is about 400 MB of texture
     const tiers = meta.tiers || [];
     const big = ctx.params.has('walk4k') || !/intel|radeon\(tm\) graphics|780m|680m|iris|uhd|apple/i.test(ctx.quality.gpu || '');
+    // the rails: scan positions joined where the scan data says they are neighbors. Only some
+    // of a home's scans are on disk, so pairs within 9 m on the same level with a clear line
+    // of sight through the mesh are joined too (a clear line cannot cross a wall).
+    const extra = new Map(W.panos.map((o) => [o.p.id, new Set(o.p.n || [])]));
+    for (let i = 0; i < W.panos.length; i++) for (let j = i + 1; j < W.panos.length; j++) {
+      const a = W.panos[i], b = W.panos[j], d = a.w.distanceTo(b.w);
+      if (d > 9 || d < 0.2 || Math.abs(a.w.y - b.w.y) > 0.5) continue;
+      tmp2.copy(b.w).sub(a.w).normalize();
+      if (!hit(a.w, tmp2, d - 0.1)) { extra.get(a.p.id).add(b.p.id); extra.get(b.p.id).add(a.p.id); }
+    }
+    W.graph = buildGraph(W.panos.map((o) => ({ id: o.p.id, pos: o.w, neighbors: [...extra.get(o.p.id)], floor: o.p.floor })));
     W.hiTier = ctx.quality.low ? '' : tiers.includes('4k') && big && ctx.renderer.capabilities.maxTextureSize >= 12288 ? '4k' : tiers.includes('2k') ? '2k' : '';
     W.ready = true;
   }
@@ -233,12 +248,33 @@ export function createWalk(ctx, hooks = {}) {
     const e = await loadAtlas(entry.p).promise;
     if (e.failed) return false;
     placeAt(entry);
+    // rails by default: start on the largest joined set of scan positions
+    const main = new Set(components(W.graph)[0] || []);
+    const startId = main.has(entry.p.id) ? entry.p.id : [...main][0];
+    W.rider = main.size >= 2 ? createRider(W.graph, startId) : null;
+    W.railOn = !!W.rider && !ctx.params.has('freewalk');
+    if (W.railOn) { W.rider.faceHeading(W.yaw, 0); W.pos.copy(W.rider.state.pos); }
+    mat.uniforms.solo.value = W.railOn ? 1 : 0;
     pickPanos(true);
     return true;
   }
 
   // the two scan points to project from: nearest to the eye, same floor and in sight preferred
   function pickPanos(force) {
+    if (W.railOn && W.rider) {
+      // on rails: the scan position the rider is nearest to, alone
+      const R = W.rider.state;
+      const o = W.panos.find((x) => x.p.id === (R.near || R.node));
+      if (!o) return;
+      loadAtlas(o.p);
+      const ahead = R.rail.route[Math.min(R.rail.route.length - 1, R.rail.nodeNear(R.s) + 1)];
+      const nx = W.panos.find((x) => x.p.id === ahead);
+      if (nx) loadAtlas(nx.p);
+      if (loTex(o) && W.a !== o) { W.b = W.a; W.a = o; }
+      W.wantMix = 0;
+      if (W.near !== W.a.p) { W.near = W.a.p; W.hiWait = 0; hooks.onPano && hooks.onPano(W.a.p); }
+      return;
+    }
     W.losClock++;
     if (!force && W.losClock % 5) return;
     const eye = W.pos;
@@ -277,7 +313,8 @@ export function createWalk(ctx, hooks = {}) {
     const want = eb ? (W.wantMix || 0) : 0;
     // when the pair changes the blend restarts from the side that stayed
     if (W.lastA !== W.a || W.lastB !== W.b) {
-      if (W.lastA === W.b && W.lastB === W.a) u.mixB.value = 1 - u.mixB.value;
+      if (W.railOn && W.lastA === W.b) u.mixB.value = 1; // cross over from the scan just left
+      else if (W.lastA === W.b && W.lastB === W.a) u.mixB.value = 1 - u.mixB.value;
       else if (W.lastB === W.a) u.mixB.value = Math.max(0, 1 - u.mixB.value - 0.5);
       else if (W.lastA !== W.a) u.mixB.value = want;
       W.lastA = W.a; W.lastB = W.b;
@@ -301,6 +338,18 @@ export function createWalk(ctx, hooks = {}) {
     W.yaw += turn * dt * 1.9;
     const tilt = (k.has('ArrowUp') ? 1 : 0) - (k.has('ArrowDown') ? 1 : 0);
     W.pitch = THREE.MathUtils.clamp(W.pitch + tilt * dt, -1.25, 1.25);
+    if (W.railOn && W.rider) {
+      const f = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) + ((W.pad && W.pad.y) || 0);
+      W.rider.state.yawOff += turn * dt * 1.9;
+      W.rider.state.pitch = THREE.MathUtils.clamp(W.rider.state.pitch + tilt * dt, -1.25, 1.25);
+      const R = W.rider.update(dt, { move: f, run: k.has('ShiftLeft') || k.has('ShiftRight'), branch: (k.has('KeyA') ? -1 : 0) + (k.has('KeyD') ? 1 : 0) });
+      if (R.done) { R.done = false; W.touring = false; W.rider.stopTour(); W.rider.resetAt(W.home || R.rail.route[0]); hooks.onTourEnd && hooks.onTourEnd(); }
+      W.pos.copy(W.rider.state.pos);
+      W.yaw = W.rider.heading; W.pitch = W.rider.state.pitch;
+      W.speed = Math.abs(W.rider.state.v);
+      W.vel.set(0, 0, 0); W.grounded = true; W.onFloor = true; W.glide = null;
+      return;
+    }
     if (W.glide) {
       const g = W.glide;
       g.t = Math.min(1, g.t + dt / g.dur);
@@ -379,7 +428,7 @@ export function createWalk(ctx, hooks = {}) {
     const before = Math.floor(W.phase);
     if (sp > 0.5 && W.grounded) W.phase += dt * (1.1 + sp * 0.36);
     if (Math.floor(W.phase) !== before && hooks.onStep) hooks.onStep(sp);
-    const want = sp > 0.5 ? Math.sin(W.phase * Math.PI * 2) * 0.026 * Math.min(1, sp / WALK) : 0;
+    const want = sp > 0.5 && !W.railOn ? Math.sin(W.phase * Math.PI * 2) * 0.026 * Math.min(1, sp / WALK) : 0; // rails glide
     W.bob += (want - W.bob) * Math.min(1, dt * 12);
   }
 
@@ -399,6 +448,7 @@ export function createWalk(ctx, hooks = {}) {
   function goTo(pano) {
     const entry = W.panos.find((o) => o.p === pano);
     if (!entry || W.glide) return;
+    if (W.railOn && W.rider) { if (W.rider.resetAt(entry.p.id)) { loadAtlas(entry.p); W.pos.copy(W.rider.state.pos); } return; }
     const fl = floorUnder(entry.w.x, entry.w.y - 1.3, entry.w.z);
     const to = new THREE.Vector3(entry.w.x, (fl ?? entry.w.y - 1.45) + EYE, entry.w.z);
     const d = to.distanceTo(W.pos);
@@ -410,6 +460,7 @@ export function createWalk(ctx, hooks = {}) {
   }
   // "walk on": glide to the scan point most in front of us (demo mode, phone button)
   function forward() {
+    if (W.railOn) return false; // on rails W itself walks on
     let best = null, bs = 0.2;
     for (const o of W.panos) {
       const dx = o.w.x - W.pos.x, dz = o.w.z - W.pos.z, d = Math.hypot(dx, dz);
@@ -432,11 +483,38 @@ export function createWalk(ctx, hooks = {}) {
     u.depthA.value = emptyCube.texture; u.depthB.value = emptyCube.texture; u.useDepth.value = 0;
     W.ready = false; W.a = W.b = W.lastA = W.lastB = null; W.near = null; W.glide = null; W.pad = null;
     W.vel.set(0, 0, 0); W.phase = 0; W.bob = 0; W.speed = 0;
+    W.rider = null; W.graph = null; W.railOn = false; W.touring = false;
   }
 
   return {
     load, start, render, stop, goTo, forward, state: W,
-    look(dx, dy = 0) { W.yaw += dx; W.pitch = THREE.MathUtils.clamp(W.pitch + dy, -1.25, 1.25); },
+    look(dx, dy = 0) {
+      if (W.railOn && W.rider) W.rider.look(dx, dy);
+      else { W.yaw += dx; W.pitch = THREE.MathUtils.clamp(W.pitch + dy, -1.25, 1.25); }
+    },
+    // rails on or off (off = free walking with collisions)
+    toggleRail() {
+      if (!W.rider) return false;
+      W.railOn = !W.railOn;
+      mat.uniforms.solo.value = W.railOn ? 1 : 0;
+      if (W.railOn) {
+        // step back onto the nearest scan position
+        let best = null, bd = Infinity;
+        for (const o of W.panos) { const d = o.w.distanceTo(W.pos); if (d < bd && W.graph.get(o.p.id).links.size) { bd = d; best = o; } }
+        if (best) { W.rider.resetAt(best.p.id); W.rider.faceHeading(W.yaw, W.pitch); }
+      } else { const fl = floorUnder(W.pos.x, W.pos.y - EYE, W.pos.z); if (fl !== null) W.pos.y = fl + EYE; }
+      return W.railOn;
+    },
+    get onRails() { return W.railOn; },
+    // glide the whole route in about `seconds`, then stand at the start again
+    tour(seconds = 45) {
+      if (!W.rider) return 0;
+      if (W.touring) { W.touring = false; W.rider.stopTour(); return 0; }
+      if (!W.railOn) this.toggleRail();
+      W.home = W.rider.state.node || W.rider.state.near;
+      W.touring = true;
+      return W.rider.startTour(seconds);
+    },
     setPad(x, y) { W.pad = x || y ? { x, y } : null; },
     debugPlace(entry, yaw) { placeAt(entry, false); W.yaw = yaw; W.pitch = 0; pickPanos(true); },
     get ready() { return W.ready; },
@@ -446,6 +524,7 @@ export function createWalk(ctx, hooks = {}) {
       const u = mat.uniforms;
       return {
         x: W.pos.x, y: W.pos.y, z: W.pos.z, yaw: W.yaw, speed: W.speed, a: W.a?.p.id, b: W.b?.p.id, onFloor: W.onFloor, inside,
+        rail: W.railOn && W.rider ? W.rider.info() : null, touring: W.touring,
         base: u.useBase.value > 0.5, hiTier: W.hiTier, sharp: !!(W.a && W.hiTier && atlases.get(`${W.a.p.faces}|${W.hiTier}`)?.tex), camA: +u.camA.value.toFixed(2),
       };
     },

@@ -95,7 +95,9 @@ export function initDemo(ctx) {
           await ctx.tour.enter(target);
           const end = performance.now() + (fast() ? 1500 : 10000);
           let n = 0;
-          while (alive() && performance.now() < end) { await wait(fast() ? 400 : 2400); if (ctx.tour.active && ++n <= 3) { ctx.tour.look(0.5); ctx.tour.forward(); } }
+          // on rails the tour glides the route by itself; the older viewers are stepped by hand
+          const gliding = ctx.tour.active && ctx.tour.autoTour(fast() ? 6 : 45);
+          while (alive() && performance.now() < end) { await wait(fast() ? 400 : 2400); if (!gliding && ctx.tour.active && ++n <= 3) { ctx.tour.look(0.5); ctx.tour.forward(); } }
           if (ctx.tour.active) await ctx.tour.exit();
         }
         if (!alive()) break;
