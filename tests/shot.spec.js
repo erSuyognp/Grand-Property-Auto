@@ -118,6 +118,14 @@ test('shot: load and drive', async ({ page }) => {
   await page.screenshot({ path: `${DIR}/10-saved.png` });
   await page.keyboard.press('Tab');
 
+  // the map
+  await page.keyboard.press('KeyM');
+  await page.waitForFunction(() => window.__gpa.map?.open === true, null, { timeout: 10_000 });
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${DIR}/12-map.png` });
+  await page.keyboard.press('KeyM');
+  await page.waitForFunction(() => window.__gpa.state === 'play', null, { timeout: 5_000 });
+
   const fps = await page.evaluate(() => window.__gpa.fps);
   console.log(`final fps ${fps}`);
   expect(errors, errors.join('\n')).toEqual([]);

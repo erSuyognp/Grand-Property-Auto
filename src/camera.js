@@ -8,7 +8,11 @@ export function createCamera(ctx) {
   const pos = new THREE.Vector3(0, 60, 60), look = new THREE.Vector3();
   const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3(), tmpFrom = new THREE.Vector3();
   let mode = 'chase';
-  let topDown = false;
+  // C cycles three views: aerial (high and tilted, the default: the photo city looks its best
+  // from here and still has depth), straight down, and the close street view
+  const VIEWS = ['aerial', 'top', 'street'];
+  let view = 0, topDown = false;
+  try { const v = VIEWS.indexOf(ctx.params.get('view') || localStorage.getItem('gpa-view')); if (v >= 0) { view = v; topDown = v === 1; } } catch { /* private mode */ }
   let orbit = 0, orbitPitch = 0, dragging = false, lastX = 0, lastY = 0, releaseT = 0;
   let script = null; // {t, dur, fn(k), done}
   let t = 0;
@@ -31,11 +35,14 @@ export function createCamera(ctx) {
     // about 10 m up and 14 m back, pitched down about 20 degrees; it sinks to about 6 m when
     // the car is nearly stopped (arriving at a house feels closer) and rises a little at speed
     const moving = THREE.MathUtils.smoothstep(speed, 0.5, 9);
-    const dist = 10.5 + moving * 3.5 + speed * 0.1, height = 6 + moving * 4 + speed * 0.07 + orbitPitch * 9;
+    const aerial = view === 0;
+    const dist = aerial ? 34 + moving * 10 + speed * 0.25 : 10.5 + moving * 3.5 + speed * 0.1;
+    const height = (aerial ? 44 + moving * 14 + speed * 0.3 : 6 + moving * 4 + speed * 0.07) + orbitPitch * 9;
     const a = s.heading + orbit;
     out.set(s.x + Math.sin(a) * dist, s.y + height, s.z + Math.cos(a) * dist);
-    // the point on the ground that puts the view 20 degrees below the horizon
-    const ahead = height / Math.tan(THREE.MathUtils.degToRad(20)) - dist;
+    // street view: the point on the ground that puts the view 20 degrees below the horizon;
+    // aerial: look a little ahead of the car, about 50 degrees down
+    const ahead = aerial ? 7 + speed * 0.35 : height / Math.tan(THREE.MathUtils.degToRad(20)) - dist;
     outLook.set(s.x - Math.sin(s.heading) * ahead, s.y + 0.6, s.z - Math.cos(s.heading) * ahead);
     if (topDown) {
       out.set(s.x + Math.sin(s.heading) * 0.01, s.y + 95 + speed, s.z + Math.cos(s.heading) * 0.01);
@@ -81,7 +88,7 @@ export function createCamera(ctx) {
     if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
     else cam.up.set(0, 1, 0);
     cam.lookAt(look);
-    const targetFov = mode === 'chase' && car ? 60 + Math.min(8, Math.max(0, Math.abs(car.state.speed) - 22) * 0.4) : 58;
+    const targetFov = mode === 'chase' && car ? (view === 0 ? 46 : 60) + Math.min(8, Math.max(0, Math.abs(car.state.speed) - 22) * 0.4) : 58;
     if (Math.abs(cam.fov - targetFov) > 0.05) { cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 3); cam.updateProjectionMatrix(); }
   }
 
@@ -89,7 +96,12 @@ export function createCamera(ctx) {
     update, pos, look,
     get mode() { return mode; },
     setMode(m) { mode = m; script = null; },
-    toggleTop() { topDown = !topDown; },
+    toggleTop() {
+      view = (view + 1) % VIEWS.length; topDown = view === 1;
+      try { localStorage.setItem('gpa-view', VIEWS[view]); } catch { /* private mode */ }
+      return VIEWS[view];
+    },
+    get view() { return VIEWS[view]; },
     snap() { if (ctx.car) { chaseTarget(ctx.car, pos, look); } },
     // drop from the sky to the car
     intro(done) {

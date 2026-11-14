@@ -36,7 +36,7 @@ python tools/check_data.py houston la mock
 python tools/check_confidential.py
 ```
 
-Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, M (or G) Google 3D map or block city, N sound on or off, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, click to look with the mouse (or drag, or arrow keys), Shift to run, G see it empty (photo view), T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
+Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time of day, C cycles the three views, M the map, G Google 3D city or block city, N sound on or off, Q drone view (where offered), R reset, V hold to talk, T type instead, E walk inside, F save, Tab saved homes, 1 to 4 toggle kinds, X clear the mission, M mute, 0 demo mode. Inside a home: WASD to walk freely, click to look with the mouse (or drag, or arrow keys), Shift to run, G see it empty (photo view), T switch viewer (free walk, Matterport Showcase, photo spots), N next space, Esc exit.
 
 ## Needs you
 
@@ -59,6 +59,11 @@ Keys in the game: WASD drive, Space handbrake, Shift boost, C top view, L time o
 - **Title, intro drop, saved homes compare (Tab), demo mode (0).**
 - **Offline:** with the Node server down and no internet, the game still drives, shows cards, runs missions with the local parser and opens tours in the built in viewer.
 - **Production build:** `npm run demo`. The build output contains only the mock data; real city files are served from `public/data/` by the local server.
+
+## Aerial view and the map (added Nov 14)
+
+- **Default view is now high and tilted** (about 50 m up, looking 50 degrees down). The Google city looks sharp from there and holds 60 fps. `C` cycles aerial, straight down, street view.
+- **`M` opens the map:** a night map of the whole area made from the Vexcel photo, with glowing streets, raised buildings, every listing and the car. Click a home to get a route. `G` now switches the Google 3D city; `N` is sound.
 
 ## Visual quality pass (added Nov 14)
 

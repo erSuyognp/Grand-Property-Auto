@@ -305,8 +305,8 @@ export function initTiles(ctx) {
   });
 
   ctx.on('key', (code) => {
-    // M (maps) and G both switch between the Google 3D city and the block city
-    if ((code !== 'KeyG' && code !== 'KeyM') || ctx.state !== 'play' || ctx.hud.choosing) return;
+    // G switches between the Google 3D city and the block city (M is the map, src/bigmap.js)
+    if (code !== 'KeyG' || ctx.state !== 'play' || ctx.hud.choosing) return;
     if (!allowed) { ctx.hud.toast(ctx.mock ? 'Google 3D city is off in mock mode' : 'No Google Maps key: block city only'); return; }
     wanted = !(S.on || S.loading);
     try { localStorage.setItem('gpa-city3d', wanted ? 'on' : 'off'); } catch { /* private mode */ }

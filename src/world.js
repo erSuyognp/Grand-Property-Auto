@@ -449,7 +449,7 @@ export async function createWorld(ctx, city) {
   let lastNight = -1;
 
   const world = {
-    city, area, proj, bounds, group, buildings, listings, commercial, nearby, base, mini, G, uvAt, roads,
+    city, area, proj, bounds, group, buildings, listings, commercial, nearby, base, mini, G, uvAt, roads, aerial: img,
     heightAt, buildingAt, nearBuildings, pointIn, isFree, findSpawn,
     grid: { cols, rows, cell: CELL, blocked, cost, comp, mainComp },
     listingByBuilding,

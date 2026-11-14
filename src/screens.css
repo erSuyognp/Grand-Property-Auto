@@ -55,3 +55,21 @@ body.titled #qr .inner { display: flex; }
 #compare .rm, #compare .goto { border: 0; border-radius: 999px; padding: 6px 12px; background: rgba(255, 250, 240, 0.12); color: var(--paper); font: 600 12px var(--font); cursor: pointer; }
 #compare .goto { background: var(--gold); color: var(--ink); }
 #compare .empty { padding: 30px 22px 40px; font-size: 17px; opacity: 0.8; }
+
+/* ---- the map (M): a night map of the whole area on a dark sea */
+#bigmap { position: fixed; inset: 0; z-index: 7; display: none; font-family: var(--font); color: var(--paper);
+  background: radial-gradient(ellipse at 50% 46%, #18264d 0%, #0d1530 48%, #070b1c 100%); }
+#bigmap.show { display: block; }
+#bigmap .sheet { position: absolute; left: 50%; top: 50%; width: min(92vh, 92vw); height: min(92vh, 92vw); transform: translate(-50%, -50%); filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
+#bigmap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bigmap .head { position: absolute; left: 30px; top: 24px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+#bigmap .head b { font: 44px/1 var(--display); letter-spacing: 0.5px; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+#bigmap .head span { font-size: 13px; opacity: 0.7; }
+#bigmap .legend { position: absolute; left: 30px; bottom: 28px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600; pointer-events: none; }
+#bigmap .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 10px currentColor; }
+#bigmap .legend i.me { background: #ff5a2a; border-radius: 2px; transform: rotate(45deg); }
+#bigmap .legend em { font-style: normal; opacity: 0.55; margin-left: 4px; }
+#bigmap .foot { position: absolute; right: 30px; bottom: 28px; font-size: 13px; opacity: 0.8; }
+#bigmap .tip { position: fixed; display: none; pointer-events: none; padding: 8px 12px; border-radius: 10px; background: rgba(14, 17, 23, 0.94); max-width: 240px; z-index: 8; }
+#bigmap .tip b { display: block; font: 18px/1.1 var(--display); }
+#bigmap .tip span { font-size: 12px; opacity: 0.8; }
