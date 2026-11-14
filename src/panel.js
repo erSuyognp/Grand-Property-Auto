@@ -204,6 +204,7 @@ export function initPanel(ctx) {
         <button class="act" data-act="compare"><kbd>Tab</kbd>Compare</button>
         <button class="act" data-act="better"><kbd>B</kbd>Better options</button>
         <button class="act ghost" data-act="replay" title="Play the reveal again">${icon('sparkles', 15)}Replay</button>
+        <p class="keys"><kbd>,</kbd><kbd>.</kbd> other homes · <kbd>H</kbd> sources · <kbd>[</kbd><kbd>]</kbd> down payment${d?.solar?.panels ? ' · <kbd>Y</kbd> solar' : ''}${mission ? ' · <kbd>Enter</kbd> submit' : ''}</p>
       </div>`;
     for (const k of openInfo) toggleInfo(k, true);
     wire();
@@ -265,6 +266,24 @@ export function initPanel(ctx) {
       setTimeout(() => { if (c.isConnected) { c.classList.add('in'); countUp(c); } }, delay);
     });
   }
+
+  // keyboard: , and . step through the homes, H shows every source, [ and ] change the down
+  // payment, Y switches solar, Enter submits to the client
+  ctx.on('key', (code) => {
+    if (ctx.state !== 'play' || ctx.hud.choosing) return;
+    if (code === 'Comma' || code === 'Period') {
+      const list = ctx.world.listings.filter((l) => ctx.listingsSys.visible[l.kind]);
+      if (!list.length) return;
+      const i = cur ? list.indexOf(cur) : -1;
+      ctx.reveal.select(list[(i + (code === 'Period' ? 1 : list.length - 1) + (i < 0 && code === 'Comma' ? 1 : 0)) % list.length], { instant: !!cur });
+      return;
+    }
+    if (!cur || !el.classList.contains('show')) return;
+    if (code === 'KeyH') { const any = openInfo.size > 0; for (const b of el.querySelectorAll('.ibtn')) toggleInfo(b.dataset.info, !any); }
+    else if ((code === 'BracketLeft' || code === 'BracketRight') && ins?.cost) { const steps = [3.5, 10, 20], i = steps.indexOf(opts.downPct); opts.downPct = steps[Math.max(0, Math.min(2, i + (code === 'BracketRight' ? 1 : -1)))]; refreshCost(); }
+    else if (code === 'KeyY' && ins?.solar?.panels) { opts.solarOn = !opts.solarOn; refreshCost(); }
+    else if (code === 'Enter' && ctx.clients?.active && !ctx.clients.active.game) ctx.clients.submit(cur);
+  });
 
   ctx.on('select', (l) => {
     if (!l) { cur = null; ins = null; el.classList.remove('show'); document.body.classList.remove('revealing'); return; }

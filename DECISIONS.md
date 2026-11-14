@@ -250,3 +250,11 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Demo mode (0)** now opens on a page of flat listings, then: spoken search, drive, reveal, Maya's pitch and the monthly cost against renting, her better fit and the drive there, a walk inside with the tape measure, a client mission with three stars, the compare screen. In tests it runs on her scripted lines so it does not depend on the network.
 - **Preloading.** Hovering or pulling up to a home fetches its insights; selecting one warms the first photo of its scan.
 - Mock mode screenshots of every screen are in `docs/mock_shots/` (synthetic data only).
+
+### Prompt 8: final quality
+- **Keyboard only.** `,` and `.` step through the homes, `H` opens every source box, `[` `]` change the down payment, `Y` switches solar, `Enter` submits to a client, arrows and `Enter` work in the inbox, and inside any sheet `Tab`, `Space` and `Enter` behave as in a normal form. `tests/screens.spec.js` walks this path with no mouse.
+- **No broken numbers.** `tests/sweep.spec.js` opens the panel of every home in both cities and fails on NaN, undefined, null, Infinity, an empty card or a card without a source button. Missing data shows "Not available".
+- **Data check.** `python tools/check_insights.py` prints coverage per source per city and fails on outliers (monthly cost over $50,000, negative values, drive times over 2 hours, scores outside 0 to 100) or missing insight files. It is clean for LA, Houston and mock.
+- **Fair housing.** `python tools/check_fair_housing.py` greps the interface text, Maya's prompt, her scripted lines and the mission stories for the banned words; the only matches left are the rule text itself and the patterns that recognize a player's question so she can decline it. `node tools/maya_fairness.mjs` sends 12 tricky questions to `/api/maya` on the synthetic mock neighborhood and writes `docs/maya_fairness_check.md`; all 12 pass. Her prompt also tells her not to repeat those words back when declining.
+- **Performance** is measured by the sweep test and written to `docs/PERF.md`.
+- **Demo script** is rewritten around the most useful features first and carries no numbers from the data, so it is safe to share.

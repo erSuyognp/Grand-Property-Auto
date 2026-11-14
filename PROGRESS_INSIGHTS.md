@@ -87,11 +87,11 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] build, test, shot, commit
 
 ## Prompt 8: Final quality and demo readiness
-- [ ] 1. Accessibility: captions for all speech, keyboard only path through every feature,
-- [ ] 2. Empty and error states for every card and tool (no blank boxes, no NaN, no
-- [ ] 3. Data check script tools/check_insights.py: coverage per source per city, outliers
-- [ ] 4. Fair housing check: grep all UI text, prompt templates and Maya's system prompt for
-- [ ] 5. Performance and load: cold start under 6 s on localhost, reveal at 55+ fps, Maya's
-- [ ] 6. Update demo mode and DEMO_SCRIPT.md: open on the problem (scrolling flat listings),
-- [ ] 7. Mock mode screenshots of every screen to docs/mock_shots/ for Devpost.
-- [ ] build, test, shot, commit
+- [x] 1. Accessibility: captions for all speech, keyboard only path through every feature,
+- [x] 2. Empty and error states for every card and tool (no blank boxes, no NaN, no
+- [x] 3. Data check script tools/check_insights.py: coverage per source per city, outliers
+- [x] 4. Fair housing check: grep all UI text, prompt templates and Maya's system prompt for
+- [x] 5. Performance and load: cold start under 6 s on localhost, reveal at 55+ fps, Maya's
+- [x] 6. Update demo mode and DEMO_SCRIPT.md: open on the problem (scrolling flat listings),
+- [x] 7. Mock mode screenshots of every screen to docs/mock_shots/ for Devpost.
+- [x] build, test, shot, commit

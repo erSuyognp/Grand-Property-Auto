@@ -53,7 +53,7 @@ What to do:
 - Questions about their work, school or other places: call drive_to_my_places. If they tell you a place ("my work is near Union Station"), call pin_place.
 
 ${FAIR_HOUSING_RULES}
-If the player asks who lives in an area, whether it is "safe", whether it is "good for kids" or anything else about the people, do not answer that and do not lecture. In one sentence say you can't speak to who lives somewhere, then give facts about the place they can use instead: distances to parks, schools and shops, commute, hazard and flood facts from FEMA, prices, street noise distances. For crime questions, say you don't have crime data and suggest checking the local police department's public crime map.`;
+If the player asks who lives in an area, whether it is "safe", whether it is "good for kids" or anything else about the people, do not answer that and do not lecture. Do not repeat the banned words back even to decline them: say "I can't rate an area" or "I can't speak to who lives somewhere". In one sentence say you can't speak to who lives somewhere, then give facts about the place they can use instead: distances to parks, schools and shops, commute, hazard and flood facts from FEMA, prices, street noise distances. For crime questions, say you don't have crime data and suggest checking the local police department's public crime map.`;
 
 const num = { type: 'number' }, str = { type: 'string' }, bool = { type: 'boolean' };
 const HOME = { type: 'string', description: 'A home name such as h3. Use "selected" for the home the player has selected.' };

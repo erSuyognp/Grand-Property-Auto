@@ -1,69 +1,80 @@
 # Demo script (2 minutes, live)
 
-Setup before the judges arrive: `npm run demo`, open http://localhost:8787 in Chrome, full screen (F11), Houston selected, sound on. Phone on the same wifi (or the laptop's hotspot) with the camera app ready. Have the title screen showing.
+Setup before the judges arrive: `npm run demo`, open http://localhost:8787 in Chrome, full screen (F11), Houston selected, sound on. Title screen showing. Check the bottom right says ULTRA and the fps is near 60.
 
-If the wifi is bad: everything below still works. Voice falls back to typing (press T), missions use the local parser, tours fall back to the built in viewer. If something goes badly wrong, press 0 and let demo mode drive while you talk.
+If anything goes wrong: press `0`. Demo mode drives this whole script by itself while you talk. If the wifi drops, everything below still works: Maya switches to her scripted lines and the browser voice, and voice input falls back to typing (`T`).
 
-## 0:00 The problem (title screen on the big screen)
+The order puts the most useful things first: what it costs, what it's worth, what living there is like.
 
-"Every home search starts the same way. A form. Beds, baths, price, a list of results. The keynote called it the funnel: you narrow, you scroll, you click, and you never get a feel for the place. Nobody shops for a neighborhood from a spreadsheet. So we built the opposite. This is Grand Property Auto."
+## 0:00 The problem (press 0 once, or just say it over the title screen)
 
-## 0:15 Scan to play (phone)
+Demo mode opens on a page of flat listings scrolling by.
 
-Scan the QR code. The phone becomes the controller and the game starts on its own.
+"Every home search looks like this. A price, a bed count, 'charming, must see'. A listing tells you the price. It doesn't tell you what it costs to live there, or what it's like. So we built the opposite. This is Grand Property Auto."
 
-"That is a real neighborhood in Houston. The ground, the buildings and their heights, the trees and the pools all come from Vexcel's aerial data. Every marker is a real home from CoStar's listings. Green is for sale, blue is for rent, purple is an apartment community."
+## 0:12 Say what you want (hold V)
 
-Tilt to drive a few seconds.
+Say: **"Find me a three bedroom under 900K near a park."**
 
-## 0:30 Voice mission (hold the mic on the phone)
+"No form. The matches light up, a gold line takes me there. That's a real Houston neighborhood from Vexcel's aerial data, and every marker is a real CoStar listing."
 
-Say: **"Three bedrooms under 900K with a pool."**
+Drive the gold line (or let demo mode drive).
 
-"I did not fill in a form. The matches light up, the rest dim, and a gold line takes me to the best one. And 'with a pool' does not mean the listing said pool. It means a pool the aircraft actually saw."
+## 0:30 The reveal (press E at the home, or click any marker)
 
-Drive the gold line. When the narration plays, let it finish.
+The camera lifts, walk time rings spread out, the nearest grocery, school, park and transit stop pop up with routes and minutes, solar panels drop onto the roof.
 
-## 0:55 The card
+"This is the part a listing can't show. Five, ten, fifteen minute walk rings. The real nearest supermarket, four minutes on foot. Panels on the actual roof, and what they'd save a year."
 
-"The top half of this card is what the agent wrote. The bottom half is what we can see from above: tree cover, solar, a park three hundred meters away. And these are real aerial photos of this exact house."
+## 0:45 What it really costs (the panel on the right)
 
-## 1:05 Walk inside (tap Walk inside, or say "take me inside")
+Point at **Price and value**, then **True monthly cost**.
 
-"From the curb to the living room. This is the real Matterport scan of this home." Walk two or three spots. Tap **See it empty**. "Same room, furniture removed, so you can picture your own."
+"CoStar comps: here is how this home is priced against similar homes nearby, per square foot. And here's the number nobody shows you: the true monthly cost. Loan at this week's Freddie Mac rate, the listing's own property tax, insurance, HOA, the electric bill. Next to it: what a similar apartment rents for two blocks away, from CoStar's apartment data."
 
-Exit. Thumbs up.
+Click **3.5%** down, then the **i** button.
 
-## 1:30 A conversation, not a funnel
+"Every card has an i. Source, date, how we got it. Anything we calculated says Estimate."
 
-Say: **"Something cheaper."** Then, without waiting long: **"Closer to a park."**
+## 1:05 Maya (hold V)
 
-"That is the part a form cannot do. I react to a home I just walked through, and the search follows me. Cheaper than that one. Closer to a park, which the aerial search found, not a tag somebody typed."
+Say: **"Is this a good deal, and is there a better fit for the money?"**
 
-If there is time, say **"More like this one"** at the next home: "That is a visual search over the aerial imagery. It finds homes that look like this one from the sky."
+Maya answers out loud with numbers, the matching card flashes, and three alternatives appear.
 
-## 1:50 Saved homes (press Tab)
+"That's Maya. She's Claude with tools that only read our local data, so she can't make a number up. She's honest about the downside, and she follows fair housing rules: ask her who lives here and she'll tell you about the place instead."
 
-"Everything I liked, side by side, cheapest first. That is the shortlist a buyer takes to an agent. No form, no chat window. You drive, you talk, you walk in."
+Say: **"Yes, take me there."** The route starts.
 
-## Who cares about which part
+## 1:25 Walk inside and measure (E, then R)
 
-| Judge | Show them |
-|---|---|
-| **Vexcel** | The city is built from their data with no map provider. Roofs match the aerial photo. Pool, solar and tree badges on the card. Angled aerial photos of each home. "Closer to a park" and "more like this one" run on their visual search. Top down view (C) to show alignment. |
-| **Matterport** | The walk inside moment, room names in the overlay, See it empty, the phone walking you between rooms, and the T key that switches between their viewer and ours. |
-| **CoStar data platform** | Homes, rentals, apartment communities with floor plans and rent ranges, recently sold homes, commercial buildings as scenery cards. Listing text and aerial facts joined on one card, and the game pointing out where they disagree. The saved homes compare. |
-| **Everyone** | No search box and no chat window. Voice first, phone as the controller, and follow ups that depend on the last home you saw. |
+At the second home press `E` twice. "From the curb to the living room: the real Matterport scan." Press `R`, click two points on a wall. "There's the wall, in feet and inches. My sofa fits."
 
-## Every line the demo uses (the local parser handles all of these offline)
+Press `Esc`.
 
-- three bedrooms under 900K with a pool
-- something cheaper
-- something with a bigger yard
-- closer to a park
-- find me more like this one
-- show me apartments under 2500 near a park
-- take me inside
-- see it empty
-- save this one
-- show me everything
+## 1:40 A client mission (press I)
+
+Open the inbox, pick **Rent or Buy?**, accept. Select the home whose tracker shows all green checks, press **Submit this home**.
+
+"Missions are real buyer problems. Marcus is tired of paying rent: is there a home he could own for about the same each month? The answer is in the data." Three stars pop.
+
+## 1:52 Compare (Tab)
+
+"My saved homes side by side: monthly cost, value, commute to my own pinned places, risk. Maya's pick, with her reason. And it prints as a one page shortlist."
+
+## 2:00 Close
+
+"Listings tell you the price. Grand Property Auto tells you what it's like to live there, and what it really costs. Thank you."
+
+## If there is time for questions
+
+- **Can I afford it?** Press `P`, type an income. Every marker gets a ring: comfortable, a stretch, out of range.
+- **My places.** Press `O`, pin work. The rings switch to weekly drive time.
+- **Risk.** Open the Risk card on any Houston home near the bayou: FEMA risk rating, flood zone, insurance pressure.
+- **Sun.** Drag the time of day slider on the Energy card.
+- **Same money, other city.** Ask Maya: "what does the same money get in Los Angeles?"
+- **Where do the numbers come from?** `INSIGHTS_REPORT.md` lists every source; `docs/SCORES.md` has every formula.
+
+## Keys
+
+`W A S D` drive · `E` select, then walk inside · `,` `.` step through homes · `V` talk to Maya · `B` better options · `F` save · `Tab` compare · `I` clients · `P` budget · `O` my places · `U` settings · `H` sources · `[` `]` down payment · `Y` solar · `R` tape measure (inside) · `M` map · `C` camera · `N` mute · `0` demo mode

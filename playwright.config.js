@@ -3,6 +3,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests',
   timeout: 60_000,
+  // every test renders the 3D city: more than 4 at once starves the GPU and timings drift
+  workers: Number(process.env.PW_WORKERS) || 4,
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
     viewport: { width: 1280, height: 720 },

@@ -161,12 +161,12 @@ export function initReveal(ctx) {
       let line = null;
       const makeLine = () => {
         let pts = [{ x: hx, z: hz }, { x: px, z: pz }];
-        if (!far && d < 700) { try { pts = findPath(world, { x: hx, z: hz }, { x: px, z: pz }); } catch { /* straight */ } }
+        if (!far && d < 520) { try { pts = findPath(world, { x: hx, z: hz }, { x: px, z: pz }); } catch { /* straight */ } }
         else { const steps = 24; pts = Array.from({ length: steps + 1 }, (_, i) => ({ x: hx + ((px - hx) * i) / steps, z: hz + ((pz - hz) * i) / steps })); }
         line = ribbon(pts, new THREE.Color(CAT_COLOR[cat]));
         if (group) group.add(line);
       };
-      setTimeout(() => { if (cur === l && group) makeLine(); }, 60 + n * 45);
+      setTimeout(() => { if (cur === l && group) makeLine(); }, 80 + n * 140); // one route search per few frames, so the frame rate holds
       add(t0, 0.7, (k) => {
         const s = Math.max(0.001, k) * 0.052;
         sprite.scale.set(s, s, 1);

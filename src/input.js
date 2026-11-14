@@ -10,6 +10,8 @@ export function createInput(ctx) {
   const typing = (e) => /INPUT|TEXTAREA/.test(e.target?.tagName || '');
   addEventListener('keydown', (e) => {
     if (typing(e)) return;
+    const modal = ['sheet', 'settings', 'inbox', 'result'].includes(ctx.state);
+    if (modal && (e.code === 'Tab' || (/^(BUTTON|SELECT|A)$/.test(e.target?.tagName || '') && (e.code === 'Space' || e.code === 'Enter')))) return;
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
     if (!keys.has(e.code)) ctx.emit('key', e.code, e);
     keys.add(e.code);

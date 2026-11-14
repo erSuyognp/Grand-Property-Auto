@@ -22,6 +22,18 @@ All images here come from mock mode: a synthetic neighborhood with invented home
 - **Compare** your saved homes side by side with Tab.
 - **Demo mode** with 0: the game plays itself (mission, drive, arrive, tour, rate, next mission).
 
+## Insights, Maya and missions
+
+Select a home (click its marker, or pull up and press `E`) and the world shows what living there is like:
+
+- **The reveal.** The camera lifts, 5, 10 and 15 minute walk rings spread out, the nearest supermarket, school, park, transit stop, gym and hospital pop up with routes and minutes, solar panels drop onto the roof, a flood zone ripples in blue.
+- **The panel.** Price against similar homes nearby (CoStar comps), the true monthly cost (loan, tax, insurance, HOA, electric) with a down payment switch and a solar switch, renting a similar home nearby, errands and commute, outdoors, energy and solar, risk and insurance, neighborhood activity, schools, HOA and amenities, area facts, street noise. Every card has an "i" with its source, date and method. Calculated numbers say Estimate.
+- **Maya** (hold `V`). A voice agent that answers from the local data only, suggests better fits and drives you there. She follows fair housing rules and falls back to scripted lines when the model is off.
+- **Client missions** (`I`). Eleven buyer and renter situations generated from the city's own data, with stars, XP and badges.
+- **Buyer tools.** "Can I afford it?" (`P`), my places with drive times (`O`), compare with Maya's pick and a printable shortlist (`Tab`), a sun slider, a tape measure inside homes (`R`), same money in the other city.
+
+Build the insight data (cached, safe to rerun): `python tools/enrich_city.py --city houston`, then `--city la`. Check it: `python tools/check_insights.py`. Sources and what is estimated: `INSIGHTS_REPORT.md`. Score formulas: `docs/SCORES.md`.
+
 ## The three data sources
 
 | Source | What the game uses it for |

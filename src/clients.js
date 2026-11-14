@@ -141,7 +141,7 @@ export function initClients(ctx) {
   result.id = 'cresult';
   document.body.append(inbox, result);
   ctx.hud.root.append(tracker);
-  let missions = [], active = null, startedAt = 0, visited = new Set(), open = false, tick = 0;
+  let missions = [], active = null, startedAt = 0, visited = new Set(), open = false, tick = 0, shownAt = 0;
   let save = { xp: 0, best: {}, badges: [], runs: [] };
   try { save = { ...save, ...JSON.parse(localStorage.getItem('gpa-career') || '{}') }; } catch { /* first run or private mode */ }
   const persist = () => { try { localStorage.setItem('gpa-career', JSON.stringify(save)); } catch { /* private mode */ } };
@@ -197,8 +197,8 @@ export function initClients(ctx) {
     for (const b of inbox.querySelectorAll('.mlist button')) b.addEventListener('click', () => { ctx.audio.blip(820, 0.05); renderInbox(b.dataset.id); });
     inbox.querySelector('.accept')?.addEventListener('click', (e) => { accept(e.target.dataset.id); });
   }
-  function show(detail) { if (ctx.state !== 'play' || !missions.length) return false; open = true; ctx.state = 'inbox'; renderInbox(detail); inbox.classList.add('show'); ctx.audio.whoosh?.(0.4); return true; }
-  function close() { if (!open) return; open = false; inbox.classList.remove('show'); if (ctx.state === 'inbox') ctx.state = 'play'; }
+  function show(detail) { if (ctx.state !== 'play' || !missions.length) return false; open = true; ctx.state = 'inbox'; inbox.inert = false; renderInbox(detail); inbox.classList.add('show'); ctx.audio.whoosh?.(0.4); return true; }
+  function close() { if (!open) return; open = false; if (inbox.contains(document.activeElement)) document.activeElement.blur(); inbox.inert = true; inbox.classList.remove('show'); if (ctx.state === 'inbox') ctx.state = 'play'; }
 
   // ---- an accepted mission
   function accept(id) {
@@ -278,6 +278,7 @@ export function initClients(ctx) {
       <div class="ract">${best && (!info.chosen || info.chosen.id !== best.id) ? `<button class="act" data-a="fly">${icon('plane', 15)}Fly over the best answer</button>` : ''}<button class="act" data-a="inbox">${icon('inbox', 15)}Next client</button><button class="act primary" data-a="ok">Done <kbd>Enter</kbd></button></div></div>`;
     result.classList.add('show');
     ctx.state = 'result';
+    shownAt = performance.now(); // the Enter that submitted must not also dismiss the result
     if (out.stars > 0) { ctx.audio.fanfare?.(); for (let i = 0; i < out.stars; i++) setTimeout(() => ctx.audio.star?.(i), 500 + i * 320); ctx.cam.shake?.(0.5); } else ctx.audio.blip(220, 0.3, 'triangle');
     const done = (then) => { result.classList.remove('show'); if (ctx.state === 'result') ctx.state = 'play'; then?.(); };
     result.querySelector('[data-a="ok"]').addEventListener('click', () => done());
@@ -340,7 +341,10 @@ export function initClients(ctx) {
   ctx.on('city-unload', () => { active = null; tracker.classList.remove('show'); close(); });
   ctx.on('key', (code) => {
     if (code === 'KeyI') { if (open) close(); else if (ctx.state === 'play' && !ctx.hud.choosing) show(); } else if (code === 'Escape' && open) close();
-    else if (code === 'Enter' && ctx.state === 'result') (result.querySelector('[data-a="guess"]') || result.querySelector('[data-a="ok"]'))?.click();
+    else if (open && (code === 'ArrowDown' || code === 'ArrowUp')) { const btns = [...inbox.querySelectorAll('.mlist button')]; if (btns.length) { const i = btns.indexOf(document.activeElement); btns[(i + (code === 'ArrowDown' ? 1 : btns.length - 1)) % btns.length].focus(); } }
+    else if (open && code === 'Enter') { const a = inbox.querySelector('.accept'); if (a) a.click(); else (inbox.querySelector('.mlist button:focus') || inbox.querySelector('.mlist button'))?.click(); }
+    else if (open && code === 'Backspace') inbox.querySelector('.back')?.click();
+    else if (code === 'Enter' && ctx.state === 'result' && performance.now() - shownAt > 300) (result.querySelector('[data-a="guess"]') || result.querySelector('[data-a="ok"]'))?.click();
     else if (code === 'Escape' && ctx.state === 'result') (result.querySelector('[data-a="cancel"]') || result.querySelector('[data-a="ok"]'))?.click();
   });
 
