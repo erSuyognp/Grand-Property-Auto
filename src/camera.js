@@ -15,7 +15,7 @@ export function createCamera(ctx) {
   try { const v = VIEWS.indexOf(ctx.params.get('view') || localStorage.getItem('gpa-view')); if (v >= 0) { view = v; topDown = v === 1; } } catch { /* private mode */ }
   let orbit = 0, orbitPitch = 0, dragging = false, lastX = 0, lastY = 0, releaseT = 0;
   let script = null; // {t, dur, fn(k), done}
-  let t = 0;
+  let t = 0, shakeT = 0, shakeAmp = 0;
 
   const el = ctx.renderer.domElement;
   el.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
@@ -86,6 +86,11 @@ export function createCamera(ctx) {
     }
     // 'free' mode: another system (the property reveal) moves pos and look itself
     cam.position.copy(pos);
+    if (shakeT > 0) { // a small shake on mission success
+      shakeT -= dt;
+      const a = Math.max(0, shakeT) * shakeAmp;
+      cam.position.x += (Math.random() - 0.5) * a; cam.position.y += (Math.random() - 0.5) * a; cam.position.z += (Math.random() - 0.5) * a;
+    }
     if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
     else cam.up.set(0, 1, 0);
     cam.lookAt(look);
@@ -120,5 +125,6 @@ export function createCamera(ctx) {
       script = { t: 0, dur, done, fn: (k) => { pos.lerpVectors(from, end, k); look.lerpVectors(fromLook, to, Math.min(1, k * 1.6)); } };
     },
     isScripted() { return !!script; },
+    shake(dur = 0.5, amp = 1.6) { if (!(ctx.settings?.reducedMotion ?? matchMedia('(prefers-reduced-motion: reduce)').matches)) { shakeT = dur; shakeAmp = amp; } },
   };
 }

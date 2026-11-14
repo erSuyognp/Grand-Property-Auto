@@ -49,18 +49,18 @@ Started Sat Nov 14 2026 16:03 EST.
 - [x] build, test, shot, commit
 
 ## Prompt 5: Missions (real buyer and renter situations, every data type)
-- [ ] 1. "First Home": budget, 2+ beds, under X min drive to a supermarket. Score: fit,
-- [ ] 2. "Room to Grow": 3+ beds, a park within 10 min, lot over 0.15 acres. No family
-- [ ] 3. "Power Bill Hater": lowest estimated electric bill or best solar potential under
-- [ ] 4. "Rent or Buy?": the client pays $X rent. Find a home where the true monthly cost is
-- [ ] 5. "Downtown Commuter": under 20 min drive to downtown or 10 min walk to transit.
-- [ ] 6. "Pool Season": a pool seen from the air (Vexcel), not just listed.
-- [ ] 7. "Low Risk": outside a flood zone, lowest FEMA risk tier, roof in good condition.
-- [ ] 8. "Investor": a small apartment community or home where nearby rents cover the
-- [ ] 9. "Busy Street Life": most shops and restaurants within a 10 minute walk (CoStar
-- [ ] 10. "Price Detective" mini game: show a home's photos and facts, the player guesses the
-- [ ] 11. "Open House Rush": visit and walk inside 3 homes that match a client within 5
-- [ ] build, test, shot, commit
+- [x] 1. "First Home": budget, 2+ beds, under X min drive to a supermarket. Score: fit,
+- [~] 2. Lot threshold comes from the city data (Houston lots here are under 0.07 acres); hidden in LA (too few 3 bed homes for sale). "Room to Grow": 3+ beds, a park within 10 min, lot over 0.15 acres. No family
+- [x] 3. "Power Bill Hater": lowest estimated electric bill or best solar potential under
+- [x] 4. "Rent or Buy?": the client pays $X rent. Find a home where the true monthly cost is
+- [x] 5. "Downtown Commuter": under 20 min drive to downtown or 10 min walk to transit.
+- [x] 6. "Pool Season": a pool seen from the air (Vexcel), not just listed.
+- [x] 7. "Low Risk": outside a flood zone, lowest FEMA risk tier, roof in good condition.
+- [x] 8. "Investor": a small apartment community or home where nearby rents cover the
+- [x] 9. "Busy Street Life": most shops and restaurants within a 10 minute walk (CoStar
+- [x] 10. "Price Detective" mini game: show a home's photos and facts, the player guesses the
+- [x] 11. "Open House Rush": visit and walk inside 3 homes that match a client within 5
+- [x] build, test, shot, commit
 
 ## Prompt 6: Polish pass (modern game feel)
 - [ ] 1. One design system: font pairing, spacing scale, colors per score category, glass

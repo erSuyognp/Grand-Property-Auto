@@ -75,8 +75,24 @@ export function createAudio(ctx) {
     }
   }
 
+  // a soft rush of air: reveals and panels sliding in
+  function whoosh(vol = 1) {
+    if (!ac || muted || !noiseBuf) return;
+    const src = ac.createBufferSource(); src.buffer = noiseBuf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+    const g = ac.createGain(), t = ac.currentTime;
+    bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(2600, t + 0.45);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16 * vol, t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t, Math.random() * 0.3, 0.65);
+  }
+  const NOTES = [523.25, 659.25, 783.99, 1046.5];
+  function star(i = 0) { blip(NOTES[Math.min(3, i + 1)], 0.35, 'triangle', 0.22); setTimeout(() => blip(NOTES[Math.min(3, i + 1)] * 2, 0.25, 'sine', 0.1), 60); }
+  function fanfare() { NOTES.slice(0, 3).forEach((f, i) => setTimeout(() => blip(f, 0.22, 'triangle', 0.16), i * 110)); }
+
   return {
-    blip, step, roomTone,
+    blip, step, roomTone, whoosh, star, fanfare,
+    click() { blip(1100, 0.035, 'sine', 0.07); },
     chime() { blip(660, 0.14); setTimeout(() => blip(880, 0.2), 110); },
     thud() { blip(90, 0.18, 'triangle', 0.35); },
     setMuted(v) { muted = v; if (master) master.gain.value = v ? 0 : 0.5; },

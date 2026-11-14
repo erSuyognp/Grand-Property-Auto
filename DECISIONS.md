@@ -217,3 +217,13 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Numbers are written as digits** in her captions ("$860,000") so they scan quickly; the voice reads them correctly.
 - **Fair housing.** Rules 5 to 8 are in her system prompt word for word. Questions about people get one sentence ("I can't speak to who lives somewhere") and then facts about the place. The scripted brain has the same redirect.
 - **Her avatar** is an original SVG drawing (no photo): blinks when idle, tilts and shows a red ring while listening, dots while thinking, mouth driven by the audio level while talking.
+
+### Prompt 5: missions
+- **Every number in a brief is generated from the city's own data** (percentiles of price, drive time, lot size, shops and so on), and a mission only appears when at least one home meets all of its needs. So "lot over 0.15 acres" became "lot of 0.05 acres or more" in Houston's Rice Military, where lots are small, and Room to Grow is hidden in LA, which has too few 3 bed homes for sale. Houston shows all 11 missions, LA shows 10.
+- **Scoring.** 1 star: at least half the needs met. 2 stars: every need met. 3 stars: every need met and the home is the best on the mission's goal (or within 3% of it, or under the stated target). The result screen lists what fit and what did not, names the best possible answer and offers a fly over.
+- **Candidate highlight** is every home that meets the first need, so the map narrows without giving the answer away. A tracker in the top left checks each need against whichever home is selected.
+- **Rent or Buy?** has two shapes: where some home's monthly cost is within 10% of the client's rent, find it; where none is (LA), prove renting is cheaper by submitting a rental below the cheapest home's monthly cost.
+- **Investor** asks for the best rent to cost ratio the data supports ("nearby rent covers at least N%"), since no home in either area has rents that fully cover the estimated cost at today's rate.
+- **Recently sold homes are never the answer** to a buying mission; they stay as comps.
+- **Progress** (XP, level, badges, best runs) is saved in browser storage under `gpa-career`, inside try/catch. The "leaderboard" is the player's own best runs on this laptop.
+- **Keys:** `I` opens the inbox (`M` is the map). `Enter` closes the result screen.
