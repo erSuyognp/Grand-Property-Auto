@@ -99,6 +99,19 @@ app.post('/api/narrate', async (req, res) => {
 app.post('/api/maya', (req, res) => maya.handle(req, res));
 app.post('/api/maya/tts', (req, res) => maya.tts(req, res));
 
+// ---- "My places": look up an address the player typed (Census geocoder, public, no key).
+// Only the player's own text is sent; never anything from the data kit.
+app.get('/api/geocode', async (req, res) => {
+  const q = String(req.query.q || '').slice(0, 120);
+  if (q.length < 4 || GAME_MODE === 'mock') return res.status(400).json({ error: 'no query' });
+  try {
+    const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=' + encodeURIComponent(q), { signal: AbortSignal.timeout(6000) });
+    const m = (await r.json())?.result?.addressMatches?.[0];
+    if (!m) return res.status(404).json({ error: 'not found' });
+    res.json({ lat: m.coordinates.y, lon: m.coordinates.x, label: String(m.matchedAddress || q).split(',').slice(0, 2).join(',') });
+  } catch { res.status(504).json({ error: 'geocoder timeout' }); }
+});
+
 // ---- optional nicer narrator voice
 app.post('/api/tts', async (req, res) => {
   if (!TTS_ENABLED) return res.status(404).json({ error: 'tts off' });

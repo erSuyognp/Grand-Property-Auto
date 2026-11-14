@@ -224,4 +224,4 @@ export function makeTools(db) {
 }
 
 // Tools the game itself carries out (the server only passes them through).
-export const CLIENT_TOOLS = ['start_route', 'set_filters', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'fast_travel', 'set_sun_time'];
+export const CLIENT_TOOLS = ['start_route', 'set_filters', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'fast_travel', 'set_sun_time', 'print_shortlist', 'measure'];

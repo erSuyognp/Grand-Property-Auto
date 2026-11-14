@@ -78,6 +78,9 @@ export const TOOLS = [
   tool('remember_preference', 'Remember something lasting the player said they want, in a few words ("budget 900k", "wants a yard", "works downtown").', { preference: str }, ['preference']),
   tool('pin_place', 'Pin a place that matters to the player (work, a school, a gym) by name or address so drive times can be shown.', { name: str, where: str }, ['name', 'where']),
   tool('open_compare', 'Open the compare screen with the player\'s saved homes.', {}),
+  tool('set_sun_time', 'Move the sun over the selected home to a time of day (hour 6 to 20, local time).', { hour: num }, ['hour']),
+  tool('print_shortlist', 'Open the one page shortlist report of the saved homes for printing.', {}),
+  tool('measure', 'Tell the player how the tape measure works: inside a home, key R, then click two points.', {}),
   tool('fast_travel', 'Switch the game to the other city.', { city: { type: 'string', enum: ['la', 'houston'] } }, ['city']),
 ];
 

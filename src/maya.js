@@ -167,6 +167,9 @@ export function initMaya(ctx) {
     else if (name === 'open_compare') { if (!ctx.compare.open) ctx.emit('key', 'Tab', null); }
     else if (name === 'fast_travel' && ctx.cities.includes(input.city) && input.city !== ctx.city) ctx.loadCity(input.city);
     else if (name === 'other_city') ctx.buyer?.showOtherCity?.(input);
+    else if (name === 'set_sun_time' && ctx.reveal?.listing) { const h = Math.max(6, Math.min(20, Number(input.hour) || 15)); ctx.buyer?.applySun(ctx.reveal.listing, h); ctx.panel.flash('energy'); const s = ctx.panel.el.querySelector('[data-sun]'); if (s) { s.value = h; ctx.panel.el.querySelector('.sunline').textContent = ctx.buyer.sunLine(ctx.reveal.listing, h); } }
+    else if (name === 'print_shortlist') { if (!ctx.compare.open) ctx.emit('key', 'Tab', null); ctx.compare.print(); }
+    else if (name === 'measure') ctx.hud.toast('Inside a home press R, then click two points', 3200);
     pub();
   }
   function renderAlts(why) {

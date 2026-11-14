@@ -74,17 +74,17 @@ Started Sat Nov 14 2026 16:03 EST.
 - [ ] build, test, shot, commit
 
 ## Prompt 7: Buyer tools (what makes it actually useful)
-- [ ] 1. "Can I afford it?" profile (key A or ask Maya): yearly income, monthly debts,
-- [ ] 2. "My places": the player pins up to 3 places that matter (work, a school, family,
-- [ ] 3. Compare (Tab): up to 4 saved homes side by side: price, true monthly cost, price per
-- [ ] 4. Shortlist report: export the saved homes as a clean one page summary (print to PDF
-- [ ] 5. Sun and light: a time of day slider on the reveal that moves the real sun position
-- [ ] 6. Street noise check: distance to the nearest highway, rail line and airport (OSM),
-- [ ] 7. Room fit inside walk mode: a tape measure tool (key R) that measures between two
-- [ ] 8. "Same money, other city": for a selected LA home, Maya can show what the same
-- [ ] 9. Price changes: if the listing data has price history or status changes, show a tiny
-- [ ] 10. What's included: for apartments, a clear list of community amenities and what the
-- [ ] build, test, shot, commit
+- [x] 1. "Can I afford it?" profile (key A or ask Maya): yearly income, monthly debts,
+- [~] 2. Drive times are estimates from distance (Routes API refused the key). "My places": the player pins up to 3 places that matter (work, a school, family,
+- [x] 3. Compare (Tab): up to 4 saved homes side by side: price, true monthly cost, price per
+- [x] 4. Shortlist report: export the saved homes as a clean one page summary (print to PDF
+- [~] 5. The plain line comes from the sun position (no Solar API roof data); shadows show on the block city only. Sun and light: a time of day slider on the reveal that moves the real sun position
+- [x] 6. Street noise check: distance to the nearest highway, rail line and airport (OSM),
+- [~] 7. Tape measure done; room sizes are the scan's room areas (no wall lengths in the data, so the sofa answer gives an estimated wall length and sends the player to the tape). Room fit inside walk mode: a tape measure tool (key R) that measures between two
+- [x] 8. "Same money, other city": for a selected LA home, Maya can show what the same
+- [x] 9. Price changes: if the listing data has price history or status changes, show a tiny
+- [x] 10. What's included: for apartments, a clear list of community amenities and what the
+- [x] build, test, shot, commit
 
 ## Prompt 8: Final quality and demo readiness
 - [ ] 1. Accessibility: captions for all speech, keyboard only path through every feature,

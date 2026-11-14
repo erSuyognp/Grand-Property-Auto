@@ -20,6 +20,7 @@ import { initReveal } from './reveal.js';
 import { initPanel } from './panel.js';
 import { initMaya } from './maya.js';
 import { initClients } from './clients.js';
+import { initBuyer } from './buyer.js';
 
 export async function initSystems(ctx) {
   ctx.saved = initSaved(ctx);
@@ -42,6 +43,7 @@ export async function initSystems(ctx) {
   ctx.panel = initPanel(ctx);
   ctx.maya = initMaya(ctx);
   ctx.clients = initClients(ctx);
+  ctx.buyer = initBuyer(ctx);
 
   // "Take me there" from the saved homes screen: a mission with one target
   ctx.missions.goTo = (l, quiet) => {

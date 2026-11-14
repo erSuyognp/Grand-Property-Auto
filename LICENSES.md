@@ -57,6 +57,7 @@ Car models: **Kenney Car Kit 3.1** (www.kenney.nl), Creative Commons Zero (CC0),
 | Package | License | Used for |
 |---|---|---|
 | lucide-static | ISC | Interface icons (`src/icons.js` inlines the handful it uses at build time) |
+| suncalc | BSD-2-Clause | Sun position for the time of day slider (`src/buyer.js`) |
 
 ## Outside data used by the insight pipeline (tools/enrich_city.py)
 

@@ -227,3 +227,15 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Recently sold homes are never the answer** to a buying mission; they stay as comps.
 - **Progress** (XP, level, badges, best runs) is saved in browser storage under `gpa-career`, inside try/catch. The "leaderboard" is the player's own best runs on this laptop.
 - **Keys:** `I` opens the inbox (`M` is the map). `Enter` closes the result screen.
+
+### Prompt 7: buyer tools
+- **Keys:** `P` opens "Can I afford it?" (`A` steers), `O` opens My places, `R` inside a home is the tape measure, `Tab` is Compare. A small dock in the top left has the same buttons for the mouse.
+- **Affordability** is the 28% / 36% guideline on gross income with this week's rate, the county tax rate and the state average insurance; "a stretch" is up to 33% / 43%. It is labeled a guideline and not advice everywhere it shows. Rings under the markers are green, yellow or gray; the same words appear on the panel and the compare screen, so color is never the only signal.
+- **My places.** Spoken or typed names are matched first against a short list of well known places per city (public coordinates), then against the Census geocoder through `/api/geocode` (only the player's own text is sent). A click on the map works in any view. Up to 3 places per city, 5 round trips a week each. Drive times are the same distance estimate as everywhere else, since the Routes API is not available.
+- **Rings have one meaning at a time:** budget, weekly drive time, or off, switched from the dock, with a key at the bottom of the screen.
+- **Compare** shows the last 4 saved homes. A star marks the best value in each row. "Maya's pick for you" is worked out locally from the player's stated preferences, budget fit, drive to their places and the value score, and gives its reasons.
+- **Shortlist report** is built in the page and printed with the browser's own print dialog (save as PDF there). Nothing is uploaded.
+- **Sun slider** uses SunCalc (BSD-2-Clause, within the license rule) for today's sun position at the home's coordinates, in the city's standard time. The sentence about which side gets light comes from the sun's direction; "backyard" is not claimed because lot orientation is not in the data.
+- **Tape measure** picks two points on the scan's mesh in the walking view and shows feet and inches plus meters. Room fit through Maya uses the room areas in the scan; the wall length it quotes is an estimate from that area and she says so.
+- **Same money, other city** compares monthly cost (within 12%) against the other city's homes and offers fast travel.
+- **Phone controller:** spoken lines from the phone now go to Maya. The phone's buttons already send any key, so every tool above is reachable from it.

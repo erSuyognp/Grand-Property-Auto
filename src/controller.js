@@ -74,7 +74,7 @@ export function initController(ctx) {
       ctx.emit('key', m.code, null);
       setTimeout(() => ctx.emit('keyup', m.code, null), 60);
     } else if (m.t === 'say' && typeof m.text === 'string') {
-      ctx.missions.handle(m.text.slice(0, 200));
+      if (ctx.maya) ctx.maya.hear(m.text.slice(0, 200)); else ctx.missions.handle(m.text.slice(0, 200));
     } else if (m.t === 'live') {
       ctx.hud.live(m.text == null ? null : String(m.text).slice(0, 200));
     } else if (m.t === 'tour') {

@@ -344,7 +344,8 @@ export function initTour(ctx) {
     drag = null;
     if (moved < 6) { const d = pickDisc(e); if (d) goTo(d.userData.pano); }
   });
-  stage.addEventListener('click', () => {
+  stage.addEventListener('click', (e) => {
+    if (T.path === 'W' && tape.on) { tapeClick(e); return; }
     if (T.path === 'W' && document.pointerLockElement !== stage && stage.requestPointerLock) {
       try { const r = stage.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch { /* not allowed right now */ }
     }
@@ -356,8 +357,8 @@ export function initTour(ctx) {
     if (T.path === 'W') hint.textContent = document.pointerLockElement === stage ? 'WASD walk · mouse looks · Shift runs · Esc frees the mouse' : WALK_HINT;
   });
   const freeMouse = () => { if (document.pointerLockElement === stage && document.exitPointerLock) document.exitPointerLock(); };
-  const WALK_HINT = 'W S along the route · A D pick a branch · drag to look · Shift faster · P tour · F free walk · T other views';
-  const FREE_HINT = 'WASD walk · click to look with the mouse (or drag) · Shift runs · F back on the route · T other views';
+  const WALK_HINT = 'W S along the route · A D pick a branch · drag to look · Shift faster · P tour · F free walk · R tape measure · T other views';
+  const FREE_HINT = 'WASD walk · click to look with the mouse (or drag) · Shift runs · F back on the route · R tape measure · T other views';
   const RAIL_HINT = 'W S along the route · A D pick a branch · drag to look · Shift faster · P tour · T other views · Esc exits';
   function pickDisc(e) {
     ray.setFromCamera(new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1), cam);
@@ -702,6 +703,7 @@ export function initTour(ctx) {
     else if (code === 'KeyP') autoTour();
     else if (code === 'KeyF' && T.path === 'W') { hint.textContent = walk.toggleRail() ? WALK_HINT : FREE_HINT; }
     else if (T.path === 'A' && T.rail) { /* W, S, A and D are read by the rail every frame */ }
+    else if (code === 'KeyR' && T.path === 'W') toggleTape();
     else if (T.path === 'W') { if (code === 'Enter') forward(); }
     else if (code === 'KeyW' || code === 'Enter') forward();
     else if (code === 'KeyS') stepSweep(-1);
@@ -736,7 +738,47 @@ export function initTour(ctx) {
     } else enter(l);
   }
 
+  // ---------------------------------------------------------------- tape measure (R, walking view)
+  // Click two points on the scan: the distance shows in feet and inches (and meters).
+  const tape = { on: false, a: null, b: null, feet: null };
+  const tapeLabel = document.createElement('div');
+  tapeLabel.className = 'tape-label';
+  stage.append(tapeLabel);
+  const ftIn = (m) => { const inches = Math.round(m * 39.3701); return `${Math.floor(inches / 12)} ft ${inches % 12} in`; };
+  function toggleTape(force) {
+    tape.on = force ?? !tape.on;
+    tape.a = tape.b = null; tape.feet = null;
+    walk.setTape(null, null);
+    tapeLabel.classList.remove('show');
+    stage.classList.toggle('measuring', tape.on);
+    if (tape.on) { freeMouse(); hint.textContent = 'Tape measure: click two points (walls, floor, furniture) · R puts it away'; } else hint.textContent = walk.onRails ? WALK_HINT : FREE_HINT;
+    window.__gpa.tape = { on: tape.on, feet: null };
+    return tape.on;
+  }
+  function tapeClick(e) {
+    const locked = document.pointerLockElement === stage;
+    const p = walk.pick(locked ? 0 : (e.clientX / window.innerWidth) * 2 - 1, locked ? 0 : -(e.clientY / window.innerHeight) * 2 + 1);
+    if (!p) return;
+    if (!tape.a || tape.b) { tape.a = p; tape.b = null; tape.feet = null; } else {
+      tape.b = p;
+      const m = tape.a.distanceTo(tape.b);
+      tape.feet = m * 3.28084;
+      tapeLabel.innerHTML = `<b>${ftIn(m)}</b><span>${m.toFixed(2)} m</span>`;
+      ctx.audio.blip(980, 0.06);
+    }
+    walk.setTape(tape.a, tape.b);
+    window.__gpa.tape = { on: true, feet: tape.feet };
+  }
+  ctx.on('post', () => {
+    if (!T.active || !tape.on || !tape.a || !tape.b) { if (tapeLabel.classList.contains('show') && !(tape.a && tape.b)) tapeLabel.classList.remove('show'); return; }
+    const mid = walk.toScreen(tape.a.clone().lerp(tape.b, 0.5));
+    tapeLabel.classList.toggle('show', !!mid);
+    if (mid) tapeLabel.style.transform = `translate(${mid.x}px, ${mid.y}px) translate(-50%, -140%)`;
+  });
+  ctx.on('tour-exit', () => { if (tape.on) toggleTape(false); });
+
   const api = {
+    toggleTape, tapePick: (nx, ny) => tapeClick({ clientX: ((nx + 1) / 2) * window.innerWidth, clientY: ((1 - ny) / 2) * window.innerHeight }),
     enter, exit, request, forward, look, toggleEmpty, switchPath, nextSpace, stepSweep,
     get active() { return T.active; },
     get path() { return T.path; },

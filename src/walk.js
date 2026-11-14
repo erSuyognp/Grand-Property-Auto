@@ -473,6 +473,7 @@ export function createWalk(ctx, hooks = {}) {
   }
 
   function stop() {
+    setTape(null, null);
     if (W.mesh) { scene.remove(W.mesh); W.mesh.geometry.dispose(); W.mesh = null; }
     for (const e of atlases.values()) if (e.tex) e.tex.dispose();
     atlases.clear();
@@ -486,8 +487,38 @@ export function createWalk(ctx, hooks = {}) {
     W.rider = null; W.graph = null; W.railOn = false; W.touring = false;
   }
 
+  // ---- tape measure: two points picked on the scan's mesh
+  const tape = { line: null, dots: [] };
+  const ndc = new THREE.Vector2();
+  function pick(nx, ny) {
+    if (!W.mesh) return null;
+    ray.setFromCamera(ndc.set(nx, ny), cam); ray.far = 40;
+    const h = ray.intersectObject(W.mesh, false);
+    return h.length ? h[0].point.clone() : null;
+  }
+  function setTape(a, b) {
+    if (tape.line) { scene.remove(tape.line); tape.line.geometry.dispose(); tape.line = null; }
+    for (const d of tape.dots) scene.remove(d);
+    tape.dots = [];
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffc940, depthTest: false });
+    for (const p of [a, b]) {
+      if (!p) continue;
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), dotMat);
+      d.position.copy(p); d.renderOrder = 20; scene.add(d); tape.dots.push(d);
+    }
+    if (a && b) {
+      tape.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xffc940, depthTest: false }));
+      tape.line.renderOrder = 19; scene.add(tape.line);
+    }
+  }
+  const proj = new THREE.Vector3();
+  function toScreen(v) {
+    proj.copy(v).project(cam);
+    return proj.z > 1 ? null : { x: ((proj.x + 1) / 2) * window.innerWidth, y: ((1 - proj.y) / 2) * window.innerHeight };
+  }
+
   return {
-    load, start, render, stop, goTo, forward, state: W,
+    load, start, render, stop, goTo, forward, state: W, pick, setTape, toScreen,
     look(dx, dy = 0) {
       if (W.railOn && W.rider) W.rider.look(dx, dy);
       else { W.yaw += dx; W.pitch = THREE.MathUtils.clamp(W.pitch + dy, -1.25, 1.25); }
