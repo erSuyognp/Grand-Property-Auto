@@ -256,8 +256,13 @@ ${JSON.stringify(facts)}` : '',
   // the expressive eleven_v4_turbo; if the account or voice cannot use it, the fast flash model.
   const VOICE_SETTINGS = { stability: Number(process.env.ELEVENLABS_STABILITY) || 0.5, similarity_boost: Number(process.env.ELEVENLABS_SIMILARITY) || 0.75, speed: Number(process.env.ELEVENLABS_SPEED) || 1 };
   let ttsModel = process.env.ELEVENLABS_MODEL || 'eleven_v4_turbo';
+  // Credits used up: remember it for a few minutes and answer at once, so the game goes
+  // straight to the browser voice instead of waiting on a request that will be refused.
+  let quotaUntil = 0, lastTtsError = '';
+  const ttsStatus = (_req, res) => res.json({ ok: Date.now() >= quotaUntil && !lastTtsError, reason: Date.now() < quotaUntil ? 'quota' : lastTtsError || null });
   async function tts(req, res) {
     if (!ttsReady()) return res.status(404).json({ error: 'tts off' });
+    if (Date.now() < quotaUntil) return res.status(429).json({ error: 'tts quota used up' });
     const src = req.method === 'GET' ? req.query : req.body || {};
     const text = String(src.text || '').slice(0, 600);
     if (!text) return res.status(400).json({ error: 'no text' });
@@ -269,12 +274,21 @@ ${JSON.stringify(facts)}` : '',
     });
     try {
       let r = await call(ttsModel);
+      if (!r.ok) {
+        const body = await r.clone().text().catch(() => '');
+        if (/quota_exceeded/.test(body)) {
+          quotaUntil = Date.now() + 300000; lastTtsError = 'quota';
+          console.warn('[maya] ElevenLabs credits are used up (quota_exceeded). The game uses the browser voice until credits are added.');
+          return res.status(429).json({ error: 'tts quota used up' });
+        }
+      }
       if (!r.ok && ttsModel !== 'eleven_flash_v2_5') {
         console.warn(`[maya] voice model ${ttsModel} answered ${r.status}; using eleven_flash_v2_5`);
         if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) ttsModel = 'eleven_flash_v2_5';
         r = await call('eleven_flash_v2_5');
       }
-      if (!r.ok || !r.body) return res.status(502).json({ error: 'tts provider ' + r.status });
+      if (!r.ok || !r.body) { lastTtsError = 'provider ' + r.status; return res.status(502).json({ error: 'tts provider ' + r.status }); }
+      lastTtsError = '';
       res.set({ 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
       Readable.fromWeb(r.body).on('error', () => res.end()).pipe(res);
     } catch { if (!res.headersSent) res.status(504).json({ error: 'tts timeout' }); else res.end(); }
@@ -295,5 +309,5 @@ ${JSON.stringify(facts)}` : '',
       res.set('cache-control', 'no-store').json({ token: (await r.json()).token });
     } catch { res.status(504).json({ error: 'agent timeout' }); }
   }
-  return { handle, tts, stt, voices, session, liveReady, ready, ttsReady, model: MODEL };
+  return { handle, tts, ttsStatus, stt, voices, session, liveReady, ready, ttsReady, model: MODEL };
 }

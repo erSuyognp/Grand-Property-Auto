@@ -99,8 +99,17 @@ export function initMaya(ctx) {
     b.textContent = text; b.dataset.who = who; b.classList.add('show');
     S.caption = text; pub();
   }
+  // When the voice service keeps refusing (most often: the account's credits are used up), she
+  // stops asking it for a few minutes and speaks with the browser voice at once, so every
+  // sentence does not first wait for a failure.
+  let ttsFails = 0, ttsOffUntil = 0;
+  function ttsFailed() {
+    if (++ttsFails < 2 || performance.now() < ttsOffUntil) return;
+    ttsOffUntil = performance.now() + 180000; ttsFails = 0;
+    fetch('/api/maya/tts/status').then((r) => r.json()).then((j) => ctx.hud.toast(j.reason === 'quota' ? "Maya's ElevenLabs credits are used up. Using the browser voice" : "Maya's voice service is not answering. Using the browser voice", 4200)).catch(() => {});
+  }
   function fetchAudio(text) {
-    if (muted() || !ctx.config.mayaTts) return null;
+    if (muted() || !ctx.config.mayaTts || performance.now() < ttsOffUntil) return null;
     const a = new Audio();
     a.preload = 'auto';
     a.src = `/api/maya/tts?text=${encodeURIComponent(text)}${ctx.settings?.voiceId ? '&voice=' + encodeURIComponent(ctx.settings.voiceId) : ''}`;
@@ -141,7 +150,7 @@ export function initMaya(ctx) {
     if (a) {
       item.el = a;
       let failed = false;
-      const fail = () => { if (failed || token !== speakToken) return; failed = true; item.el = null; try { a.pause(); } catch { /* gone */ } browserVoice(); };
+      const fail = () => { if (failed || token !== speakToken) return; failed = true; item.el = null; try { a.pause(); } catch { /* gone */ } ttsFailed(); browserVoice(); };
       try {
         ac = ac || new (window.AudioContext || window.webkitAudioContext)();
         if (ac.state === 'suspended') ac.resume();
@@ -149,7 +158,7 @@ export function initMaya(ctx) {
         ac.createMediaElementSource(a).connect(analyser);
       } catch { /* plays without the mouth meter */ }
       a.volume = ctx.settings?.volume ?? 1;
-      a.onplaying = started; a.onended = done; a.onerror = fail;
+      a.onplaying = () => { ttsFails = 0; started(); }; a.onended = done; a.onerror = fail;
       if (a.error) fail(); else a.play().catch(fail);
       setTimeout(() => { if (!failed && token === speakToken && playing === item && a.readyState < 2 && a.currentTime === 0) fail(); }, 6000); // nothing arrived
     } else browserVoice();

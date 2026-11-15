@@ -345,3 +345,9 @@ Checked every insight file in Los Angeles, Houston and the mock neighborhood aga
 - **Community list cleaned.** The listing's community section also holds the subdivision name, the builder and pet rules. `amenityList()` drops those and anything longer than 32 characters.
 - **Shorter waits.** On the tour: a question waits 6 s (was 11) before "No rush", and she moves to the next room after 3 s of quiet (was 6). The filler line on a walk starts after 2.2 s (was 3.2). The live agent picks the conversation back up after 6 s of silence (was 12) with one new fact instead of "are you there". `tools/setup_maya_agent.mjs` was rerun.
 - **Checked** in the running game: the reveal steps on a Houston home (no giant pin, insurance step present) and the amenity sentences across all Houston homes. The tour lines and the new wait times were not walked through, and the Playwright tests were not rerun.
+
+## Pins parked out of view, ElevenLabs credits used up (Nov 14)
+
+- **Giant pin again.** Not reproduced with the current build (ten apartment homes at `quality=ultra`: no visible pin before its step), so the page that showed it was most likely still running older code. Unplaced pins are now also parked 100 km below the map, on top of being hidden.
+- **Maya's voice stopped: the ElevenLabs account is out of credits.** The speech request answers `quota_exceeded`: 10,000 of 10,000 credits used on the pay as you go tier, next reset Dec 12. Nothing in the code is broken. Needs the user to add credits. The agent tests in this session (text mode, no audio) may have used some of them.
+- **Graceful fallback.** The server remembers `quota_exceeded` for five minutes and answers 429 at once; `/api/maya/tts/status` says why. In the game, after two failed sentences Maya stops asking the service for three minutes, speaks with the browser voice straight away and shows one toast saying the credits are used up. Checked in the running game.

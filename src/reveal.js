@@ -190,6 +190,7 @@ export function initReveal(ctx) {
       // hidden until its step: a sprite that keeps its screen size is drawn at full scale (it
       // fills the screen) at the world origin until its animation places it
       sprite.visible = false; stem.visible = false; sprite.scale.set(0.0001, 0.0001, 1);
+      sprite.position.set(px, -100000, pz); stem.position.set(px, -100000, pz); // and parked far below the map, out of any camera's view
       group.add(sprite, stem);
       const useWalk = p.walkMin <= 15;
       const c = chip(`${icon(PLACE_ICON[cat], 14)}<b>${useWalk ? p.walkMin + ' min walk' : p.driveMin + ' min drive'}</b><span>${p.name && p.name !== PLACE_LABEL[cat] ? p.name : PLACE_LABEL[cat]}${far ? ' →' : ''}</span>`, 'place');
