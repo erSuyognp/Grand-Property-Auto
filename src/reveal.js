@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { findPath } from './nav.js';
 import { iconUrl, icon, PLACE_ICON, PLACE_LABEL } from './icons.js';
+import { extraFacts } from './mayaTools.js';
 
 const PLACES = ['supermarket', 'school', 'park', 'transit', 'gym', 'hospital'];
 export const CAT_COLOR = { supermarket: '#ffb020', school: '#7c9cff', park: '#3ddc84', transit: '#4cc9f0', gym: '#ff7ab6', hospital: '#ff6b6b', pharmacy: '#c59bff', cafe: '#e0a878', restaurant: '#ffa15c' };
@@ -99,8 +100,10 @@ export function initReveal(ctx) {
     const solar = !!(data?.solar?.panels || data?.aerial?.solar), flood = !!data?.risk?.flood?.sfha;
     if (!guided()) return { outline: 0.5, ring: (i) => 1.0 + i * 0.32, place: (n) => 1.9 + n * 0.16, solar: 2.9, flood: 3.2, panel: 2.5, end: 4.2, wideIn: 0.9, wideOut: 3.3, guided: false };
     const ring0 = 2.2, place0 = ring0 + nRings * 1.0 + 0.5, gap = 1.25;
-    const solarT = place0 + nPlaces * gap + 0.3, floodT = solarT + (solar ? 2.2 : 0), panelT = floodT + (flood ? 2.2 : 0) + 0.4;
-    return { outline: 0.5, ring: (i) => ring0 + i * 1.0, place: (n) => place0 + n * gap, solar: solarT, flood: floodT, panel: panelT, end: panelT + 1.6, wideIn: ring0 - 0.4, wideOut: solarT - 0.5, guided: true };
+    // after the places: what it costs to own (insurance, HOA, amenities, tax), one step each
+    const nFacts = Math.min(4, extraFacts(data).filter((x) => x.key !== 'energy' && !(x.key === 'risk' && flood)).length);
+    const solarT = place0 + nPlaces * gap + 0.3, floodT = solarT + (solar ? 2.2 : 0), factT = floodT + (flood ? 2.2 : 0), panelT = factT + nFacts * 2.4 + 0.4;
+    return { outline: 0.5, ring: (i) => ring0 + i * 1.0, place: (n) => place0 + n * gap, solar: solarT, flood: floodT, fact: (n) => factT + n * 2.4, nFacts, panel: panelT, end: panelT + 1.6, wideIn: ring0 - 0.4, wideOut: solarT - 0.5, guided: true };
   }
   const capEl = document.createElement('div');
   capEl.id = 'reveal-cap';
@@ -184,6 +187,9 @@ export function initReveal(ctx) {
       sprite.renderOrder = 10;
       const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1, 6), basic(new THREE.Color(CAT_COLOR[cat]), 0.9));
       stem.renderOrder = 9;
+      // hidden until its step: a sprite that keeps its screen size is drawn at full scale (it
+      // fills the screen) at the world origin until its animation places it
+      sprite.visible = false; stem.visible = false; sprite.scale.set(0.0001, 0.0001, 1);
       group.add(sprite, stem);
       const useWalk = p.walkMin <= 15;
       const c = chip(`${icon(PLACE_ICON[cat], 14)}<b>${useWalk ? p.walkMin + ' min walk' : p.driveMin + ' min drive'}</b><span>${p.name && p.name !== PLACE_LABEL[cat] ? p.name : PLACE_LABEL[cat]}${far ? ' →' : ''}</span>`, 'place');
@@ -202,6 +208,7 @@ export function initReveal(ctx) {
       };
       setTimeout(() => { if (cur === l && group) makeLine(); }, 80 + n * 140); // one route search per few frames, so the frame rate holds
       add(t0, 0.7, (k) => {
+        sprite.visible = true; stem.visible = true;
         const s = Math.max(0.001, k) * 0.052;
         sprite.scale.set(s, s, 1);
         const h = 13 * Math.min(1.15, k);
@@ -253,6 +260,8 @@ export function initReveal(ctx) {
       beat(P.flood, 'Flood zone', `${data.risk.flood.label}. A lender will likely require flood insurance.`);
       add(P.flood, 0.9, (k) => { water.material.opacity = 0.22 * k; c.on = k > 0.4; }, smooth);
     }
+    // 6. the costs of owning it: insurance, HOA, amenities, tax (guided pace only)
+    if (P.guided && P.nFacts) extraFacts(data).filter((x) => x.key !== 'energy' && !(x.key === 'risk' && data?.risk?.flood?.sfha)).slice(0, P.nFacts).forEach((x, i) => beat(P.fact(i), x.title, x.text));
     // a little dimmer, so the highlights read
     baseExposure = 1;
     add(0.1, 1.0, (k) => { ctx.env.setDim(1 - 0.2 * k); }, smooth);

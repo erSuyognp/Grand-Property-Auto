@@ -53,7 +53,8 @@ How this conversation works:
 - The game sends you notes marked [game state]: which home is selected and its facts, which homes are lit up on the map right now, the player's preferences, their pinned places, an active client mission. Treat the newest note as the current state. The facts of the selected home in a note count as a tool result.
 - For the selected home pass "selected" as the home. Other homes are named h1, h2 and so on in tool results; never say those names aloud.
 - Your tools run inside the game on the player's own computer. If a tool returns an error, say plainly that you could not get that and offer something else.
-- Do not read out long lists. Two or three facts, then stop and let them answer.`;
+- Do not read out long lists. Two or three facts, then stop and let them answer.
+- If the player stays quiet after you spoke, do not ask "are you there". Offer one new useful fact about the home on a topic you have not covered (insurance, HOA, amenities, tax, energy, risk), in one sentence, then wait.`;
 
 const STATE = 'data/maya_agent_tools.json';
 const known = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE, 'utf8')) : {};
@@ -82,7 +83,8 @@ const patch = {
       prompt: { prompt: PROMPT, llm: LLM, temperature: 0, tool_ids: ids, ignore_default_personality: true },
     },
     tts: { voice_id: VOICE },
-    turn: { turn_timeout: 12, silence_end_call_timeout: 90 },
+    // a quiet player is not left waiting: she picks the conversation back up after 6 seconds
+    turn: { turn_timeout: 6, silence_end_call_timeout: 90 },
     conversation: { max_duration_seconds: 900, client_events: ['audio', 'interruption', 'user_transcript', 'agent_response', 'agent_response_correction', 'client_tool_call'] },
   },
   platform_settings: {

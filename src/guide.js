@@ -5,7 +5,7 @@
 // She ends on the strongest room, then recaps with the honest trade off and a next step.
 // Every fact comes from the scan (room names and sizes), the listing's own features, or the
 // insight file. Room uses are offered as possibilities ("this could be your bedroom").
-import { pitch } from './mayaTools.js';
+import { pitch, extraFacts } from './mayaTools.js';
 import { icon } from './icons.js';
 import { MAYA_AVATAR } from './maya.js';
 
@@ -200,6 +200,8 @@ export function initGuide(ctx) {
       ask: 'How does this one feel?', choices: [['I love it', 'love'], ['Show me the costs', 'costs'], ['Find me a better fit', 'better']], final: true };
   }
 
+  // the next owning fact she has not said yet in this showing (insurance, HOA, amenities, ...)
+  const nextFact = () => extraFacts(G.ins)[G.factI || 0] || null;
   // ---- what she says on the way to a room, like an agent walking a step ahead of you
   function hello() {
     const l = G.listing, ms = ctx.maya?.state;
@@ -291,6 +293,9 @@ export function initGuide(ctx) {
     const s = G.stops[i];
     G.seen.add(s.key);
     const m = say(s);
+    // a room with no question for the buyer carries one owning fact instead (insurance, HOA, amenities, ...)
+    const fact = !m.ask && i > 0 ? nextFact() : null;
+    if (fact) { G.factI++; m.text = `${m.text.trim()} While we are here: ${fact.text}`; }
     G.ask = m.ask || null;
     G.choices = m.choices ? m.choices.map(([label, value]) => ({ label, value })) : null;
     G.on = m.on || null;
@@ -315,7 +320,7 @@ export function initGuide(ctx) {
       if (near && near !== G.stops[0] && d(G.stops[0]) - d(near) > 4) { G.stops = [near, ...G.stops.filter((s) => s !== near)]; }
     }
     if (ctx.tour.path === 'W') ctx.tour.walk.setLead(AVATAR_URL);
-    G.hl = 0; G.walkT = 0; G.filler = false;
+    G.hl = 0; G.walkT = 0; G.filler = false; G.factI = 0; G.walks = 0;
     G.phase = 'hello'; G.ask = null; G.choices = null;
     speak(hello());
     render();
@@ -424,10 +429,16 @@ export function initGuide(ctx) {
     if (G.phase === 'walking') {
       G.walkT += dt;
       const hl = (G.listing.highlights || []).filter((x) => x && x.length < 40);
-      if (G.quiet && !G.filler && G.walkT > 3.2 && hl.length > G.hl) {
-        G.filler = true;
-        const a = hl[G.hl++], b = hl[G.hl] && G.hl % 2 ? hl[G.hl++] : null;
-        speak(`While we walk: the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);
+      // on the way she covers the owning side too (insurance, HOA, amenities, tax, energy),
+      // taking turns with what the listing points out
+      const fact = G.walks % 2 === 0 || hl.length <= G.hl ? nextFact() : null;
+      if (G.quiet && !G.filler && G.walkT > 2.2 && (fact || hl.length > G.hl)) {
+        G.filler = true; G.walks++;
+        if (fact) { G.factI++; speak(`While we walk: ${fact.text}`); }
+        else {
+          const a = hl[G.hl++], b = hl[G.hl] && G.hl % 2 ? hl[G.hl++] : null;
+          speak(`While we walk: the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);
+        }
         render();
       }
     }
@@ -435,7 +446,8 @@ export function initGuide(ctx) {
     if (G.quiet && G.phase === 'room') {
       G.idle += dt;
       const asking = !!(G.choices && G.showAsk);
-      if (asking && !G.nudged && G.idle > 11) { G.nudged = true; G.ask = null; G.choices = null; speak('No rush. Take a look around.'); render(); } else if (!asking && G.idle > 6) { G.idle = 0; next(); }
+      // a buyer who stays quiet is not kept waiting: a short pause on a question, then she moves on
+      if (asking && !G.nudged && G.idle > 6) { G.nudged = true; G.ask = null; G.choices = null; speak('No rush. Take a look around.'); render(); } else if (!asking && G.idle > 3) { G.idle = 0; next(); }
     }
   });
   ctx.on('key', (code) => {

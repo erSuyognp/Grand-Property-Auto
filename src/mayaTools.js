@@ -48,6 +48,8 @@ export function pitch(ins, row) {
   if (a.roofCondition >= 4) pts.push({ w: 45, card: 'energy', text: `the roof looks in good shape from the air, ${a.roofCondition} out of 5` });
   if (a.roofCondition && a.roofCondition <= 2) cons.push({ w: 58, card: 'energy', text: `the roof rates ${a.roofCondition} out of 5 from the air, so budget for an inspection` });
   if (c && !c.hoa) pts.push({ w: 30, card: 'hoa', text: 'there is no HOA fee listed' });
+  const amen = amenityList(ins);
+  if (amen.length >= 2) pts.push({ w: 60, card: 'hoa', text: `${ins.apartment ? 'amenities include' : 'the listing names community features like'} ${amen.slice(0, 3).map((x) => String(x).toLowerCase()).join(', ')}` });
   if (c && c.hoa >= 400) cons.push({ w: 50 + Math.min(40, c.hoa / 50), card: 'hoa', text: `the HOA fee is ${usd(c.hoa)} a month` });
   if (ins.energy && ins.energy.billMonth >= 260) cons.push({ w: 45, card: 'energy', text: `the electric bill is estimated at ${usd(ins.energy.billMonth)} a month` });
   if (n.highway && n.highway.distM < 250) cons.push({ w: 52, card: 'noise', text: `a highway is ${n.highway.distM} meters away` });
@@ -58,6 +60,32 @@ export function pitch(ins, row) {
   if (ins.apartment?.unitsAvailable) pts.push({ w: 40, card: 'rent', text: `${ins.apartment.unitsAvailable} homes are available now` });
   pts.sort((x, y) => y.w - x.w); cons.sort((x, y) => y.w - x.w);
   return { points: pts.slice(0, 3), tradeoffs: cons.slice(0, 2) };
+}
+
+// Amenities worth saying aloud: the listing's community section also holds the subdivision
+// name, the builder and pet rules, which are not amenities.
+export const amenityList = (ins) => (ins?.apartment ? ins.apartment.amenities || [] : ins?.home?.community || []).filter((x) => x && String(x).length <= 32 && !/subdivision|\bsubd?\b|\baddition\b|\bsection\b|\bphase\b|built by|call for|\bpets?\b|deposit|\brules?\b/i.test(String(x)));
+
+// The money and paperwork side of a home as short spoken sentences: insurance, hazard risk,
+// HOA, amenities, tax, energy. The reveal and the guided tour use these so the story is not
+// only about what is nearby. Calculated numbers say "estimated"; missing data is skipped.
+export function extraFacts(ins) {
+  if (!ins) return [];
+  const out = [], h = ins.home || {}, c = ins.cost, r = ins.risk, list = (a) => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
+  const low = (a) => a.map((x) => String(x).toLowerCase());
+  if (c?.insurance) out.push({ key: 'insurance', card: 'cost', title: 'Insurance', text: `Home insurance is estimated at about ${usd(c.insurance)} a month, from the state average. A quote from an insurer is the real number.` });
+  if (r?.nri?.rating || r?.flood) {
+    const top = (r.nri?.top || []).slice(0, 2).map((x) => x.hazard.toLowerCase());
+    out.push({ key: 'risk', card: 'risk', title: 'Risk', text: `${r.nri?.rating ? `FEMA rates natural hazard risk here ${r.nri.rating.toLowerCase()}${top.length ? ', mainly ' + list(top) : ''}. ` : ''}${r.flood?.sfha ? 'It is in a high risk flood zone, so a lender will likely require flood insurance.' : r.flood?.label ? r.flood.label + '.' : ''}`.trim() });
+  }
+  const covers = (h.hoa?.lines || []).map((x) => (/include/i.test(x) ? x.replace(/^.*?include[s]?\s*/i, '').split(/,\s*/) : [])).flat().filter(Boolean);
+  if (h.hoa?.fee) out.push({ key: 'hoa', card: 'hoa', title: 'HOA', text: `The HOA fee is ${usd(h.hoa.fee)} a month${covers.length ? `, and it covers ${list(low(covers.slice(0, 3)))}` : '. The listing does not say what it covers'}.` });
+  else if (c && !c.hoa && !ins.apartment) out.push({ key: 'hoa', card: 'hoa', title: 'HOA', text: 'There is no HOA fee listed for this home.' });
+  const amen = amenityList(ins);
+  if (amen.length) out.push({ key: 'amenities', card: 'hoa', title: 'Amenities', text: `${ins.apartment ? 'Amenities here include' : 'Community features in the listing:'} ${list(low(amen.slice(0, 4)))}.` });
+  if (c?.tax) out.push({ key: 'tax', card: 'cost', title: 'Property tax', text: `Property tax is estimated at about ${usd(c.tax)} a month.` });
+  if (ins.energy?.billMonth) out.push({ key: 'energy', card: 'energy', title: 'Energy', text: `The electric bill is estimated at about ${usd(ins.energy.billMonth)} a month${ins.solar?.panels ? `, and rooftop solar could save an estimated ${usd(ins.solar.savingsYear)} a year` : ''}.` });
+  return out;
 }
 
 export function makeTools(db) {
