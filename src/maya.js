@@ -108,13 +108,33 @@ export function initMaya(ctx) {
     ttsOffUntil = performance.now() + 180000; ttsFails = 0;
     fetch('/api/maya/tts/status').then((r) => r.json()).then((j) => ctx.hud.toast(j.reason === 'quota' ? `Maya's ${j.provider === 'openai' ? 'OpenAI' : 'ElevenLabs'} credits are used up. Using the browser voice` : "Maya's voice service is not answering. Using the browser voice", 4200)).catch(() => {});
   }
-  function fetchAudio(text) {
-    if (muted() || !ctx.config.mayaTts || performance.now() < ttsOffUntil) return null;
+  const voiceOn = () => !muted() && !!ctx.config.mayaTts && performance.now() >= ttsOffUntil;
+  function makeAudio(text) {
     const a = new Audio();
     a.preload = 'auto';
     a.src = `/api/maya/tts?text=${encodeURIComponent(text)}${ctx.settings?.voiceId ? '&voice=' + encodeURIComponent(ctx.settings.voiceId) : ''}`;
     a.load();
     return a;
+  }
+  // sentences whose voice is already on its way (see preload below)
+  const warm = new Map();
+  function fetchAudio(text) {
+    if (!voiceOn()) return null;
+    const ready = warm.get(text);
+    if (ready) { warm.delete(text); return ready; }
+    return makeAudio(text);
+  }
+  // Ask for the voice of a line before it is needed, so there is no pause when she gets to it
+  // (the home reveal does this with the next step's line while she says the current one).
+  function preload(text) {
+    if (!voiceOn() || !text) return;
+    const sp = splitter((s) => {
+      s = s.trim();
+      if (!s || warm.has(s)) return;
+      warm.set(s, makeAudio(s));
+      if (warm.size > 6) { const k = warm.keys().next().value, old = warm.get(k); warm.delete(k); try { old.removeAttribute('src'); old.load(); } catch { /* gone */ } }
+    });
+    sp.push(String(text) + ' '); sp.flush();
   }
   function enqueue(text, { show = true } = {}) {
     text = text.trim();
@@ -350,7 +370,7 @@ export function initMaya(ctx) {
   return {
     live,
     level: () => (playing || liveLevel ? level() : 0),
-    hear, ask, say, interrupt, remember, act,
+    hear, ask, say, interrupt, remember, act, preload,
     open(pitchNow) { el.classList.add('show'); if (pitchNow) { if (live?.active) { live.send('Tell me about this home.'); return; } interrupt(); ask('__pitch__'); } },
     listening(on) { if (on) { interrupt(); setState('listening'); el.classList.add('show'); } else if (S.state === 'listening') setState('idle'); },
     get state() { return S; },

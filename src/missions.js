@@ -1,6 +1,7 @@
 // Voice missions: score every listing against the spoken filters, light up the top five,
 // pick the best and guide the player there with a glowing ribbon on the ground and an arrow
 // at the top of the screen. Narrates on arrival. Never a chat window.
+import { pick } from './lines.js';
 import * as THREE from 'three';
 import { EMPTY_FILTERS, describe, narrate, parseMission } from './parser.js';
 import { findPath, pathLength } from './nav.js';
@@ -145,14 +146,15 @@ export function initMissions(ctx) {
     M.active = !!M.target;
     M.arrived = false;
     M.exact = good.length;
-    if (!M.target) { speak('Nothing on the map fits that yet.'); return; }
+    if (!M.target) { speak(pick('ms-none', ['Nothing on the map fits that yet.', 'I have nothing that fits that on this map yet.', 'No home here matches that yet.'])); return; }
     // make sure the kinds we are sending the player to are visible
     for (const l of M.top) if (!ctx.listingsSys.visible[l.kind]) ctx.listingsSys.setVisible(l.kind, true);
     ctx.listingsSys.setHighlights(M.top.map((l) => l.id), M.target);
     reroute(true);
     let line = say || describe({ filters: M.filters, near: M.near });
-    if (!good.length) line += ' Nothing matches everything, so here is the closest fit.';
-    else if (!opts.quiet) line += good.length === 1 ? ' One match. Follow the gold line.' : ` ${Math.min(good.length, 5)} lit up. Follow the gold line to the best one.`;
+    if (!good.length) line += ' ' + pick('ms-close', ['Nothing matches everything, so here is the closest fit.', 'No exact match, so I lit up the closest fit.', 'Nothing fits every point, here is the nearest thing.']);
+    else if (!opts.quiet) line += good.length === 1 ? ' ' + pick('ms-one', ['One match. Follow the gold line.', 'Just one fits. The gold line takes you there.', 'One home fits. Follow the gold line.'])
+      : ' ' + pick('ms-many', [`${Math.min(good.length, 5)} lit up. Follow the gold line to the best one.`, `${Math.min(good.length, 5)} homes lit up. The gold line goes to the best fit.`, `I lit up ${Math.min(good.length, 5)}. The gold line leads to the strongest one.`]);
     speak(line);
     prefetchNarration(M.target);
     ctx.audio.chime();
@@ -358,7 +360,7 @@ export function initMissions(ctx) {
   }
   function prefetchNarration(l) {
     if (!l || M.prefetch.has(l.id)) return;
-    const fallback = narrate(l, M.seed++);
+    const fallback = narrate(l, Math.floor(Math.random() * 3));
     const p = (async () => {
       if (!ctx.config.llm) return fallback;
       try {

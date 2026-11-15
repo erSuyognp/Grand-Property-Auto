@@ -4,7 +4,19 @@
     {
       "name": "game",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "set PORT=&& npm run dev"],
+      "runtimeArgs": [
+        "/c",
+        "set PORT=&& npm run dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "game-mock",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set PORT=&& set GAME_MODE=mock&& npm run dev"
+      ],
       "port": 5173
     }
   ]

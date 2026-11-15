@@ -302,7 +302,9 @@ export function initPanel(ctx) {
     cur = l; ins = null; openInfo = new Set();
     document.body.classList.add('revealing');
   });
-  ctx.on('reveal-panel', (l, d) => {
+  // narrated: Maya is telling the home's story, so the panel opens with no cards and she brings
+  // them in one at a time (focus), then the rest together (revealAll)
+  ctx.on('reveal-panel', (l, d, o = {}) => {
     if (l !== cur) return;
     ins = d;
     opts.solarOn = false;
@@ -310,10 +312,17 @@ export function initPanel(ctx) {
     el.scrollTop = 0;
     el.querySelector('.icards').scrollTop = 0;
     el.classList.add('show');
-    animateIn(ctx.reveal.stage >= 3);
+    el.classList.toggle('told', !!o.narrated);
+    if (o.narrated) for (const c of el.querySelectorAll('.icard[data-card]')) c.classList.add('wait');
+    else animateIn(ctx.reveal.stage >= 3);
     ctx.audio.whoosh?.(0.5);
-    window.__gpa.panel = { id: l.id, cards: [...el.querySelectorAll('.icard')].map((c) => c.dataset.card).filter(Boolean) };
+    window.__gpa.panel = { id: l.id, cards: [...el.querySelectorAll('.icard')].map((c) => c.dataset.card).filter(Boolean), narrated: !!o.narrated };
   });
+  function arrive(c, delay = 0) {
+    c.classList.remove('wait');
+    void c.offsetWidth; // so it slides in rather than just appearing
+    setTimeout(() => { if (c.isConnected && !c.classList.contains('in')) { c.classList.add('in'); countUp(c); } }, delay);
+  }
   ctx.on('saved', () => { if (cur && el.classList.contains('show')) { const b = el.querySelector('[data-act="save"]'); if (b) b.innerHTML = `<kbd>F</kbd>${ctx.saved.has(cur.id) ? 'Saved' : 'Save'}`; } });
   ctx.on('tour-enter', () => el.classList.add('away'));
   ctx.on('tour-exit', () => el.classList.remove('away'));
@@ -323,6 +332,26 @@ export function initPanel(ctx) {
     get options() { return opts; },
     setOptions(o) { Object.assign(opts, o); refreshCost(); },
     refresh() { if (cur && ins && el.classList.contains('show')) { render(); for (const c of el.querySelectorAll('.icard')) c.classList.add('in'); countUp(el, 1); } },
+    // the card she is talking about comes in (or lights up again) and scrolls into view
+    focus(key) {
+      const sec = el.querySelector(`[data-card="${key}"]`);
+      if (!sec) return false;
+      for (const c of el.querySelectorAll('.icard.now')) if (c !== sec) c.classList.remove('now');
+      if (sec.classList.contains('wait') || !sec.classList.contains('in')) arrive(sec, 30);
+      sec.classList.add('now');
+      setTimeout(() => { if (sec.isConnected) sec.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 60);
+      return true;
+    },
+    // the story is over or skipped: every card she did not get to comes in
+    revealAll() {
+      el.classList.remove('told');
+      for (const c of el.querySelectorAll('.icard.now')) c.classList.remove('now');
+      const rest = [...el.querySelectorAll('.icard:not(.in)')];
+      rest.forEach((c, i) => arrive(c, 40 + i * 110));
+      // show where the new cards start
+      if (rest[0]) setTimeout(() => { if (rest[0].isConnected) rest[0].scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 120);
+      if (window.__gpa.panel) window.__gpa.panel.narrated = false;
+    },
     flash(key) {
       const sec = el.querySelector(`[data-card="${key}"]`);
       if (!sec) return false;

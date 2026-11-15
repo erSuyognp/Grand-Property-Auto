@@ -8,6 +8,7 @@
 import { pitch, extraFacts } from './mayaTools.js';
 import { icon } from './icons.js';
 import { MAYA_AVATAR } from './maya.js';
+import { pick } from './lines.js';
 
 const AVATAR_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(MAYA_AVATAR.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"').replace('width="88" height="88"', 'width="256" height="256"'));
 
@@ -141,40 +142,40 @@ export function initGuide(ctx) {
     const l = G.listing, d = G.ins || {}, f = l.features || {}, h = d.home || {};
     const size = sizeText(s), first = G.i === 0;
     const pick = (sec, n = 3) => (f[sec] || []).filter((x) => !/\d+ (bed|full|half|sq)/i.test(x)).slice(0, n);
-    const hello = '';
-    const focus = G.focus && G.focus === s.kind ? 'You said this is the room that matters most to you, so take your time here. ' : '';
+    const hello = '', focus = '';
+    const vary = (slot, list) => pickLine(`tg-${slot}`, list);
     switch (s.kind) {
-      case 'entry': return { text: `${hello}This is the entry${size ? ', ' + size : ''}. ${pick('Interior Spaces', 2).length ? `Inside, the listing calls out ${join(pick('Interior Spaces', 2).map((x) => x.toLowerCase()))}.` : ''} Picture coming home through this door.`,
+      case 'entry': return { text: `${hello}${vary('entry-open', ['This is the entry', 'Here is the entry', 'We start at the entry'])}${size ? ', ' + size : ''}. ${pick('Interior Spaces', 2).length ? `Inside, the listing calls out ${join(pick('Interior Spaces', 2).map((x) => x.toLowerCase()))}.` : ''} ${vary('entry', ['Picture coming home through this door.', 'Imagine walking in here after a long day.', 'This is the first thing you would see every evening.'])}`,
         ask: 'What matters most to you in a home?', choices: [['The kitchen', 'kitchen'], ['Space to work', 'flex'], ['Outdoor space', 'outdoor'], ['The bedrooms', 'bedroom']], on: (v) => { G.focus = v; return `Good to know. I'll make sure we spend time on that.`; } };
-      case 'living': return { text: `${hello}${focus}This could be your living room${size ? ', ' + size : ''}. ${pick('Flooring', 2).length ? `The floors are ${join(pick('Flooring', 2).map((x) => x.toLowerCase()))}. ` : ''}Picture your sofa along that wall. Press R to measure it.`,
+      case 'living': return { text: `${hello}${focus}${vary('living-open', ['This could be your living room', 'Here is the living room', 'Picture this as your living room'])}${size ? ', ' + size : ''}. ${pick('Flooring', 2).length ? `The floors are ${join(pick('Flooring', 2).map((x) => x.toLowerCase()))}. ` : ''}${vary('living', ['Picture your sofa along that wall. Press R to measure it.', 'Think about where the sofa goes. Press R to measure the wall.', 'Want to know if your couch fits? Press R and measure it.'])}`,
         ask: 'What would this room be for you?', choices: [['Movie nights', 'movies'], ['Having friends over', 'friends'], ['A quiet place to read', 'quiet']], on: (v) => (v === 'friends' && d.activity?.shopsWalk ? `Then you'll like this: ${d.activity.shopsWalk} shops and places to eat are within a 10 minute walk for when the evening moves out.` : v === 'quiet' && d.noise?.highway ? `For quiet, a fact: the nearest highway is ${d.noise.highway.distM} meters away.` : 'It has the wall space for it. Measure it with R if you want to be sure.') };
-      case 'dining': return { text: `${hello}The dining room${size ? ', ' + size : ''}. Picture dinner with friends here, right off the kitchen.` };
+      case 'dining': return { text: `${hello}The dining room${size ? ', ' + size : ''}. ${vary('dining', ['Picture dinner with friends here.', 'Imagine the table set for a Sunday dinner.', 'This is where the long dinners happen.'])}` };
       case 'kitchen': {
         const k = (h.kitchen?.length ? h.kitchen : pick('Kitchen', 4)).slice(0, 4);
         const sup = d.places?.supermarket?.[0];
-        return { text: `${hello}${focus}This is the kitchen${size ? ', ' + size : ''}. ${k.length ? `The listing includes ${join(k.map((x) => x.toLowerCase()))}. ` : ''}Picture a weeknight dinner here.`,
+        return { text: `${hello}${focus}${vary('kitchen-open', ['This is the kitchen', 'And here is the kitchen', 'The kitchen'])}${size ? ', ' + size : ''}. ${k.length ? `The listing includes ${join(k.map((x) => x.toLowerCase()))}. ` : ''}${vary('kitchen', ['Picture a weeknight dinner here.', 'Imagine the coffee going on here in the morning.', 'This is where the evenings start.'])}`,
           ask: 'Do you cook most nights?', choices: [['Most nights', 'cook'], ['Sometimes', 'some'], ['Mostly takeout', 'takeout']], on: (v) => (v === 'takeout' ? (d.activity?.shopsWalk ? `Then the street matters more than the stove: ${d.activity.shopsWalk} shops and places to eat within a 10 minute walk.` : 'Then the stove gets an easy life.') : sup ? `Then this helps: ${sup.name} is ${sup.walkMin <= 15 ? `${an(sup.walkMin)} ${sup.walkMin} minute walk` : `about ${an(sup.driveMin)} ${sup.driveMin} minute drive`} for groceries.` : 'Then this is where you will spend your evenings.') };
       }
-      case 'flex': return { text: `${hello}${focus}The listing calls this ${/^[aeiou]/i.test(s.name) ? 'an' : 'a'} ${s.name.toLowerCase()}${size ? ', ' + size : ''}. This could be your office, a guest room, or a place for hobbies.`,
+      case 'flex': return { text: `${hello}${focus}The listing calls this ${/^[aeiou]/i.test(s.name) ? 'an' : 'a'} ${s.name.toLowerCase()}${size ? ', ' + size : ''}. ${vary('flex', ['This could be your office, a guest room, or a place for hobbies.', 'It could be an office, a guest room, or the hobby room you never had.', 'Office, guest room, studio: it is yours to decide.'])}`,
         ask: 'Do you work from home?', choices: [['Most days', 'wfh'], ['Sometimes', 'hybrid'], ['No', 'commute']], on: (v) => (v === 'commute' && d.drive?.downtown ? `Then the commute counts: ${d.drive.downtown.name} is about ${an(d.drive.downtown.min)} ${d.drive.downtown.min} minute drive, as an estimate.` : `Then picture your desk here. ${d.places?.cafe?.[0] ? `And for a change of scene, ${d.places.cafe[0].name} is ${an(d.places.cafe[0].walkMin)} ${d.places.cafe[0].walkMin} minute walk.` : ''}`) };
       case 'bedroom': {
         const bed = s.area >= 13 ? 'a king bed fits with space to walk around it' : s.area >= 9.5 ? 'a queen bed fits comfortably' : s.area ? 'a full bed fits, or it makes a good office' : '';
-        return { text: `${hello}${focus}This could be your bedroom. ${size ? `At ${size}, ${bed}. ` : ''}${pick('Bedrooms and Bathrooms', 2).length ? `The listing mentions ${join(pick('Bedrooms and Bathrooms', 2).map((x) => x.toLowerCase()))}. ` : ''}Picture waking up here.`,
+        return { text: `${hello}${focus}${vary('bed-open', ['This could be your bedroom.', 'Here is a bedroom.', 'Picture this one as your bedroom.'])} ${size ? `At ${size}, ${bed}. ` : ''}${pick('Bedrooms and Bathrooms', 2).length ? `The listing mentions ${join(pick('Bedrooms and Bathrooms', 2).map((x) => x.toLowerCase()))}. ` : ''}${vary('bed', ['Picture waking up here.', 'Imagine the first coffee of the day from here.', 'Think about where the bed would go.'])}`,
           ask: 'What would you use this room for?', choices: [['My bedroom', 'mine'], ['A guest room', 'guest'], ['A home office', 'office']], on: (v) => (v === 'office' ? 'A door you can close and a window: that works as an office.' : v === 'guest' ? 'Guests would have their own space here.' : `Then here's a fact for the mornings: ${ctx.buyer?.sunLine ? ctx.buyer.sunLine(l, 7).split('.')[0] + '.' : 'check the light with the sun slider on the home panel.'}`) };
       }
-      case 'bath': return { text: `${hello}A bathroom${size ? ', ' + size : ''}. The listing counts ${l.baths ?? 'the'} bathrooms in all.` };
-      case 'laundry': return { text: `${hello}Laundry is here${(h.laundry || []).length ? `: ${join(h.laundry.slice(0, 3).map((x) => x.toLowerCase()))}` : ''}. No trips to a laundromat.` };
+      case 'bath': return { text: `${hello}${vary('bath', ['A bathroom', 'Here is a bathroom', 'One of the bathrooms'])}${size ? ', ' + size : ''}. The listing counts ${l.baths ?? 'the'} bathrooms in all.` };
+      case 'laundry': return { text: `${hello}Laundry is here${(h.laundry || []).length ? `: ${join(h.laundry.slice(0, 3).map((x) => x.toLowerCase()))}` : ''}. ${vary('laundry', ['No trips to a laundromat.', 'Laundry day stays at home.', 'Handy to have it right here.'])}` };
       case 'garage': return { text: `${hello}The garage${size ? ', ' + size : ''}. ${(h.parking || []).length ? `Parking in the listing: ${join(h.parking.slice(0, 2).map((x) => x.toLowerCase()))}.` : ''}` };
       case 'outdoor': {
         const park = d.places?.park?.[0], a = d.aerial || {};
-        return { text: `${hello}${focus}Step outside: the ${s.name.toLowerCase()}${size ? ', ' + size : ''}. ${a.pool ? 'There is a pool, seen from the air. ' : ''}${a.treeCoverPct >= 10 ? `Tree cover on the lot is ${a.treeCoverPct} percent. ` : ''}${park ? `And ${park.name} is ${an(park.walkMin)} ${park.walkMin} minute walk when you want more green.` : ''}`,
+        return { text: `${hello}${focus}${vary('out-open', ['Step outside: the', 'Out here is the', 'And outside, the'])} ${s.name.toLowerCase()}${size ? ', ' + size : ''}. ${a.pool ? 'There is a pool, seen from the air. ' : ''}${a.treeCoverPct >= 10 ? `Tree cover on the lot is ${a.treeCoverPct} percent. ` : ''}${park ? `And ${park.name} is ${an(park.walkMin)} ${park.walkMin} minute walk when you want more green.` : ''}`,
           ask: 'What would you do out here?', choices: [['Morning coffee', 7.5], ['Evening grill', 18], ['Grow plants', 13]], on: (v) => (ctx.buyer?.sunLine ? ctx.buyer.sunLine(l, v).split(' Sunrise')[0] : 'It gets you outside without leaving home.') };
       }
       case 'space': case 'photo': {
         const facts = factLines(), fact = s.n < facts.length ? ' ' + facts[s.n] : '';
         const photo = s.kind === 'photo';
-        const open = photo ? (s.n === 0 ? `There is no 3D scan to walk through here, so I'll take you through the listing photos.` : ['Here is another view.', 'One more photo from the listing.'][s.n % 2])
-          : first ? `We'll start here.${s.alone ? ` This scan has no room names, so I'll tell you what the listing says as we go.` : ''}` : ['Have a look around this part of the home.', 'Take in this space.'][s.n % 2];
+        const open = photo ? (s.n === 0 ? `There is no 3D scan to walk through here, so I'll take you through the listing photos.` : vary('photo', ['Here is another view.', 'One more photo from the listing.', 'Another angle from the listing.']))
+          : first ? `${vary('space-first', ["We'll start here.", "Let's begin here.", 'First stop, right here.'])}${s.alone ? ` This scan has no room names, so I'll tell you what the listing says as we go.` : ''}` : vary('space', ['Have a look around this part of the home.', 'Take in this space.', 'Look around in here.', 'Turn around and take this one in.']);
         const tape = !photo && s.n === 1 && ctx.tour.path === 'W' ? ' Press R to measure anything.' : '';
         const m = { text: `${open}${fact}${tape}` };
         if (first) {
@@ -196,7 +197,7 @@ export function initGuide(ctx) {
     const p = d ? pitch(d, row) : { points: [], tradeoffs: [] };
     const pts = p.points.slice(0, 2).map((x) => x.text);
     const cost = d?.cost ? ` Owning it is an estimated ${usd(d.cost.total)} a month.` : row?.rent ? ` Rent starts at ${usd(row.rent)} a month.` : '';
-    return { text: `That's the home. ${pts.length ? `What stands out: ${join(pts)}.` : ''}${p.tradeoffs[0] ? ` The trade off: ${p.tradeoffs[0].text}.` : ''}${cost}`,
+    return { text: `${pickLine('tg-recap', ["That's the home.", 'And that is the whole home.', 'That was the tour.'])} ${pts.length ? `${pickLine('tg-recap-pts', ['What stands out', 'What I would remember', 'The highlights'])}: ${join(pts)}.` : ''}${p.tradeoffs[0] ? ` ${pickLine('tg-recap-trade', ['The trade off', 'The thing to weigh', 'One honest catch'])}: ${p.tradeoffs[0].text}.` : ''}${cost}`,
       ask: 'How does this one feel?', choices: [['I love it', 'love'], ['Show me the costs', 'costs'], ['Find me a better fit', 'better']], final: true };
   }
 
@@ -206,28 +207,34 @@ export function initGuide(ctx) {
   function hello() {
     const l = G.listing, ms = ctx.maya?.state;
     // she says who she is once per game, not at every door
-    const open = ms && ms.introduced ? 'Welcome in.' : "Welcome in, I'm Maya, your real estate AI agent.";
+    const open = ms && ms.introduced ? pickLine('tg-hello', ['Welcome in.', 'Come on in.', 'Here we are.', 'Step inside.']) : pickLine('tg-hello-intro', ["Welcome in, I'm Maya, your real estate AI agent.", "Come on in. I'm Maya, your real estate AI agent.", "Hi, I'm Maya, your real estate AI agent. Welcome in."]);
     if (ms) ms.introduced = true;
     // the best thing about this home first, from its own data; a listing highlight when there is none
     const top = G.ins ? pitch(G.ins, ctx.insights.row(l.id)).points[0] : null;
     const hl = top ? null : (l.highlights || []).find((x) => x && x.length < 40);
     if (hl) G.hl = 1;
-    const best = top ? ` Here's my favorite thing about this one: ${top.text}.` : hl ? ` The listing's headline here is ${hl.toLowerCase()}.` : '';
+    const best = top ? ` ${pickLine('tg-best', ["Here's my favorite thing about this one", 'What I like most here', 'The best part, if you ask me'])}: ${top.text}.` : hl ? ` The listing's headline here is ${hl.toLowerCase()}.` : '';
     const n = (v, w) => `${v} ${w}${Number(v) === 1 ? '' : 's'}`;
     const rooms = [l.beds != null ? n(l.beds, 'bedroom') : null, l.baths != null ? n(l.baths, 'bath') : null].filter(Boolean);
     const facts = [rooms.length ? `It has ${rooms.join(' and ')}` : null, l.sqft ? `${rooms.length ? '' : 'It has '}${Number(l.sqft).toLocaleString('en-US')} square feet` : null].filter(Boolean).join(', ');
     const built = l.yearBuilt ? (facts ? `, and it was built in ${l.yearBuilt}` : `It was built in ${l.yearBuilt}`) : '';
-    return `${open}${best}${facts || built ? ` ${facts}${built}.` : ''} Walk with me, I'll show you around. Stop me any time.`;
+    return `${open}${best}${facts || built ? ` ${facts}${built}.` : ''} ${pickLine('tg-lead', ["Walk with me, I'll show you around. Stop me any time.", "Follow me and I'll show you around. Stop me whenever you like.", "I'll lead the way. Wander off whenever you want, I'll catch up."])}`;
   }
   function onTheWay(s, from) {
     const fl = (x) => x?.panos?.[0]?.floor;
     const stairs = from && fl(from) != null && fl(s) != null && fl(from) !== fl(s) ? (fl(s) > fl(from) ? ' It is upstairs.' : ' It is downstairs.') : '';
-    if (s.kind === 'photo') return 'Next photo.';
-    if (s.kind === 'space') return ['Come this way.', 'There is more over here.', 'Let us keep going.'][s.n % 3] + stairs;
+    if (s.kind === 'photo') return pickLine('tg-way-photo', ['Next photo.', 'Here is the next one.', 'Another one.']);
+    if (s.kind === 'space') return pickLine('tg-way-space', ['Come this way.', 'There is more over here.', 'Let us keep going.', 'Follow me.', 'This way.']) + stairs;
     const last = G.stops.indexOf(s) === G.stops.length - 1 && G.stops.length > 2;
-    const t = { entry: 'Let us start at the front door.', living: 'Come on through to the living room.', dining: 'The dining room is just through here.', kitchen: 'Follow me into the kitchen.', flex: `This way. I want to show you the ${s.name.toLowerCase()}.`,
-      bedroom: /2|3|4/.test(s.title) ? 'One more bedroom, just over here.' : 'The bedrooms are this way.', bath: 'A quick look at the bathroom.', laundry: 'Laundry is right here.', garage: 'Let me show you the garage.', outdoor: 'Now step outside with me.' }[s.kind] || `Next, the ${s.name.toLowerCase()}.`;
-    return (last ? 'I saved this one for last. ' : '') + t + stairs;
+    const name = s.name.toLowerCase();
+    const WAY = { entry: ['Let us start at the front door.', "We'll begin at the front door.", 'First, the front door.'], living: ['Come on through to the living room.', 'The living room is right through here.', 'This way to the living room.'],
+      dining: ['The dining room is just through here.', 'Next is the dining room.', "Let's look at the dining room."], kitchen: ['Follow me into the kitchen.', 'Now the kitchen, right this way.', "Let's see the kitchen."],
+      flex: [`This way. I want to show you the ${name}.`, `Over here is the ${name}.`, `Let me show you the ${name}.`],
+      bedroom: /2|3|4/.test(s.title) ? ['One more bedroom, just over here.', 'Another bedroom, this way.'] : ['The bedrooms are this way.', "Let's see the bedrooms.", 'Bedrooms next, follow me.'],
+      bath: ['A quick look at the bathroom.', 'Let me show you the bathroom.', 'The bathroom is just here.'], laundry: ['Laundry is right here.', 'A quick stop at the laundry.'],
+      garage: ['Let me show you the garage.', 'Out to the garage.', 'The garage is this way.'], outdoor: ['Now step outside with me.', "Let's head outside.", 'Come out back with me.'] }[s.kind];
+    const t = WAY ? pickLine(`tg-way-${s.kind}`, WAY) : `Next, the ${name}.`;
+    return (last ? pickLine('tg-last', ['I saved this one for last. ', 'And to finish, ', 'Last stop. ']) : '') + t + stairs;
   }
 
   // ---- the card: Maya's face, the room, her words, the buyer's choices
@@ -253,7 +260,8 @@ export function initGuide(ctx) {
     el.querySelector('[data-a="end"]')?.addEventListener('click', () => end());
     pub();
   }
-  function speak(text) { G.line = text; G.quiet = false; G.idle = 0; G.nudged = false; ctx.maya?.say(text, { caption: false, force: true }); ctx.mayaLive?.note(400); }
+  function speak(text) { G.line = text; G.quiet = false; G.idle = 0; G.nudged = false; ctx.maya?.say(text, { caption: false, force: true }); ctx.mayaLive?.note(400); ctx.voiceLines?.remember(text); }
+  const pickLine = (slot, list) => pick(slot, list);
   function hide() { el.classList.remove('show'); G.phase = G.active ? G.phase : 'off'; pub(); }
   // her mouth moves with her voice
   ctx.on('post', () => { if (!el.classList.contains('show')) return; const m = el.querySelector('.gava .mouth'); if (m) { const v = ctx.maya?.level?.() || 0; m.setAttribute('ry', (2 + v * 8).toFixed(1)); } });
@@ -292,10 +300,15 @@ export function initGuide(ctx) {
     G.i = i; G.phase = 'room'; G.target = null; G.pan = 0;
     const s = G.stops[i];
     G.seen.add(s.key);
-    const m = say(s);
+    // the room's line was written when the tour began; in her own words when the model sent them
+    const m = { ...(G.said?.[i] || say(s)) };
+    const own = G.lines?.get(`stop${i}`);
+    if (own) { m.text = own; m.source = 'model'; }
+    if (G.focus && G.focus === s.kind) m.text = `${pickLine('tg-focus', ['You said this is the room that matters most to you, so take your time here.', 'This is the room you said matters most, so take your time.', 'You told me this one matters most. Have a good look.'])} ${m.text}`;
     // a room with no question for the buyer carries one owning fact instead (insurance, HOA, amenities, ...)
     const fact = !m.ask && i > 0 ? nextFact() : null;
-    if (fact) { G.factI++; m.text = `${m.text.trim()} While we are here: ${fact.text}`; }
+    if (fact) { G.factI++; m.text = `${m.text.trim()} ${pickLine('tg-here', ['While we are here:', 'Worth knowing while we are here:', 'One more thing:'])} ${fact.text}`; }
+    window.__gpa.guideLine = { i, key: s.key, source: m.source || 'script', text: m.text };
     G.ask = m.ask || null;
     G.choices = m.choices ? m.choices.map(([label, value]) => ({ label, value })) : null;
     G.on = m.on || null;
@@ -322,6 +335,10 @@ export function initGuide(ctx) {
     if (ctx.tour.path === 'W') ctx.tour.walk.setLead(AVATAR_URL);
     G.hl = 0; G.walkT = 0; G.filler = false; G.factI = 0; G.walks = 0;
     G.phase = 'hello'; G.ask = null; G.choices = null;
+    // every room's line now, so the model can say them in its own words while she says hello
+    G.said = G.stops.map((s, k) => { const keep = G.i; G.i = k; try { return say(s); } finally { G.i = keep; } });
+    G.lines?.cancel();
+    G.lines = ctx.voiceLines?.request('tour', G.said.map((m, k) => ({ key: `stop${k}`, stock: String(m.text || '').replace(/\s+/g, ' ').trim(), max: 40 })).filter((x) => x.stock.length > 3)) || null;
     speak(hello());
     render();
     if (ctx.tour.path === 'W' && G.stops[0].panos.length) ctx.tour.walk.preload(rep(G.stops[0]));
@@ -347,7 +364,7 @@ export function initGuide(ctx) {
     ctx.audio.click?.();
     if (G.phase === 'recap') {
       const l = G.listing;
-      if (c.value === 'love') { ctx.saved.add(l); ctx.hud.toast('Saved to your list'); G.ask = null; G.choices = null; speak('Saved. When you are ready, compare it with your other favorites on Tab.'); render(); return; }
+      if (c.value === 'love') { ctx.saved.add(l); ctx.hud.toast('Saved to your list'); G.ask = null; G.choices = null; speak(pickLine('tg-saved', ['Saved. When you are ready, compare it with your other favorites on Tab.', 'It is on your list. Press Tab to put it next to your other favorites.', 'Saved it. Tab lines it up against the others you liked.'])); render(); return; }
       end(true);
       ctx.tour.exit().then(() => { if (c.value === 'costs') ctx.reveal.select(l, { instant: true }).then(() => setTimeout(() => ctx.panel.flash('cost'), 600)); else ctx.reveal.select(l, { instant: true }).then(() => ctx.maya.hear('Show me better options')); });
       return;
@@ -357,13 +374,14 @@ export function initGuide(ctx) {
     if (generic(s)) ctx.maya?.remember?.(`matters most: ${c.label.toLowerCase()}`); else if (s.kind !== 'entry') ctx.maya?.remember?.(`${s.name.toLowerCase()}: ${c.label.toLowerCase()}`);
     const reply = G.on ? G.on(c.value) : '';
     G.ask = null; G.choices = null;
-    speak(reply || 'Got it.');
+    speak(reply || pickLine('tg-ok', ['Got it.', 'Good to know.', 'Noted.']));
     render();
   }
   function end(quiet) {
     if (!G.active && G.phase === 'off') return;
     clearTimeout(walkTimer);
     G.active = false; G.phase = 'off'; G.i = -1; G.line = ''; G.target = null;
+    G.lines?.cancel(); G.lines = null; G.said = null;
     if (ctx.tour.active && ctx.tour.path === 'W') ctx.tour.walk.setLead(null);
     el.classList.remove('show');
     if (!quiet) ctx.maya?.interrupt();
@@ -434,10 +452,11 @@ export function initGuide(ctx) {
       const fact = G.walks % 2 === 0 || hl.length <= G.hl ? nextFact() : null;
       if (G.quiet && !G.filler && G.walkT > 2.2 && (fact || hl.length > G.hl)) {
         G.filler = true; G.walks++;
-        if (fact) { G.factI++; speak(`While we walk: ${fact.text}`); }
+        const lead = pickLine('tg-walk', ['While we walk:', 'On the way:', 'Quick one while we walk:', 'Something worth knowing:']);
+        if (fact) { G.factI++; speak(`${lead} ${fact.text}`); }
         else {
           const a = hl[G.hl++], b = hl[G.hl] && G.hl % 2 ? hl[G.hl++] : null;
-          speak(`While we walk: the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);
+          speak(`${lead} the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);
         }
         render();
       }
@@ -447,7 +466,7 @@ export function initGuide(ctx) {
       G.idle += dt;
       const asking = !!(G.choices && G.showAsk);
       // a buyer who stays quiet is not kept waiting: a short pause on a question, then she moves on
-      if (asking && !G.nudged && G.idle > 6) { G.nudged = true; G.ask = null; G.choices = null; speak('No rush. Take a look around.'); render(); } else if (!asking && G.idle > 3) { G.idle = 0; next(); }
+      if (asking && !G.nudged && G.idle > 6) { G.nudged = true; G.ask = null; G.choices = null; speak(pickLine('tg-norush', ['No rush. Take a look around.', 'Take your time, look around.', 'No hurry. Have a look.'])); render(); } else if (!asking && G.idle > 3) { G.idle = 0; next(); }
     }
   });
   ctx.on('key', (code) => {

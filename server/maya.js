@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { makeTools, CLIENT_TOOLS, label } from '../src/mayaTools.js';
+import { keepsFacts } from '../src/lines.js';
 
 const MODEL = process.env.MAYA_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const CITY_NAME = { la: 'Los Angeles', houston: 'Houston', mock: 'Mockingbird Heights' };
@@ -57,6 +58,36 @@ What to do:
 
 ${FAIR_HOUSING_RULES}
 If the player asks who lives in an area, whether it is "safe", whether it is "good for kids" or anything else about the people, do not answer that and do not lecture. Do not repeat the banned words back even to decline them: say "I can't rate an area" or "I can't speak to who lives somewhere". In one sentence say you can't speak to who lives somewhere, then give facts about the place they can use instead: distances to parks, schools and shops, commute, hazard and flood facts from FEMA, prices, street noise distances. For crime questions, say you don't have crime data and suggest checking the local police department's public crime map. Do not bring up income or any other statistic about residents in those answers: mention the Census income figure only when the player asks for income directly, and then as a plain number next to the city's.`;
+
+// The same lines, never the same way twice. The game has stock wording for everything Maya
+// says by herself (the flyover of a home, the walk through its rooms). With the model on, she
+// says each of those lines in her own words instead. The stock line is the only source of
+// facts: every line she writes is checked against it (src/lines.js) before the game uses it.
+export const SAY_SYSTEM = `You are Maya, the voice of a driving game for home buyers and renters called Grand Property Auto. You are an original character: a friendly, sharp local real estate agent. Your words are spoken aloud by a text to speech voice, one line at a time, while the game shows what you are talking about.
+
+The game gives you numbered items. Each item is a line it would say in its own stock wording. Say every item in your own words, so that no two showings ever sound the same.
+
+Output format, exactly: one line per item, in the same order, written as
+key: your line
+Nothing else. No preamble, no numbering, no blank lines, no quotation marks, no markdown.
+
+Rules for every line:
+- Keep each number exactly as written, as digits with its dollar sign or unit. Never add, drop, round, convert or spell out a number.
+- Keep every name exactly as written: places, communities, FEMA, HOA.
+- Add no fact, figure or claim that is not in the item. No opinions about the area or about who lives there.
+- Never say where something is or which way to go (next to, across from, along the street, at the edge of a ring, up ahead, over there): the item gives a time, not a place.
+- Keep the hedges. When the item says about, roughly, estimated or likely, your line says so too. An asking price stays an asking price.
+- Stay within the word limit shown for the item: one or two short spoken sentences.
+- No questions.
+- Sound like a person showing a friend around, not a spec sheet. Change the shape of the sentences from item to item, use a connecting word now and then, and never start two lines in a row the same way.
+
+${FAIR_HOUSING_RULES}`;
+const SAY_KIND = {
+  reveal: 'The moment: a flyover of one home. The map shows each thing as you say its line (the home, walking rings, the nearest places one by one, the roof), then the insight panel of the home opens one card at a time as you explain it (price against similar homes, the monthly cost, energy, risk, HOA, then the rest). Every line stays on its own item, and the lines run as one spoken walkthrough, so let them flow into each other.',
+  tour: 'The moment: you are walking the buyer through the rooms of one home, one line per room, while they look around it. Keep any invitation to press a key (R to measure) exactly.',
+  line: 'The moment: single lines you say to the player while they drive.',
+};
+const SAY_TONES = ['brisk and upbeat, like you have somewhere good to show them next', 'warm and unhurried', 'plain and matter of fact, a little dry', 'like a friend pointing things out from the passenger seat', 'quietly confident, in short sentences', 'curious and light, as if this is the part of the job you enjoy'];
 
 const num = { type: 'number' }, str = { type: 'string' }, bool = { type: 'boolean' };
 const HOME = { type: 'string', description: 'A home name such as h3. Use "selected" for the home the player has selected.' };
@@ -214,6 +245,66 @@ ${JSON.stringify(facts)}` : '',
     res.end();
   }
 
+  // Stock lines in, Maya's own wording out, as an event stream: one "line" event for every line
+  // that passed the fact check, as soon as it is written. Lines that fail are left out and the
+  // game says its stock line for them. What the model receives: the stock sentences (numbers,
+  // place names, the home's facts; no street address, listing id or agent data), what the
+  // player said they want, and a few of her own recent lines so she does not repeat herself.
+  async function say(req, res) {
+    const b = req.body || {};
+    if (!ready()) return res.json({ scripted: true, reason: 'llm off' });
+    const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 24)
+      .map((x) => ({ key: String(x?.key || '').toLowerCase(), text: String(x?.text || '').replace(/\s+/g, ' ').trim().slice(0, 320), must: (Array.isArray(x?.must) ? x.must : []).slice(0, 4).map((m) => String(m).slice(0, 60)), max: Math.max(8, Math.min(40, Number(x?.max) || 30)) }))
+      .filter((x) => /^[a-z0-9_]{1,32}$/.test(x.key) && x.text.length > 3);
+    if (!lines.length) return res.json({ scripted: true, reason: 'no lines' });
+    const short = (a, n, len) => (Array.isArray(a) ? a : []).slice(0, n).map((x) => String(x).replace(/\s+/g, ' ').trim().slice(0, len)).filter(Boolean);
+    const prefs = short(b.prefs, 8, 60), avoid = short(b.avoid, 12, 200);
+    const user = [
+      SAY_KIND[b.kind] || SAY_KIND.line,
+      b.intro ? 'This is the first time you speak to this player: open the first line by saying you are Maya, their agent, in a few words.' : 'The player already knows you: no greeting, and do not say your name.',
+      prefs.length ? `The buyer told you they want: ${prefs.join('; ')}. Where a line touches one of those, you may say so in words, without adding any number.` : '',
+      `Delivery for this take: ${SAY_TONES[Math.floor(Math.random() * SAY_TONES.length)]}.`,
+      avoid.length ? `You said these in earlier showings. Do not open a line the same way and do not reuse their phrasing:\n${avoid.map((x) => `- ${x}`).join('\n')}` : '',
+      `Take ${1000 + Math.floor(Math.random() * 9000)}.`,
+      '',
+      'Items:',
+      ...lines.map((x, i) => `${i + 1}. key=${x.key} | at most ${x.max} words | ${x.text}`),
+    ].filter((x, i) => x || i === 6).join('\n');
+
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+    const send = (event, data) => { if (!closed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const started = Date.now(), byKey = new Map(lines.map((x) => [x.key, x])), sent = new Set();
+    let closed = false, buf = '', firstMs = 0, dropped = 0, stream = null;
+    res.on('close', () => { closed = true; try { stream?.abort(); } catch { /* already finished */ } });
+    const take = (raw) => {
+      const m = /^\s*(?:\d+[.)]\s*)?(?:key=)?([a-z0-9_]+)\s*:\s*(.+?)\s*$/i.exec(raw);
+      const src = m && byKey.get(m[1].toLowerCase());
+      if (!src || sent.has(src.key)) return;
+      const text = m[2].replace(/^["“”']+|["“”']+$/g, '').replace(/\s+/g, ' ').trim();
+      if (!keepsFacts(src.text, text, { must: src.must, max: src.max })) { dropped++; return; }
+      sent.add(src.key);
+      if (!firstMs) firstMs = Date.now() - started;
+      send('line', { key: src.key, text });
+    };
+    try {
+      stream = getClient().messages.stream({
+        model: MODEL, max_tokens: 1500, ...speedParams(MODEL),
+        system: [{ type: 'text', text: SAY_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: user }],
+      }, { timeout: 15000 });
+      stream.on('text', (delta) => { buf += delta; let i; while ((i = buf.indexOf('\n')) >= 0) { take(buf.slice(0, i)); buf = buf.slice(i + 1); } });
+      const msg = await stream.finalMessage();
+      if (buf.trim()) take(buf);
+      if (msg.stop_reason === 'refusal') send('fallback', { reason: 'refusal' });
+      send('done', { asked: lines.length, written: sent.size, dropped, firstMs, ms: Date.now() - started, model: MODEL });
+    } catch (e) {
+      const kind = e instanceof Anthropic.RateLimitError ? 'rate limited' : e instanceof Anthropic.AuthenticationError ? 'bad key' : e instanceof Anthropic.APIError ? `api ${e.status}` : 'network';
+      if (!closed) console.warn('[maya] could not write her own lines, the game says its stock lines:', kind, String(e.message || e).slice(0, 160));
+      send('fallback', { reason: kind, written: sent.size });
+    }
+    res.end();
+  }
+
   // Maya's voice: one sentence in, streamed audio out (ElevenLabs). The browser voice is the fallback.
   const ttsKey = process.env.ELEVENLABS_API_KEY || (String(process.env.TTS_API_KEY || '').startsWith('sk_') ? process.env.TTS_API_KEY : '');
   // The voice can come from OpenAI instead: set OPENAI_API_KEY (speech out and speech to text
@@ -356,5 +447,5 @@ ${JSON.stringify(facts)}` : '',
       res.set('cache-control', 'no-store').json({ token: (await r.json()).token });
     } catch { res.status(504).json({ error: 'agent timeout' }); }
   }
-  return { handle, tts, ttsStatus, stt, voices, session, liveReady, ready, ttsReady, model: MODEL, provider };
+  return { handle, say, tts, ttsStatus, stt, voices, session, liveReady, ready, ttsReady, model: MODEL, provider };
 }

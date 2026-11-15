@@ -97,6 +97,7 @@ app.post('/api/narrate', async (req, res) => {
 
 // ---- Maya, the voice sales agent (server/maya.js)
 app.post('/api/maya', (req, res) => maya.handle(req, res));
+app.post('/api/maya/say', (req, res) => maya.say(req, res));
 app.get('/api/maya/tts/status', (req, res) => maya.ttsStatus(req, res));
 app.post('/api/maya/tts', (req, res) => maya.tts(req, res));
 app.get('/api/maya/tts', (req, res) => maya.tts(req, res));

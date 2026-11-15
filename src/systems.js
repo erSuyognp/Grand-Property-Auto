@@ -19,6 +19,8 @@ import { initInsights } from './insights.js';
 import { initReveal } from './reveal.js';
 import { initPanel } from './panel.js';
 import { initMaya } from './maya.js';
+import { initVoiceLines } from './voiceLines.js';
+import { pick } from './lines.js';
 import { initClients } from './clients.js';
 import { initBuyer } from './buyer.js';
 import { loadSettings, initSettings } from './settings.js';
@@ -46,6 +48,7 @@ export async function initSystems(ctx) {
   ctx.reveal = initReveal(ctx);
   ctx.panel = initPanel(ctx);
   ctx.maya = initMaya(ctx);
+  ctx.voiceLines = initVoiceLines(ctx);
   ctx.clients = initClients(ctx);
   ctx.buyer = initBuyer(ctx);
   ctx.settingsUI = initSettings(ctx);
@@ -61,7 +64,7 @@ export async function initSystems(ctx) {
     M.top = [l]; M.target = l; M.active = true; M.arrived = false;
     ctx.listingsSys.setHighlights([l.id], l);
     ctx.missions.reroute(true);
-    if (!quiet) ctx.missions.speak(`Heading to ${l.name || l.address}.`);
+    if (!quiet) ctx.missions.speak(pick('ms-goto', [`Heading to ${l.name || l.address}.`, `On our way to ${l.name || l.address}.`, `Off to ${l.name || l.address}. Follow the gold line.`]));
   };
 
   ctx.on('key', (code) => {

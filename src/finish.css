@@ -30,7 +30,7 @@ body.revealing #caption { left: calc(50% - min(226px, 19vw)); max-width: min(760
 body.revealing #maya, body.revealing #hud:has(#card.show) #maya { max-width: min(720px, calc(100vw - 2 * min(226px, 19vw) - 464px)); }
 body.revealing #live, body.revealing #toast { left: calc(50% - min(226px, 19vw)); }
 /* a toast drops below whatever card holds the top of the screen */
-#hud:has(#reveal-cap.show) #toast { top: 212px; }
+#hud:has(#reveal-cap.show) #toast { top: auto; bottom: 200px; }
 #hud:has(#coach.show) #toast { top: 222px; }
 /* the chooser sits above the middle so the line being spoken stays readable under it */
 #chooser { top: 43%; }
