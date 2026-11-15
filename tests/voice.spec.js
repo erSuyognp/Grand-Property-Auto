@@ -17,6 +17,9 @@ function wav(pcm, rate = 16000) {
   return Buffer.concat([h, pcm]);
 }
 
+// Chromium's file-backed fake microphone sometimes delivers silence for a whole session (an
+// independent probe of the same device reads silence too), so these tests get fresh-browser retries.
+test.describe.configure({ retries: 3 });
 test.use({ launchOptions: { args: ['--use-angle=d3d11', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--force_high_performance_gpu', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${WAV}`] } });
 
 test.beforeAll(async () => {

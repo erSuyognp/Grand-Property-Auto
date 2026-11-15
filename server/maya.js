@@ -53,7 +53,7 @@ What to do:
 - Questions about their work, school or other places: call drive_to_my_places. If they tell you a place ("my work is near Union Station"), call pin_place.
 
 ${FAIR_HOUSING_RULES}
-If the player asks who lives in an area, whether it is "safe", whether it is "good for kids" or anything else about the people, do not answer that and do not lecture. Do not repeat the banned words back even to decline them: say "I can't rate an area" or "I can't speak to who lives somewhere". In one sentence say you can't speak to who lives somewhere, then give facts about the place they can use instead: distances to parks, schools and shops, commute, hazard and flood facts from FEMA, prices, street noise distances. For crime questions, say you don't have crime data and suggest checking the local police department's public crime map.`;
+If the player asks who lives in an area, whether it is "safe", whether it is "good for kids" or anything else about the people, do not answer that and do not lecture. Do not repeat the banned words back even to decline them: say "I can't rate an area" or "I can't speak to who lives somewhere". In one sentence say you can't speak to who lives somewhere, then give facts about the place they can use instead: distances to parks, schools and shops, commute, hazard and flood facts from FEMA, prices, street noise distances. For crime questions, say you don't have crime data and suggest checking the local police department's public crime map. Do not bring up income or any other statistic about residents in those answers: mention the Census income figure only when the player asks for income directly, and then as a plain number next to the city's.`;
 
 const num = { type: 'number' }, str = { type: 'string' }, bool = { type: 'boolean' };
 const HOME = { type: 'string', description: 'A home name such as h3. Use "selected" for the home the player has selected.' };
@@ -270,9 +270,14 @@ ${JSON.stringify(facts)}` : '',
   // Live conversation: a short lived token for the ElevenLabs agent. The key stays on the server.
   const agentId = process.env.ELEVENLABS_AGENT_ID || '';
   const liveReady = () => ttsReady() && !!agentId;
-  async function session(_req, res) {
+  async function session(req, res) {
     if (!liveReady()) return res.status(404).json({ error: 'live voice off' });
     try {
+      if (req.query.text) { // no microphone, no audio: the same agent in writing
+        const r = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`, { headers: { 'xi-api-key': ttsKey }, signal: AbortSignal.timeout(7000) });
+        if (!r.ok) return res.status(502).json({ error: 'agent ' + r.status });
+        return res.set('cache-control', 'no-store').json({ signedUrl: (await r.json()).signed_url });
+      }
       const r = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`, { headers: { 'xi-api-key': ttsKey }, signal: AbortSignal.timeout(7000) });
       if (!r.ok) return res.status(502).json({ error: 'agent ' + r.status });
       res.set('cache-control', 'no-store').json({ token: (await r.json()).token });

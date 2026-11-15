@@ -7,9 +7,9 @@
 import { label } from './mayaTools.js';
 
 export function initMayaLive(ctx, ui) {
-  const L = { conv: null, status: 'off', mode: 'listening', lastActivity: 0, tools: [], startedAt: 0, failed: 0, heard: '', said: '' };
+  const L = { log: [], conv: null, status: 'off', mode: 'listening', lastActivity: 0, tools: [], startedAt: 0, failed: 0, heard: '', said: '' };
   const available = () => !!ctx.config.mayaAgent && !ctx.params.has('mute') && ctx.settings?.liveVoice !== false && !ctx.muteVoice && L.failed < 2;
-  const pub = () => { window.__gpa.mayaLive = { status: L.status, mode: L.mode, tools: [...L.tools], heard: L.heard, said: L.said, available: available() }; };
+  const pub = () => { window.__gpa.mayaLive = { log: L.log, start: (o) => start(o), stop: () => stop(), send: (t) => { L.conv?.sendUserMessage(t); L.lastActivity = performance.now(); }, status: L.status, mode: L.mode, tools: [...L.tools], heard: L.heard, said: L.said, available: available() }; };
 
   // what the game tells her: the current situation, as one short note
   async function stateNote() {
@@ -66,19 +66,19 @@ export function initMayaLive(ctx, ui) {
     return out;
   }
 
-  async function start() {
+  async function start(opts = {}) {
     if (L.conv || L.status === 'connecting') return true;
     L.status = 'connecting'; L.tools = []; L.heard = ''; L.said = ''; pub();
     ui.show(); ui.setState('thinking'); ui.status('Connecting');
     try {
-      const res = await fetch('/api/maya/session', { signal: AbortSignal.timeout(8000) });
+      const res = await fetch('/api/maya/session' + (opts.text ? '?text=1' : ''), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error('session ' + res.status);
-      const { token } = await res.json();
+      const { token, signedUrl } = await res.json();
       const { Conversation } = await import('@elevenlabs/client');
       const voiceId = ctx.settings?.voiceId || undefined;
       L.conv = await Conversation.startSession({
-        conversationToken: token, connectionType: 'webrtc', stripAudioTags: true,
-        overrides: voiceId ? { tts: { voiceId } } : undefined,
+        ...(opts.text ? { signedUrl, connectionType: 'websocket', textOnly: true, overrides: { conversation: { textOnly: true } } } : { conversationToken: token, connectionType: 'webrtc', overrides: voiceId ? { tts: { voiceId } } : undefined }),
+        stripAudioTags: true,
         clientTools: clientTools(),
         onConnect: () => { L.status = 'connected'; L.startedAt = L.lastActivity = performance.now(); ui.setState('listening'); ui.status('Live · just talk'); ctx.audio.chime(); pub(); note(50); },
         onDisconnect: () => stopped(),
@@ -87,13 +87,14 @@ export function initMayaLive(ctx, ui) {
         onMessage: ({ message, source }) => {
           L.lastActivity = performance.now();
           if (!message) return;
+          L.log.push({ who: source === 'user' ? 'user' : 'maya', text: message, at: Math.round(performance.now()) });
           if (source === 'user') { L.heard = message; ui.bubble(`“${message}”`, 'you'); ctx.emit('heard', message); } else { L.said = message; ui.bubble(message); ui.S.history.push({ role: 'assistant', content: message }); ui.S.source = 'agent'; }
           pub();
         },
         onUnhandledClientToolCall: (c) => console.warn('[maya live] no handler for tool', c?.tool_name),
       });
-      L.conv.setVolume({ volume: ctx.settings?.volume ?? 1 });
-      ui.level(() => (L.conv && L.mode === 'speaking' ? Math.min(1, L.conv.getOutputVolume() * 2.2) : 0));
+      if (!opts.text) L.conv.setVolume({ volume: ctx.settings?.volume ?? 1 });
+      if (!opts.text) ui.level(() => (L.conv && L.mode === 'speaking' ? Math.min(1, L.conv.getOutputVolume() * 2.2) : 0));
       L.failed = 0;
       pub();
       return true;
