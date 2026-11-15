@@ -351,3 +351,11 @@ Checked every insight file in Los Angeles, Houston and the mock neighborhood aga
 - **Giant pin again.** Not reproduced with the current build (ten apartment homes at `quality=ultra`: no visible pin before its step), so the page that showed it was most likely still running older code. Unplaced pins are now also parked 100 km below the map, on top of being hidden.
 - **Maya's voice stopped: the ElevenLabs account is out of credits.** The speech request answers `quota_exceeded`: 10,000 of 10,000 credits used on the pay as you go tier, next reset Dec 12. Nothing in the code is broken. Needs the user to add credits. The agent tests in this session (text mode, no audio) may have used some of them.
 - **Graceful fallback.** The server remembers `quota_exceeded` for five minutes and answers 429 at once; `/api/maya/tts/status` says why. In the game, after two failed sentences Maya stops asking the service for three minutes, speaks with the browser voice straight away and shows one toast saying the credits are used up. Checked in the running game.
+
+## Maya's voice can come from OpenAI (Nov 14)
+
+- **Why.** The ElevenLabs account is out of credits. The user asked to swap to OpenAI speech.
+- **What.** With `OPENAI_API_KEY` in `.env`, Maya's sentences are spoken by OpenAI (`/v1/audio/speech`, `gpt-4o-mini-tts`, voice `coral` by default, streamed mp3 through the same `/api/maya/tts`), and push to talk is transcribed by OpenAI (`gpt-4o-mini-transcribe`). `TTS_PROVIDER=elevenlabs` switches back when both keys are set. The voice picker in settings lists OpenAI's eleven voices. No new dependency: plain `fetch`.
+- **Live conversation.** The press-V live conversation is an ElevenLabs agent and is off with OpenAI: V is push to talk, Claude answers, OpenAI speaks.
+- **Data agreement.** OpenAI is one more third party. It receives exactly what ElevenLabs received: the sentences Maya speaks (numbers about homes, place names, no street address or agent data) and the player's recorded voice. It follows `LLM_ENABLED` and stays off in mock mode, like before. Whether this counts as sharing is as unconfirmed as it was for ElevenLabs.
+- **Needs a key.** There is no OpenAI key in `.env` yet. Tested with a dummy key only: the config, the voice list and the request to OpenAI work and the refusal falls back to the browser voice. Real speech was not heard.

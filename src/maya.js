@@ -106,7 +106,7 @@ export function initMaya(ctx) {
   function ttsFailed() {
     if (++ttsFails < 2 || performance.now() < ttsOffUntil) return;
     ttsOffUntil = performance.now() + 180000; ttsFails = 0;
-    fetch('/api/maya/tts/status').then((r) => r.json()).then((j) => ctx.hud.toast(j.reason === 'quota' ? "Maya's ElevenLabs credits are used up. Using the browser voice" : "Maya's voice service is not answering. Using the browser voice", 4200)).catch(() => {});
+    fetch('/api/maya/tts/status').then((r) => r.json()).then((j) => ctx.hud.toast(j.reason === 'quota' ? `Maya's ${j.provider === 'openai' ? 'OpenAI' : 'ElevenLabs'} credits are used up. Using the browser voice` : "Maya's voice service is not answering. Using the browser voice", 4200)).catch(() => {});
   }
   function fetchAudio(text) {
     if (muted() || !ctx.config.mayaTts || performance.now() < ttsOffUntil) return null;

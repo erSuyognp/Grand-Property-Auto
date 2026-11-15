@@ -57,11 +57,13 @@ export function initSettings(ctx) {
     });
     el.querySelector('[data-a="close"]').addEventListener('click', hide);
     el.querySelector('[data-a="tutorial"]').addEventListener('click', () => { hide(); tutorial(true); });
-    // the voices on the ElevenLabs account: stock ones and any added to "My Voices"
+    // the voices of the voice service in use: OpenAI's built in ones, or the ElevenLabs
+    // account's stock voices and any added to "My Voices"
     const sel = el.querySelector('[data-voice]');
     const fill = (j) => {
-      if (!j?.voices?.length) { sel.innerHTML = '<option value="">Browser voice (no ElevenLabs voice available)</option>'; sel.disabled = true; return; }
-      const cur = S.voiceId || j.current;
+      if (!j?.voices?.length) { sel.innerHTML = '<option value="">Browser voice (no voice service available)</option>'; sel.disabled = true; return; }
+      // a voice picked for the other service does not exist here: show the one really in use
+      const cur = j.voices.some((v) => v.id === S.voiceId) ? S.voiceId : j.current;
       const group = (kind) => { const list = j.voices.filter((v) => v.kind === kind); return list.length ? `<optgroup label="${kind}">${list.map((v) => `<option value="${v.id}" ${v.id === cur ? 'selected' : ''}>${v.name}${v.about ? ' · ' + v.about : ''}</option>`).join('')}</optgroup>` : ''; };
       sel.innerHTML = group('My voices') + group('Stock');
     };

@@ -56,7 +56,7 @@ app.get('/api/config', (_req, res) => {
     mode: GAME_MODE,
     llm: LLM_ENABLED && llmReady(),
     tts: TTS_ENABLED,
-    maya: maya.ready(), mayaTts: maya.ttsReady(), stt: maya.ttsReady(), mayaAgent: maya.liveReady(),
+    maya: maya.ready(), mayaTts: maya.ttsReady(), stt: maya.ttsReady(), mayaAgent: maya.liveReady(), voiceProvider: maya.ttsReady() ? maya.provider : null,
     matterportSdkKey: GAME_MODE === 'mock' ? '' : process.env.MATTERPORT_SDK_KEY || '',
     googleMapsKey: GAME_MODE === 'mock' ? '' : process.env.GOOGLE_MAPS_API_KEY || '',
     showcaseBase: process.env.MATTERPORT_SHOWCASE_BASE || 'https://my.matterport.com',

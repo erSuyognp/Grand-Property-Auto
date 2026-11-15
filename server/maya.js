@@ -216,11 +216,22 @@ ${JSON.stringify(facts)}` : '',
 
   // Maya's voice: one sentence in, streamed audio out (ElevenLabs). The browser voice is the fallback.
   const ttsKey = process.env.ELEVENLABS_API_KEY || (String(process.env.TTS_API_KEY || '').startsWith('sk_') ? process.env.TTS_API_KEY : '');
-  const ttsReady = () => enabled && !!ttsKey && mode !== 'mock';
-  // The voices on this ElevenLabs account (stock voices plus any added to "My Voices"), for the picker in settings.
+  // The voice can come from OpenAI instead: set OPENAI_API_KEY (speech out and speech to text
+  // both move there). TTS_PROVIDER=elevenlabs or openai picks one when both keys are set; with
+  // no choice made, an OpenAI key wins. The live press-V conversation is an ElevenLabs agent,
+  // so with OpenAI the V key is push to talk: Claude answers, OpenAI speaks.
+  const openaiKey = process.env.OPENAI_API_KEY || (String(process.env.TTS_API_KEY || '').startsWith('sk-') ? process.env.TTS_API_KEY : '');
+  const provider = (() => { const p = String(process.env.TTS_PROVIDER || '').toLowerCase(); return p === 'openai' || p === 'elevenlabs' ? p : openaiKey ? 'openai' : 'elevenlabs'; })();
+  const OA_VOICES = [['coral', 'Warm, friendly'], ['sage', 'Calm, thoughtful'], ['nova', 'Bright, energetic'], ['shimmer', 'Clear, soft'], ['alloy', 'Neutral, balanced'], ['ballad', 'Gentle, melodic'], ['verse', 'Expressive'], ['ash', 'Confident'], ['echo', 'Smooth, steady'], ['fable', 'Storyteller'], ['onyx', 'Deep, grounded']];
+  const oaVoice = (asked) => (OA_VOICES.some(([v]) => v === asked) ? asked : process.env.OPENAI_TTS_VOICE || 'coral');
+  const OA_STYLE = 'You are Maya, a warm, upbeat real estate agent showing a home to a friend. Speak naturally and conversationally, at an easy pace, with a smile in your voice. Read dollar amounts and numbers clearly.';
+  const ttsReady = () => enabled && mode !== 'mock' && (provider === 'openai' ? !!openaiKey : !!ttsKey);
+  // The voices for the picker in settings: OpenAI's built in ones, or the voices on the
+  // ElevenLabs account (stock voices plus any added to "My Voices").
   let voiceCache = null, voiceAt = 0;
   async function voices(_req, res) {
     if (!ttsReady()) return res.status(404).json({ error: 'tts off' });
+    if (provider === 'openai') return res.json({ provider, voices: OA_VOICES.map(([id, about]) => ({ id, name: id[0].toUpperCase() + id.slice(1), about, kind: 'Stock' })), current: oaVoice('') });
     try {
       if (!voiceCache || Date.now() - voiceAt > 120000) {
         const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': ttsKey }, signal: AbortSignal.timeout(8000) });
@@ -239,6 +250,18 @@ ${JSON.stringify(facts)}` : '',
     if (!Buffer.isBuffer(buf) || buf.length < 800) return res.status(400).json({ error: 'no audio' });
     const type = String(req.headers['content-type'] || 'audio/webm').split(';')[0];
     const started = Date.now();
+    if (provider === 'openai') {
+      try {
+        const form = new FormData();
+        form.append('model', process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe');
+        form.append('language', 'en');
+        form.append('file', new Blob([buf], { type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
+        const r = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { authorization: `Bearer ${openaiKey}` }, body: form, signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return res.status(502).json({ error: 'stt provider ' + r.status });
+        const text = String((await r.json()).text || '').replace(/\s+/g, ' ').trim();
+        return res.json({ text: text.slice(0, 400), ms: Date.now() - started });
+      } catch { return res.status(504).json({ error: 'stt timeout' }); }
+    }
     try {
       const form = new FormData();
       form.append('model_id', process.env.ELEVENLABS_STT_MODEL || 'scribe_v1');
@@ -259,7 +282,7 @@ ${JSON.stringify(facts)}` : '',
   // Credits used up: remember it for a few minutes and answer at once, so the game goes
   // straight to the browser voice instead of waiting on a request that will be refused.
   let quotaUntil = 0, lastTtsError = '';
-  const ttsStatus = (_req, res) => res.json({ ok: Date.now() >= quotaUntil && !lastTtsError, reason: Date.now() < quotaUntil ? 'quota' : lastTtsError || null });
+  const ttsStatus = (_req, res) => res.json({ ok: Date.now() >= quotaUntil && !lastTtsError, reason: Date.now() < quotaUntil ? 'quota' : lastTtsError || null, provider });
   async function tts(req, res) {
     if (!ttsReady()) return res.status(404).json({ error: 'tts off' });
     if (Date.now() < quotaUntil) return res.status(429).json({ error: 'tts quota used up' });
@@ -267,6 +290,28 @@ ${JSON.stringify(facts)}` : '',
     const text = String(src.text || '').slice(0, 600);
     if (!text) return res.status(400).json({ error: 'no text' });
     const asked = String(src.voice || '');
+    if (provider === 'openai') {
+      // OpenAI speech: the same one sentence in, mp3 streamed out as it is made
+      const model = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
+      try {
+        const r = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST', headers: { authorization: `Bearer ${openaiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ model, voice: oaVoice(asked), input: text, response_format: 'mp3', ...(/gpt-4o/.test(model) ? { instructions: process.env.OPENAI_TTS_STYLE || OA_STYLE } : {}) }),
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!r.ok || !r.body) {
+          const body = await r.text().catch(() => '');
+          if (/insufficient_quota|billing/.test(body)) { quotaUntil = Date.now() + 300000; lastTtsError = 'quota'; console.warn('[maya] The OpenAI account has no credit left for speech. The game uses the browser voice until credit is added.'); return res.status(429).json({ error: 'tts quota used up' }); }
+          lastTtsError = 'provider ' + r.status;
+          console.warn(`[maya] OpenAI speech answered ${r.status}: ${body.slice(0, 160)}`);
+          return res.status(502).json({ error: 'tts provider ' + r.status });
+        }
+        lastTtsError = '';
+        res.set({ 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
+        Readable.fromWeb(r.body).on('error', () => res.end()).pipe(res);
+      } catch { if (!res.headersSent) res.status(504).json({ error: 'tts timeout' }); else res.end(); }
+      return;
+    }
     const voice = /^[A-Za-z0-9]{16,32}$/.test(asked) ? asked : process.env.ELEVENLABS_VOICE_ID || process.env.TTS_VOICE || 'hpp4J3VqNfWAUOO0d1Us';
     const call = (model) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream?output_format=mp3_44100_64${/flash|turbo_v2/.test(model) ? '&optimize_streaming_latency=3' : ''}`, {
       method: 'POST', headers: { 'xi-api-key': ttsKey, 'content-type': 'application/json' },
@@ -295,7 +340,7 @@ ${JSON.stringify(facts)}` : '',
   }
   // Live conversation: a short lived token for the ElevenLabs agent. The key stays on the server.
   const agentId = process.env.ELEVENLABS_AGENT_ID || '';
-  const liveReady = () => ttsReady() && !!agentId;
+  const liveReady = () => provider === 'elevenlabs' && ttsReady() && !!agentId;
   async function session(req, res) {
     if (!liveReady()) return res.status(404).json({ error: 'live voice off' });
     try {
@@ -309,5 +354,5 @@ ${JSON.stringify(facts)}` : '',
       res.set('cache-control', 'no-store').json({ token: (await r.json()).token });
     } catch { res.status(504).json({ error: 'agent timeout' }); }
   }
-  return { handle, tts, ttsStatus, stt, voices, session, liveReady, ready, ttsReady, model: MODEL };
+  return { handle, tts, ttsStatus, stt, voices, session, liveReady, ready, ttsReady, model: MODEL, provider };
 }
