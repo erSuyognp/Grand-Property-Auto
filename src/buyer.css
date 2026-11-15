@@ -110,3 +110,9 @@ body.pinning #app canvas { cursor: crosshair !important; }
 #guide .gkeys { display: flex; align-items: center; gap: 10px; }
 #guide .gkeys .act.primary { flex-basis: auto; font-size: 13px; }
 #guide .ghint { flex: 1; font-size: 11.5px; color: var(--muted); }
+#guide .gava { flex: none; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; display: block; }
+#guide .gava svg { width: 46px; height: 46px; display: block; }
+#guide .gava .eyes { transform-origin: 60px 58px; animation: mblink 4.6s infinite; }
+#guide .gcard.slim { padding-bottom: 10px; }
+#guide .gcard.slim .gline { font-size: calc(var(--cap, 21px) * 0.74); }
+#guide { bottom: 66px; width: min(600px, 90vw); }

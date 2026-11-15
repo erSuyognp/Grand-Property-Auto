@@ -25,6 +25,8 @@ const AVATAR = `<svg viewBox="0 0 120 120" width="88" height="88" aria-hidden="t
     <ellipse class="mouth" cx="60" cy="72" rx="7" ry="2" fill="#8c2f39"/>
   </g><circle cx="60" cy="60" r="56" fill="none" stroke="#fff" stroke-width="4"/></svg>`;
 
+export const MAYA_AVATAR = AVATAR;
+
 export function initMaya(ctx) {
   const el = document.createElement('div');
   el.id = 'maya';
@@ -309,6 +311,7 @@ export function initMaya(ctx) {
 
   return {
     live,
+    level: () => (playing || liveLevel ? level() : 0),
     hear, ask, say, interrupt, remember, act,
     open(pitchNow) { el.classList.add('show'); if (pitchNow) { if (live?.active) { live.send('Tell me about this home.'); return; } interrupt(); ask('__pitch__'); } },
     listening(on) { if (on) { interrupt(); setState('listening'); el.classList.add('show'); } else if (S.state === 'listening') setState('idle'); },

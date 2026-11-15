@@ -12,7 +12,7 @@
 //   and after a short pause it eases onto the nearest scan position and reports "settled".
 import * as THREE from 'three';
 
-const WALK = 1.2, RUN = 2.5, ACCEL = 3.2, SETTLE_AFTER = 0.4;
+const WALK = 1.0, RUN = 2.2, ACCEL = 2.4, SETTLE_AFTER = 0.4;
 
 // nodes: [{ id, pos: {x, y, z}, neighbors: [id], floor }]
 export function buildGraph(nodes) {
@@ -220,7 +220,11 @@ export function createRider(graph, startId) {
     let move = auto ? 1 : Math.max(-1, Math.min(1, input.move || 0));
     if (input.branch && input.branch !== R.lastBranch) branch(input.branch);
     R.lastBranch = input.branch || 0;
-    const top = auto ? auto.speed : input.run ? RUN : WALK;
+    // being walked somewhere eases off before it arrives, so there is no hard stop
+    let shape = 1;
+    if (auto) { const f = R.rail.tOf(R.s) * (R.rail.pts.length - 1); shape = 0.34 + 1.2 * Math.sin(Math.PI * (f - Math.floor(f))); }
+    // being walked somewhere eases off before it arrives, so there is no hard stop
+    const top = auto ? (auto.to ? Math.min(auto.speed * shape, 0.2 + (R.rail.length - R.s) * 0.8) : auto.speed * shape) : input.run ? RUN : WALK;
     if (Math.abs(move) > 0.01) {
       R.idle = 0; R.settled = false;
       const want = move * top;
@@ -242,7 +246,7 @@ export function createRider(graph, startId) {
     R.moved += Math.abs(R.s - before);
     if (R.s >= R.rail.length - 1e-4 && R.v > 0) {
       // end of the line: everything reachable has been walked. Lay a fresh round from here.
-      if (auto) { R.auto = null; R.v = 0; R.done = true; } else { R.visited = new Set(); replan(R.rail.route.length - 1, { fresh: true }); if (R.rail.length - R.s < 0.05) R.v = 0; }
+      if (auto && auto.to) { R.auto = null; R.v = 0; R.node = auto.to; R.settled = true; R.idle = 9; R.arrived = auto.to; } else if (auto) { R.auto = null; R.v = 0; R.done = true; } else { R.visited = new Set(); replan(R.rail.route.length - 1, { fresh: true }); if (R.rail.length - R.s < 0.05) R.v = 0; }
     }
     if (R.s <= 0 && R.v < 0) R.v = 0;
     const rail = R.rail;
@@ -259,7 +263,8 @@ export function createRider(graph, startId) {
         R.yaw += d * Math.min(1, dt * 3.2);
       }
     }
-    if (auto) { auto.t += dt; R.yawOff = Math.sin(auto.t * 0.55) * 0.5; R.pitch = Math.sin(auto.t * 0.31) * 0.08; }
+    if (auto && auto.to) { auto.t += dt; R.yawOff += (0 - R.yawOff) * Math.min(1, dt * 2); R.pitch += (0 - R.pitch) * Math.min(1, dt * 2); } // being led: eyes forward
+    else if (auto) { auto.t += dt; R.yawOff = Math.sin(auto.t * 0.4) * 0.38; R.pitch = Math.sin(auto.t * 0.25) * 0.06; }
     return R;
   }
 
@@ -274,10 +279,23 @@ export function createRider(graph, startId) {
       R.visited = new Set();
       R.rail = new Rail(graph, planTour(graph, R.node || R.near || startId, seconds * 2.1));
       R.s = 0; R.v = 0; R.done = false; R.settled = false; R.idle = 0;
-      R.auto = { speed: Math.max(0.6, Math.min(2.4, R.rail.length / seconds)), t: 0 };
+      R.auto = { speed: Math.max(0.5, Math.min(0.95, R.rail.length / seconds)), t: 0 };
       return R.rail.length;
     },
     stopTour() { R.auto = null; R.yawOff = 0; R.pitch = 0; },
+    // walk (not jump) to a scan position along the shortest way through the home, at a slow
+    // showing pace; state.arrived is set to its id on arrival. False when there is no way there.
+    walkTo(id, speed = 0.7) {
+      const from = R.settled ? R.node : R.near || R.node;
+      if (!graph.has(id) || !graph.has(from)) return false;
+      if (from === id) { R.arrived = id; return true; }
+      const path = shortestPath(graph, from, id);
+      if (!path || path.length < 2) return false;
+      R.rail = new Rail(graph, path);
+      R.s = 0; R.v = Math.min(R.v, 0.2); R.done = false; R.settled = false; R.idle = 0; R.arrived = null;
+      R.auto = { speed, t: 0, to: id };
+      return true;
+    },
     // stand on a given scan position with fresh rail laid from it
     resetAt(id) {
       if (!graph.has(id)) return false;

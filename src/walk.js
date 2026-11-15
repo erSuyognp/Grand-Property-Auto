@@ -10,7 +10,7 @@
 // mesh (three-mesh-bvh), sliding along walls, gravity, steps up to 0.35 m, a light head bob.
 import * as THREE from 'three';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
-import { buildGraph, createRider, components } from './rails.js';
+import { buildGraph, createRider, components, shortestPath } from './rails.js';
 
 const EYE = 1.6, RADIUS = 0.3, STEP_UP = 0.35;
 const WALK = 2.4, RUN = 4.3, ACCEL = 14, BRAKE = 18;
@@ -151,7 +151,7 @@ export function createWalk(ctx, hooks = {}) {
       e.tex = t;
       // memory: six 1K panoramas, and one sharp one, at a time
       const live = [...atlases.entries()].filter(([, v]) => v.tex && v !== e && (v.tier === '') === (tier === ''));
-      const cap = tier === '' ? 6 : 1;
+      const cap = tier === '' ? 8 : ctx.quality.ultra ? 4 : 2;
       live.sort((x, y) => x[1].used - y[1].used);
       while (live.length >= cap) { const [k0, v0] = live.shift(); v0.tex.dispose(); atlases.delete(k0); }
       return e;
@@ -319,7 +319,7 @@ export function createWalk(ctx, hooks = {}) {
       else if (W.lastA !== W.a) u.mixB.value = want;
       W.lastA = W.a; W.lastB = W.b;
     }
-    u.mixB.value += (want - u.mixB.value) * Math.min(1, dt * 6);
+    u.mixB.value += (want - u.mixB.value) * Math.min(1, dt * (hop ? 60 : W.railOn ? 2.4 : 6));
     // more than about 4 m from a scan point its photo lets go and the mesh's own color shows
     const fade = (o) => (o ? 1 - THREE.MathUtils.smoothstep(Math.hypot(o.w.x - W.pos.x, o.w.z - W.pos.z), 4, 6.2) : 0);
     const keep = u.useBase.value > 0.5 ? 0 : 1; // without baked colors there is nothing to fade to
@@ -328,7 +328,8 @@ export function createWalk(ctx, hooks = {}) {
     // the sharp version of where you stand, once you have been near it for a moment
     if (W.hiTier && W.a) {
       W.hiWait += dt;
-      if (W.hiWait > 0.5) loadAtlas(W.a.p, W.hiTier);
+      if (W.speed > 0.25) W.hiWait = 0;
+      if (W.hiWait > 0.2) loadAtlas(W.a.p, W.hiTier);
     }
   }
 
@@ -338,11 +339,23 @@ export function createWalk(ctx, hooks = {}) {
     W.yaw += turn * dt * 1.9;
     const tilt = (k.has('ArrowUp') ? 1 : 0) - (k.has('ArrowDown') ? 1 : 0);
     W.pitch = THREE.MathUtils.clamp(W.pitch + tilt * dt, -1.25, 1.25);
+    if (W.railOn && W.rider && hop) {
+      // the buyer leads: W or S takes over from being walked
+      if (k.has('KeyW') || k.has('KeyS')) { hop = null; } else {
+        W.rider.state.yawOff += turn * dt * 1.9;
+        stepHop(dt);
+        W.pos.copy(W.rider.state.pos);
+        W.yaw = W.rider.heading; W.pitch = W.rider.state.pitch;
+        W.speed = 0; W.vel.set(0, 0, 0); W.grounded = true; W.onFloor = true; W.glide = null;
+        return;
+      }
+    }
     if (W.railOn && W.rider) {
       const f = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) + ((W.pad && W.pad.y) || 0);
       W.rider.state.yawOff += turn * dt * 1.9;
       W.rider.state.pitch = THREE.MathUtils.clamp(W.rider.state.pitch + tilt * dt, -1.25, 1.25);
       const R = W.rider.update(dt, { move: f, run: k.has('ShiftLeft') || k.has('ShiftRight'), branch: (k.has('KeyA') ? -1 : 0) + (k.has('KeyD') ? 1 : 0) });
+      if (R.arrived) { const id = R.arrived; R.arrived = null; hooks.onArrive && hooks.onArrive(id); }
       if (R.done) { R.done = false; W.touring = false; W.rider.stopTour(); W.rider.resetAt(W.home || R.rail.route[0]); hooks.onTourEnd && hooks.onTourEnd(); }
       W.pos.copy(W.rider.state.pos);
       W.yaw = W.rider.heading; W.pitch = W.rider.state.pitch;
@@ -442,13 +455,19 @@ export function createWalk(ctx, hooks = {}) {
     applyUniforms(dt);
     cam.position.set(W.pos.x, W.pos.y + W.bob, W.pos.z);
     cam.rotation.set(W.pitch, W.yaw, 0);
+    updateLead(dt);
     ctx.renderer.render(scene, cam);
+    if (W.snap) { W.snap = false; xfade(); }
   }
 
   function goTo(pano) {
     const entry = W.panos.find((o) => o.p === pano);
     if (!entry || W.glide) return;
-    if (W.railOn && W.rider) { if (W.rider.resetAt(entry.p.id)) { loadAtlas(entry.p); W.pos.copy(W.rider.state.pos); } return; }
+    if (W.railOn && W.rider) {
+      loadAtlas(entry.p); if (W.hiTier) loadAtlas(entry.p, W.hiTier); // the sharp photo of where we are going, ready before we get there
+      hopTo(entry.p.id);
+      return;
+    }
     const fl = floorUnder(entry.w.x, entry.w.y - 1.3, entry.w.z);
     const to = new THREE.Vector3(entry.w.x, (fl ?? entry.w.y - 1.45) + EYE, entry.w.z);
     const d = to.distanceTo(W.pos);
@@ -474,6 +493,8 @@ export function createWalk(ctx, hooks = {}) {
 
   function stop() {
     setTape(null, null);
+    setLead(null);
+    hop = null; xf.style.opacity = '0';
     if (W.mesh) { scene.remove(W.mesh); W.mesh.geometry.dispose(); W.mesh = null; }
     for (const e of atlases.values()) if (e.tex) e.tex.dispose();
     atlases.clear();
@@ -517,8 +538,104 @@ export function createWalk(ctx, hooks = {}) {
     return proj.z > 1 ? null : { x: ((proj.x + 1) / 2) * window.innerWidth, y: ((1 - proj.y) / 2) * window.innerHeight };
   }
 
+  let hop = null;
+  const xf = document.createElement('canvas');
+  xf.id = 'walk-xfade';
+  xf.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;z-index:4;transform-origin:50% 55%';
+  document.body.append(xf);
+  // freeze the frame just drawn on top of the view, then let it dissolve while pushing in
+  function xfade() {
+    const src = ctx.renderer.domElement;
+    if (xf.width !== src.width || xf.height !== src.height) { xf.width = src.width; xf.height = src.height; }
+    try { xf.getContext('2d').drawImage(src, 0, 0); } catch { return; }
+    const calm = ctx.settings?.reducedMotion;
+    xf.style.transition = 'none'; xf.style.opacity = '1'; xf.style.transform = 'scale(1)';
+    void xf.offsetWidth;
+    xf.style.transition = `opacity ${calm ? 0.3 : 0.62}s ease-out, transform ${calm ? 0.3 : 0.7}s cubic-bezier(0.2, 0.7, 0.3, 1)`;
+    xf.style.opacity = '0'; xf.style.transform = calm ? 'scale(1)' : 'scale(1.2)';
+  }
+  function hopTo(id) {
+    const R = W.rider.state;
+    const from = R.settled ? R.node : R.near || R.node;
+    if (W.rider.state.auto) W.rider.stopTour();
+    W.touring = false;
+    const path = from === id ? [id] : shortestPath(W.graph, from, id);
+    if (!path) { W.snap = true; hop = { path: [from, id], k: 0, phase: 'go', t: 0, dwell: 0.4, jump: true }; return; }
+    if (R.near && R.near !== from && !R.settled) W.rider.resetAt(from);
+    hop = { path, k: 0, phase: path.length > 1 ? 'turn' : 'dwell', t: 0, dwell: 0.5 };
+  }
+  function stepHop(dt) {
+    const R = W.rider.state;
+    hop.t += dt;
+    const nextId = hop.path[hop.k + 1], next = nextId && W.graph.get(nextId);
+    if (hop.phase === 'turn') {
+      // face where we are going at an easy pace, and have its photo ready before we move
+      const want = Math.atan2(-(next.pos.x - R.pos.x), -(next.pos.z - R.pos.z));
+      const d = Math.atan2(Math.sin(want - (R.yaw + R.yawOff)), Math.cos(want - (R.yaw + R.yawOff)));
+      R.yawOff += Math.sign(d) * Math.min(Math.abs(d), dt * (0.5 + Math.min(1.3, Math.abs(d) * 1.6)));
+      R.pitch += (0 - R.pitch) * Math.min(1, dt * 3);
+      const entry = W.panos.find((o) => o.p.id === nextId);
+      const e = entry && loadAtlas(entry.p);
+      if (Math.abs(d) < 0.03 && hop.t > 0.3 && ((e && e.tex) || !entry || (e && e.failed) || hop.t > 3)) { hop.phase = 'go'; hop.t = 0; W.snap = true; }
+    } else if (hop.phase === 'go') {
+      if (!W.snap) { // the frame has been frozen: step to the next position underneath it
+        const heading = R.yaw + R.yawOff;
+        W.rider.resetAt(nextId);
+        W.rider.faceHeading(heading, 0);
+        hop.k++; hop.phase = 'dwell'; hop.t = 0;
+        hooks.onStep && hooks.onStep(1.2);
+      }
+    } else if (hop.t > (hop.k >= hop.path.length - 1 ? 0.25 : hop.dwell)) {
+      if (hop.k >= hop.path.length - 1) { const id = hop.path[hop.k]; hop = null; hooks.onArrive && hooks.onArrive(id); } else { hop.phase = 'turn'; hop.t = 0; }
+    }
+  }
+
+  let lead = null;
+  const leadPos = new THREE.Vector3(), leadWant = new THREE.Vector3(), tanL = new THREE.Vector3();
+  function setLead(url) {
+    if (lead) { scene.remove(lead); lead.material.map?.dispose(); lead.material.dispose(); lead = null; }
+    if (!url) return;
+    const tex = new THREE.TextureLoader().load(url);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    lead = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    lead.scale.set(0.46, 0.46, 1);
+    lead.renderOrder = 15;
+    lead.visible = false;
+    scene.add(lead);
+  }
+  function updateLead(dt) {
+    if (!lead) return;
+    const R = W.railOn && W.rider ? W.rider.state : null;
+    if (!R) { lead.visible = false; return; }
+    if (hop && hop.path.length > 1) {
+      // waiting at the next spot on the way
+      const n = W.graph.get(hop.path[Math.min(hop.path.length - 1, hop.k + 1)]);
+      leadWant.copy(n.pos); leadWant.y -= 0.14;
+    } else {
+      // standing: a little ahead and to the side, at eye level
+      const a = W.yaw - 0.62;
+      leadWant.set(W.pos.x - Math.sin(a) * 1.5, W.pos.y - 0.15, W.pos.z - Math.cos(a) * 1.5);
+      const h = hit(tmp.set(W.pos.x, W.pos.y, W.pos.z), tanL.set(-Math.sin(a), 0, -Math.cos(a)), 1.7);
+      if (h) leadWant.set(W.pos.x - Math.sin(a) * Math.max(0.5, h.distance - 0.25), W.pos.y - 0.15, W.pos.z - Math.cos(a) * Math.max(0.5, h.distance - 0.25));
+    }
+    if (!lead.visible) { lead.visible = true; leadPos.copy(leadWant); }
+    leadPos.lerp(leadWant, Math.min(1, dt * (hop ? 6 : 1.6)));
+    lead.position.copy(leadPos);
+    const near = leadPos.distanceTo(W.pos);
+    // the same apparent size near or far, so she never fills the view in a small room
+    const sc = Math.max(0.13, Math.min(0.46, 0.27 * near));
+    lead.scale.set(sc, sc, 1);
+    lead.material.opacity = Math.max(0, Math.min(1, (near - 0.35) / 0.3));
+    lead.position.y += Math.sin(performance.now() / 420) * 0.012;
+  }
+
   return {
+    setLead,
     load, start, render, stop, goTo, forward, state: W, pick, setTape, toScreen,
+    // fetch the sharp photo of a scan point ahead of time
+    preload(pano) { const e = W.panos.find((o) => o.p === pano); if (e) { loadAtlas(e.p); if (W.hiTier) loadAtlas(e.p, W.hiTier); } },
+    get moving() { return !!hop || W.speed > 0.08 || !!W.glide || !!(W.rider && W.rider.state.auto); },
+    get led() { return !!hop; },
     look(dx, dy = 0) {
       if (W.railOn && W.rider) W.rider.look(dx, dy);
       else { W.yaw += dx; W.pitch = THREE.MathUtils.clamp(W.pitch + dy, -1.25, 1.25); }

@@ -7,6 +7,9 @@
 // insight file. Room uses are offered as possibilities ("this could be your bedroom").
 import { pitch } from './mayaTools.js';
 import { icon } from './icons.js';
+import { MAYA_AVATAR } from './maya.js';
+
+const AVATAR_URL = 'data:image/svg+xml;utf8,' + encodeURIComponent(MAYA_AVATAR.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"').replace('width="88" height="88"', 'width="256" height="256"'));
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
@@ -25,9 +28,9 @@ export function initGuide(ctx) {
   const el = document.createElement('div');
   el.id = 'guide';
   document.body.append(el);
-  const G = { active: false, stops: [], i: -1, listing: null, ins: null, meta: null, focus: null, answers: {}, seen: new Set(), phase: 'off', line: '', choices: null, offered: false };
+  const G = { target: null, idle: 0, quiet: true, nudged: false, pan: 0, showAsk: false, active: false, stops: [], i: -1, listing: null, ins: null, meta: null, focus: null, answers: {}, seen: new Set(), phase: 'off', line: '', choices: null, offered: false };
   const T = () => ctx.tour._state;
-  const pub = () => { window.__gpa.guide = { active: G.active, phase: G.phase, i: G.i, n: G.stops.length, room: G.stops[G.i]?.title || null, kind: G.stops[G.i]?.kind || null, line: G.line, choices: (G.choices || []).map((c) => c.label), stops: G.stops.map((s) => s.title), available: G.stops.length >= 2 }; };
+  const pub = () => { window.__gpa.guide = { active: G.active, phase: G.phase, i: G.i, n: G.stops.length, room: G.stops[G.i]?.title || null, kind: G.stops[G.i]?.kind || null, line: G.line, choices: (G.showAsk && G.choices ? G.choices : []).map((c) => c.label), stops: G.stops.map((s) => s.title), available: G.stops.length >= 2 }; };
 
   // ---- the route: one stop per real room, in a sensible order
   function buildStops() {
@@ -66,7 +69,7 @@ export function initGuide(ctx) {
     const l = G.listing, d = G.ins || {}, f = l.features || {}, h = d.home || {};
     const size = sizeText(s), first = G.i === 0;
     const pick = (sec, n = 3) => (f[sec] || []).filter((x) => !/\d+ (bed|full|half|sq)/i.test(x)).slice(0, n);
-    const hello = first ? `Welcome in. ${l.beds != null ? `${l.beds} bedrooms, ` : ''}${l.baths != null ? `${l.baths} baths, ` : ''}${l.sqft ? `${Number(l.sqft).toLocaleString('en-US')} square feet` : ''}${l.yearBuilt ? `, built in ${l.yearBuilt}` : ''}. I'll show you around room by room, and you set the pace. ` : '';
+    const hello = '';
     const focus = G.focus && G.focus === s.kind ? 'You said this is the room that matters most to you, so take your time here. ' : '';
     switch (s.kind) {
       case 'entry': return { text: `${hello}This is the entry${size ? ', ' + size : ''}. ${pick('Interior Spaces', 2).length ? `Inside, the listing calls out ${join(pick('Interior Spaces', 2).map((x) => x.toLowerCase()))}.` : ''} Picture coming home through this door.`,
@@ -107,19 +110,35 @@ export function initGuide(ctx) {
       ask: 'How does this one feel?', choices: [['I love it', 'love'], ['Show me the costs', 'costs'], ['Find me a better fit', 'better']], final: true };
   }
 
-  // ---- the card
+  // ---- what she says on the way to a room, like an agent walking a step ahead of you
+  function hello() {
+    const l = G.listing;
+    return `Welcome in, I'm Maya. ${l.beds != null ? `${l.beds} bedrooms, ` : ''}${l.baths != null ? `${l.baths} baths` : ''}${l.sqft ? `, ${Number(l.sqft).toLocaleString('en-US')} square feet` : ''}${l.yearBuilt ? `, built in ${l.yearBuilt}` : ''}. Walk with me, I'll show you around. Stop me any time.`;
+  }
+  function onTheWay(s, from) {
+    const fl = (x) => x?.panos?.[0]?.floor;
+    const stairs = from && fl(from) != null && fl(s) != null && fl(from) !== fl(s) ? (fl(s) > fl(from) ? ' It is upstairs.' : ' It is downstairs.') : '';
+    const last = G.stops.indexOf(s) === G.stops.length - 1 && G.stops.length > 2;
+    const t = { entry: 'Let us start at the front door.', living: 'Come on through to the living room.', dining: 'The dining room is just through here.', kitchen: 'Follow me into the kitchen.', flex: `This way. I want to show you the ${s.name.toLowerCase()}.`,
+      bedroom: /2|3|4/.test(s.title) ? 'One more bedroom, just over here.' : 'The bedrooms are this way.', bath: 'A quick look at the bathroom.', laundry: 'Laundry is right here.', garage: 'Let me show you the garage.', outdoor: 'Now step outside with me.' }[s.kind] || `Next, the ${s.name.toLowerCase()}.`;
+    return (last ? 'I saved this one for last. ' : '') + t + stairs;
+  }
+
+  // ---- the card: Maya's face, the room, her words, the buyer's choices
   function render() {
     const s = G.stops[G.i];
-    const title = G.phase === 'offer' ? 'Maya' : G.phase === 'recap' ? 'Before you go' : s?.title || 'Maya';
-    el.innerHTML = `<div class="gcard" role="dialog" aria-label="Guided tour with Maya">
-      <div class="ghead"><span class="ava">M</span><div><b>${esc(title)}</b>${G.phase === 'room' ? `<small>Room ${G.i + 1} of ${G.stops.length}${s?.area ? ` · ${Math.round(s.area * 10.764)} sq ft` : ''}</small>` : '<small>Your agent</small>'}</div>
-        ${G.active ? `<span class="gdots">${G.stops.map((_, k) => `<i class="${k < G.i || G.phase === 'recap' ? 'done' : k === G.i ? 'on' : ''}"></i>`).join('')}</span>` : ''}</div>
+    const title = G.phase === 'offer' || G.phase === 'hello' ? 'Maya' : G.phase === 'recap' ? 'Before you go' : G.phase === 'walking' ? `To the ${(G.target?.title || '').toLowerCase()}` : s?.title || 'Maya';
+    const sub = G.phase === 'room' ? `Room ${G.i + 1} of ${G.stops.length}${s?.area ? ` · ${Math.round(s.area * 10.764)} sq ft` : ''}` : G.phase === 'walking' ? 'Walking with Maya' : 'Your agent';
+    el.innerHTML = `<div class="gcard${G.phase === 'walking' || G.phase === 'hello' ? ' slim' : ''}" role="dialog" aria-label="Guided tour with Maya">
+      <div class="ghead"><span class="gava">${MAYA_AVATAR}</span><div><b>${esc(title)}</b><small>${esc(sub)}</small></div>
+        ${G.active ? `<span class="gdots">${G.stops.map((x, k) => `<i class="${G.seen.has(x.key) && k !== G.i ? 'done' : k === G.i && G.phase !== 'walking' ? 'on' : ''}"></i>`).join('')}</span>` : ''}</div>
       <p class="gline" aria-live="polite">${esc(G.line)}</p>
-      ${G.ask ? `<p class="gask">${esc(G.ask)}</p>` : ''}
-      ${G.choices ? `<div class="gchoices">${G.choices.map((c, i) => `<button data-c="${i}"><kbd>${i + 1}</kbd>${esc(c.label)}</button>`).join('')}</div>` : ''}
+      ${G.ask && G.showAsk ? `<p class="gask">${esc(G.ask)}</p>` : ''}
+      ${G.choices && G.showAsk ? `<div class="gchoices">${G.choices.map((c, i) => `<button data-c="${i}"><kbd>${i + 1}</kbd>${esc(c.label)}</button>`).join('')}</div>` : ''}
       <div class="gkeys">${G.phase === 'offer' ? `<button class="act primary" data-a="start"><kbd>Q</kbd>Show me around</button><button class="act ghost" data-a="hide">Not now</button>`
         : G.phase === 'recap' ? `<button class="act ghost" data-a="end"><kbd>Q</kbd>Done</button>`
-          : `<button class="act primary" data-a="next"><kbd>Enter</kbd>${G.i >= G.stops.length - 1 ? 'Wrap up' : 'Next room'}</button><span class="ghint">or walk on, and ask me anything${ctx.mayaLive?.available() ? ' (V)' : ''}</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`}</div></div>`;
+          : G.phase === 'room' ? `<button class="act primary" data-a="next"><kbd>Enter</kbd>${[...G.stops].every((x) => G.seen.has(x.key)) ? 'Wrap up' : 'Next room'}</button><span class="ghint">or look around, I'll wait${ctx.mayaLive?.available() ? '. Press V to ask me anything' : ''}</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`
+            : `<span class="ghint">Maya is walking you there</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`}</div></div>`;
     el.classList.add('show');
     for (const b of el.querySelectorAll('[data-c]')) b.addEventListener('click', () => answer(Number(b.dataset.c)));
     el.querySelector('[data-a="start"]')?.addEventListener('click', () => start());
@@ -128,59 +147,94 @@ export function initGuide(ctx) {
     el.querySelector('[data-a="end"]')?.addEventListener('click', () => end());
     pub();
   }
-  function speak(text) { G.line = text; ctx.maya?.say(text, { caption: false, force: true }); ctx.mayaLive?.note(400); }
+  function speak(text) { G.line = text; G.quiet = false; G.idle = 0; G.nudged = false; ctx.maya?.say(text, { caption: false, force: true }); ctx.mayaLive?.note(400); }
   function hide() { el.classList.remove('show'); G.phase = G.active ? G.phase : 'off'; pub(); }
+  // her mouth moves with her voice
+  ctx.on('post', () => { if (!el.classList.contains('show')) return; const m = el.querySelector('.gava .mouth'); if (m) { const v = ctx.maya?.level?.() || 0; m.setAttribute('ry', (2 + v * 8).toFixed(1)); } });
 
-  function goTo(s) {
-    // stand at the scan point nearest the middle of the room
+  const rep = (s) => { // the scan point nearest the middle of the room
     const ps = s.panos;
     const cx = ps.reduce((t, p) => t + p.p[0], 0) / ps.length, cz = ps.reduce((t, p) => t + p.p[2], 0) / ps.length;
-    const best = [...ps].sort((a, b) => Math.hypot(a.p[0] - cx, a.p[2] - cz) - Math.hypot(b.p[0] - cx, b.p[2] - cz))[0];
-    if (ctx.tour.path === 'W') ctx.tour.walk.goTo(best); else if (ctx.tour.path === 'B') ctx.tour._show(best);
+    return [...ps].sort((a, b) => Math.hypot(a.p[0] - cx, a.p[2] - cz) - Math.hypot(b.p[0] - cx, b.p[2] - cz))[0];
+  };
+  let walkTimer = 0;
+  // walk there together: she talks on the way, the room is presented on arrival
+  function lead(i) {
+    const s = G.stops[i], from = G.stops[G.i];
+    clearTimeout(walkTimer);
+    const here = T().pano && s.panos.includes(T().pano);
+    if (here && !(ctx.tour.path === 'W' && ctx.tour.walk.moving)) return present(i);
+    G.target = s; G.targetIndex = i; G.phase = 'walking'; G.ask = null; G.choices = null; G.walkT = 0; G.filler = false;
+    speak(onTheWay(s, from));
+    render();
+    const p = rep(s);
+    G.targetPano = p.id;
+    if (ctx.tour.path === 'W') ctx.tour.walk.goTo(p); else { ctx.tour._show(p); walkTimer = setTimeout(() => arrive(p.id), 1600); return; }
+    walkTimer = setTimeout(() => arrive(p.id), 45000); // never stuck on the way
   }
-  function present(i, walked) {
-    G.i = i; G.phase = 'room';
+  function arrive(id) {
+    if (!G.active || G.phase !== 'walking' || id !== G.targetPano) return;
+    clearTimeout(walkTimer);
+    present(G.targetIndex);
+  }
+  ctx.on('walk-arrive', (id) => arrive(id));
+  function present(i) {
+    G.i = i; G.phase = 'room'; G.target = null; G.pan = 0;
     const s = G.stops[i];
     G.seen.add(s.key);
-    if (!walked) goTo(s);
     const m = say(s);
     G.ask = m.ask || null;
     G.choices = m.choices ? m.choices.map(([label, value]) => ({ label, value })) : null;
     G.on = m.on || null;
-    speak(m.text);
+    G.showAsk = false; // the question appears when she has finished the sentence before it
+    speak(m.ask ? `${m.text} ${m.ask}` : m.text);
+    G.line = m.text;
     render();
     ctx.audio.blip(880, 0.06);
+    // have the sharp photo of the next room ready before we walk there
+    const nx = G.stops.find((x) => !G.seen.has(x.key));
+    if (nx && ctx.tour.path === 'W') ctx.tour.walk.preload(rep(nx));
   }
   async function start() {
-    if (!ctx.tour.active || G.stops.length < 2) return false;
-    G.active = true; G.seen = new Set(); G.answers = {};
+    if (!ctx.tour.active || G.stops.length < 2 || G.active) return false;
+    G.active = true; G.seen = new Set(); G.answers = {}; G.i = -1;
     G.ins = G.ins || (await ctx.insights.get(G.listing.id));
-    // begin in the room the player is standing in when it is on the route, else at the first stop
-    const here = G.stops.findIndex((s) => s.key === (T().pano?.room || '~'));
-    present(here === 0 ? 0 : 0, false);
+    const at = T().pano?.p;
+    if (at) {
+      const d = (s) => Math.min(...s.panos.map((p) => Math.hypot(p.p[0] - at[0], p.p[2] - at[2]) + Math.abs(p.p[1] - at[1]) * 4));
+      const main = G.stops.filter((s) => ['entry', 'living', 'dining', 'kitchen'].includes(s.kind));
+      const near = main.sort((a, b) => d(a) - d(b))[0];
+      if (near && near !== G.stops[0] && d(G.stops[0]) - d(near) > 4) { G.stops = [near, ...G.stops.filter((s) => s !== near)]; }
+    }
+    if (ctx.tour.path === 'W') ctx.tour.walk.setLead(AVATAR_URL);
+    G.hl = 0; G.walkT = 0; G.filler = false;
+    G.phase = 'hello'; G.ask = null; G.choices = null;
+    speak(hello());
+    render();
+    if (ctx.tour.path === 'W') ctx.tour.walk.preload(rep(G.stops[0]));
     return true;
   }
   function next() {
-    if (!G.active) return;
-    // the next room not yet shown, in route order
+    if (!G.active || G.phase === 'walking') return;
     const order = [...G.stops.keys()].filter((k) => !G.seen.has(G.stops[k].key));
     if (!order.length) return wrapUp();
-    present(order[0], false);
+    lead(order[0]);
   }
   function wrapUp() {
     G.phase = 'recap';
     const m = recap();
-    G.ask = m.ask; G.choices = m.choices.map(([label, value]) => ({ label, value })); G.on = null;
-    speak(m.text);
+    G.ask = m.ask; G.choices = m.choices.map(([label, value]) => ({ label, value })); G.on = null; G.showAsk = false;
+    speak(`${m.text} ${m.ask}`);
+    G.line = m.text;
     render();
   }
   function answer(i) {
-    const c = G.choices?.[i];
+    const c = G.showAsk ? G.choices?.[i] : null;
     if (!c) return;
     ctx.audio.click?.();
     if (G.phase === 'recap') {
       const l = G.listing;
-      if (c.value === 'love') { ctx.saved.add(l); ctx.hud.toast('Saved to your list'); speak('Saved. When you are ready, compare it with your other favorites on Tab.'); G.ask = null; G.choices = null; render(); return; }
+      if (c.value === 'love') { ctx.saved.add(l); ctx.hud.toast('Saved to your list'); G.ask = null; G.choices = null; speak('Saved. When you are ready, compare it with your other favorites on Tab.'); render(); return; }
       end(true);
       ctx.tour.exit().then(() => { if (c.value === 'costs') ctx.reveal.select(l, { instant: true }).then(() => setTimeout(() => ctx.panel.flash('cost'), 600)); else ctx.reveal.select(l, { instant: true }).then(() => ctx.maya.hear('Show me better options')); });
       return;
@@ -195,20 +249,35 @@ export function initGuide(ctx) {
   }
   function end(quiet) {
     if (!G.active && G.phase === 'off') return;
-    G.active = false; G.phase = 'off'; G.i = -1; G.line = '';
+    clearTimeout(walkTimer);
+    G.active = false; G.phase = 'off'; G.i = -1; G.line = ''; G.target = null;
+    if (ctx.tour.active && ctx.tour.path === 'W') ctx.tour.walk.setLead(null);
     el.classList.remove('show');
     if (!quiet) ctx.maya?.interrupt();
     pub();
   }
 
+  // ---- pacing: she finishes a sentence, then gives the buyer time, then moves on by herself
+  ctx.on('maya-quiet', () => {
+    if (!G.active) return;
+    G.quiet = true; G.idle = 0;
+    if (G.phase === 'hello') return lead(0);
+    if ((G.phase === 'room' || G.phase === 'recap') && G.ask && !G.showAsk) { G.showAsk = true; render(); }
+  });
+  const touch = () => { G.idle = 0; };
+  addEventListener('pointerdown', touch);
+  ctx.on('key', touch);
+
   // ---- when it shows up
   let lastMeta = null, offerTimer = 0;
+  const leads = () => (ctx.params.get('guide') || ctx.settings?.tourGuide || 'auto') !== 'ask';
   ctx.on('tour-enter', (l) => { G.listing = l; G.ins = null; G.offered = false; G.focus = null; lastMeta = null; ctx.insights.get(l.id).then((d) => { if (G.listing === l) G.ins = d; }); });
   ctx.on('tour-exit', () => { clearTimeout(offerTimer); end(true); G.stops = []; el.classList.remove('show'); pub(); });
-  ctx.on('update', () => {
+  ctx.on('update', (dt) => {
     if (!ctx.tour.active) return;
     const t = T();
-    // a home (or another space of an apartment community) finished loading: plan the route, offer the tour
+    // a home (or another space of an apartment community) finished loading: plan the route.
+    // Maya then starts showing it by herself, the way an agent meets you at the door.
     if (t.meta && t.meta !== lastMeta && (ctx.tour.path === 'B' || (ctx.tour.path === 'W' && ctx.tour.walk.ready))) {
       lastMeta = t.meta;
       end(true);
@@ -218,24 +287,45 @@ export function initGuide(ctx) {
         clearTimeout(offerTimer);
         offerTimer = setTimeout(() => {
           if (!ctx.tour.active || G.active) return;
+          if (leads()) { start(); return; }
           G.phase = 'offer'; G.ask = null; G.choices = null;
-          G.line = `Want me to show you around? ${G.stops.length} rooms, a couple of minutes, and you can wander off any time.`;
+          G.line = `Want me to show you around? ${G.stops.length} rooms, a few minutes, and you can wander off any time.`;
           if (!G.offered) { G.offered = true; ctx.maya?.say('Want me to show you around?', { caption: false, force: true }); }
           render();
-        }, 1400);
+        }, 1500);
       }
     }
+    if (!G.active) return;
+    const W = ctx.tour.path === 'W';
+    // while she talks about a room the view turns slowly, so the whole room is seen
+    if (G.phase === 'room' && W && !ctx.tour.walk.moving && G.pan < 1.9 && !(ctx.settings?.reducedMotion)) { const d = dt * 0.11; G.pan += d; ctx.tour.walk.look(d, 0); }
     // the buyer leads: when they walk into a room on the route that she has not shown, she picks up there
-    if (G.active && G.phase === 'room' && t.pano) {
-      const k = G.stops.findIndex((s) => s.key === (t.pano.room || '~'));
-      if (k >= 0 && k !== G.i && !G.seen.has(G.stops[k].key)) present(k, true);
+    if (G.phase === 'room' && t.pano && !(W && ctx.tour.walk.led)) {
+      const k = G.stops.findIndex((s) => s.panos.includes(t.pano));
+      if (k >= 0 && k !== G.i && !G.seen.has(G.stops[k].key)) present(k);
+    }
+    if (G.phase === 'walking') {
+      G.walkT += dt;
+      const hl = (G.listing.highlights || []).filter((x) => x && x.length < 40);
+      if (G.quiet && !G.filler && G.walkT > 3.2 && hl.length > G.hl) {
+        G.filler = true;
+        const a = hl[G.hl++], b = hl[G.hl] && G.hl % 2 ? hl[G.hl++] : null;
+        speak(`While we walk: the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);
+        render();
+      }
+    }
+    // quiet for a while: a gentle word, then on to the next room
+    if (G.quiet && G.phase === 'room') {
+      G.idle += dt;
+      const asking = !!(G.choices && G.showAsk);
+      if (asking && !G.nudged && G.idle > 11) { G.nudged = true; G.ask = null; G.choices = null; speak('No rush. Take a look around.'); render(); } else if (!asking && G.idle > 6) { G.idle = 0; next(); }
     }
   });
   ctx.on('key', (code) => {
     if (!ctx.tour.active) return;
     if (code === 'KeyQ') { if (G.active) end(); else if (G.stops.length >= 2) start(); }
     else if (!G.active) return;
-    else if (code === 'Enter') { if (G.phase === 'recap') end(); else next(); }
+    else if (code === 'Enter') { if (G.phase === 'recap') end(); else if (G.phase === 'hello') lead(0); else next(); }
     else { const m = /^Digit([1-4])$/.exec(code); if (m) answer(Number(m[1]) - 1); }
   });
   pub();
@@ -243,6 +333,7 @@ export function initGuide(ctx) {
     start, next, end, answer,
     get active() { return G.active; },
     get stops() { return G.stops; },
+    get asked() { return G.phase === 'room' ? !!G.ask : null; },
     brief: () => (G.active ? `Guided tour in progress: ${G.phase === 'recap' ? 'wrapping up' : `in the ${G.stops[G.i]?.title}`}. You just said to the player: "${G.line}"${G.ask ? ` and asked: "${G.ask}"` : ''}. Their answers so far: ${JSON.stringify(G.answers)}. If they speak, answer briefly and stay on this room.` : ''),
   };
 }

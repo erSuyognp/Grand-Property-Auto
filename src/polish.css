@@ -71,3 +71,5 @@ body.revealing #coach { left: calc(50% - min(226px, 19vw)); }
 body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after { animation-duration: 0.01s !important; transition-duration: 0.01s !important; }
 #settings .voicerow select { min-width: 0; width: 100%; border-radius: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); color: var(--text); font: 600 13px var(--ui); padding: 8px 10px; }
 #settings .voicerow select option, #settings .voicerow select optgroup { color: #14181f; }
+/* captions off: what is spoken is no longer written out (questions, choices and controls stay) */
+body.captions-off #caption, body.captions-off #maya .mbubble, body.captions-off #guide .gline, body.captions-off #coach p { display: none !important; }

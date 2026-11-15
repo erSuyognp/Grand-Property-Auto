@@ -90,6 +90,7 @@ export function initTour(ctx) {
       }
     },
     onStep(speed) { ctx.audio.step(speed); },
+    onArrive(id) { ctx.emit('walk-arrive', id); },
   });
   let toastTimer = 0;
   function roomToast(name, detail) {
@@ -678,6 +679,7 @@ export function initTour(ctx) {
   }
   // P: glide the whole route in about 45 seconds with a gentle look around, then back to the start
   function autoTour(seconds = 45) {
+    if (ctx.guide && ctx.guide.stops.length >= 2 && !ctx.demo?.running && (T.path === 'W' || T.path === 'B')) { if (ctx.guide.active) ctx.guide.end(); else ctx.guide.start(); return true; }
     if (T.path === 'A' && T.rail) { T.rail.tour(seconds); return true; }
     if (T.path === 'W') { walk.tour(seconds); return true; }
     return false;
