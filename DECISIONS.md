@@ -325,3 +325,9 @@ Checked every insight file in Los Angeles, Houston and the mock neighborhood aga
 - **Boost.** Top speed with Shift goes from 46 to 60 m/s with stronger pull. The speed blur is now a radial motion blur from the point the car is heading to (16 dithered samples, sharp center, a little color fringe at the edges), and the field of view opens further at speed. No blur while a home reveal is open.
 - **Checked** in the running game: three homes marked and visible in all three views, the live agent in text mode over two calls (introduction once), boost to about 118 mph with the blur at 60 fps. `npm run shot` and the Playwright tests were not rerun.
 - `.claude/launch.json` starts `npm run dev` for the in-app preview with `PORT` cleared, because the preview sets `PORT=5173` and the Node server would otherwise take Vite's port.
+
+## Cover art on the title screen (Nov 14)
+
+- The title screen now shows the supplied cover illustration (`public/title-art.jpg`) behind the logo instead of the aerial flyover.
+- The supplied picture carried a wordmark in the GTA typeface over a "VI" numeral and a corner badge shaped like the Rockstar one. The rule here is original art only, so both were removed from the file: a dark plate replaces the center, where the game's own "Grand Property Auto" logo and the buttons sit, and the badge is painted over. The illustrated panels are kept as supplied.
+- The picture has no Sponsor Data, so it is safe for mock mode and public screenshots.
