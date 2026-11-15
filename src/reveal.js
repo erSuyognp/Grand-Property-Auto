@@ -1,23 +1,21 @@
 // The property reveal: select a home (click its marker, click the minimap, pull up and press
 // E, or from a mission) and the world shows what living there is like. The camera rises to a
 // drone view, walk time rings grow from the home, the nearest places pop up with routes and
-// times, solar panels drop onto the roof, a flood zone ripples in blue, and the insight panel
+// times, solar panels drop onto the roof, and the insight panel
 // slides in. Every number comes from the home's insight file.
 //
-// Maya tells it. Each thing appears as she starts its line, the map waits until she has
-// finished the sentence, and a large caption shows the number she is talking about, its words
-// lighting up as she says them. The panel then opens one card at a time, each with its own
-// line, instead of all at once. Her words are different every time (src/revealScript.js,
-// src/voiceLines.js). Space moves to the next step, Shift+Space jumps to the end. "Quick" in
-// the settings is the short silent version.
+// Maya tells it, with her voice only (no caption): each thing appears as she starts talking
+// about it, and she talks straight through, one line queued behind the other. The panel opens
+// one card at a time as she gets to it. Her words come from one of a hundred scripts that fit
+// the home, reworded by the model when it is on and quick (src/revealScript.js,
+// src/revealScripts.js, src/voiceLines.js). Space moves to the next step, Shift+Space jumps to
+// the end. "Quick" in the settings is the short silent version.
 import * as THREE from 'three';
 import { findPath } from './nav.js';
 import { iconUrl, icon, PLACE_ICON, PLACE_LABEL } from './icons.js';
-import { SCORE_COLOR } from './panel.js';
 import { costFor } from './costmath.js';
-import { MAYA_AVATAR } from './maya.js';
-import { makeFlow } from './lines.js';
-import { homeStep, walkStep, placeStep, roofStep, floodStep, panelSteps } from './revealScript.js';
+import { amenityList } from './mayaTools.js';
+import { buildScript } from './revealScript.js';
 
 const PLACES = ['supermarket', 'school', 'park', 'transit', 'gym', 'hospital'];
 export const CAT_COLOR = { supermarket: '#ffb020', school: '#7c9cff', park: '#3ddc84', transit: '#4cc9f0', gym: '#ff7ab6', hospital: '#ff6b6b', pharmacy: '#c59bff', cafe: '#e0a878', restaurant: '#ffa15c' };
@@ -101,46 +99,40 @@ export function initReveal(ctx) {
   const add = (t0, dur, fn, ease = spring) => anims.push({ t0, dur, fn, ease, done: false });
 
   // The reveal is told one step at a time so it can be followed: the home, how far you can walk,
-  // each nearest place in turn, the roof, any flood zone, then the panel card by card.
-  // In the guided pace the times below only space the steps far enough apart for their own
-  // animations: how long a step really lasts is how long Maya takes to say its line (the hold
-  // in the update loop). "Quick" keeps the short silent version.
+  // the nearby places, the roof, then the panel card by card. In the guided pace the times below
+  // only space the steps far enough apart for their own animations: the timeline waits at each
+  // step until Maya gets to it (the hold in the update loop). "Quick" keeps the short silent version.
   let P = null;
   const guided = () => (ctx.params.get('pace') || ctx.settings?.revealPace || 'guided') !== 'quick';
-  function plan(data, told, nCards = 0) {
+  function plan(data, told, nCards = 0, placesWords = 0) {
     const nPlaces = PLACES.filter((c) => data?.places?.[c]?.[0]).length;
     const nRings = (data?.rings?.walk || []).length;
-    const solar = !!(data?.solar?.panels || data?.aerial?.solar), flood = !!data?.risk?.flood?.sfha;
-    if (!told) return { outline: 0.5, ring: (i) => 1.0 + i * 0.32, place: (n) => 1.9 + n * 0.16, solar: 2.9, flood: 3.2, panel: 2.5, card: () => 2.5, end: 4.2, wideIn: 0.9, wideOut: 3.3, guided: false };
-    const ring0 = 1.5, ringGap = 0.55, place0 = ring0 + (nRings ? (nRings - 1) * ringGap + 1.25 : 0.1), gap = 1.0;
-    const solarT = place0 + nPlaces * gap + 0.2, floodT = solarT + (solar ? 1.6 : 0), panelT = floodT + (flood ? 1.2 : 0) + 0.2;
-    return { outline: 0.5, ring: (i) => ring0 + i * ringGap, place: (n) => place0 + n * gap, solar: solarT, flood: floodT, panel: panelT, card: (n) => panelT + n * 0.5, end: panelT + Math.max(1, nCards) * 0.5 + 0.5, wideIn: ring0 - 0.4, wideOut: solarT - 0.5, guided: true };
+    const solar = !!(data?.solar?.panels || data?.aerial?.solar);
+    if (!told) return { outline: 0.5, ring: (i) => 1.0 + i * 0.32, place: (n) => 1.9 + n * 0.16, solar: 2.9, panel: 2.5, card: () => 2.5, end: 4.2, wideIn: 0.9, wideOut: 3.3, guided: false };
+    // the places are one line: their pins come up one after another over about the time it takes to say it
+    const gap = nPlaces ? Math.max(0.6, Math.min(1.6, placesWords / 2.6 / nPlaces)) : 0;
+    const ring0 = 1.5, ringGap = 0.55, place0 = ring0 + (nRings ? (nRings - 1) * ringGap + 1.25 : 0.1);
+    const solarT = place0 + nPlaces * gap + 0.4, panelT = solarT + (solar ? 1.6 : 0) + 0.2;
+    return { outline: 0.5, ring: (i) => ring0 + i * ringGap, places: place0, place: (n) => place0 + 0.15 + n * gap, solar: solarT, panel: panelT, card: (n) => panelT + n * 0.4, end: panelT + Math.max(1, nCards) * 0.4 + 0.5, wideIn: ring0 - 0.4, wideOut: solarT - 0.5, guided: true };
   }
 
   // ---- the story Maya tells
-  // N holds it while it runs: the steps in order, which one she is on, and whether she has
-  // finished its line (free), which is what lets the map move on to the next step.
-  let N = null, prep = null, prepTimer = 0;
-  const capEl = document.createElement('div');
-  capEl.id = 'reveal-cap';
-  capEl.setAttribute('aria-live', 'polite');
-  ctx.hud.root.append(capEl);
-  const esc = ctx.hud.esc;
-  // every step of the story for one home, with a stock line each (src/revealScript.js)
+  // She talks without stopping: each step's line is queued while she says the one before it, so
+  // there is no pause between them, and the map follows her voice. A step's animation and its
+  // panel card start the moment she starts its first sentence (the 'maya-line' event), and the
+  // timeline waits at the next step until she gets there. N holds the story while it runs.
+  let N = null, prep = null, prepTimer = 0, storyId = 0;
+  const TOPIC = { home: 'home', places: 'places', roof: 'solar', card_value: 'value', card_cost: 'cost', card_insurance: 'insurance', card_energy: 'energy', card_hoa: 'hoa', card_amenities: 'hoa', card_rent: 'rent' };
+  // every step of the story for one home: a script that fits it (src/revealScript.js)
   function script(l, data) {
-    const ms = ctx.maya?.state, row = ctx.insights.row(l.id), flow = makeFlow();
-    const out = [homeStep(l, data, row, !!ms && !ms.introduced)];
-    out[0].intro = !!ms && !ms.introduced;
-    const rings = data?.rings?.walk || [];
-    if (rings.length) out.push(walkStep(rings));
-    let k = 0;
-    for (const cat of PLACES) { const p = data?.places?.[cat]?.[0]; if (p) out.push(placeStep(cat, p, k++, flow)); }
-    const roof = roofStep(data?.solar, data?.aerial);
-    if (roof) out.push(roof);
-    if (data?.risk?.flood?.sfha) out.push(floodStep(data.risk.flood));
-    const down = ctx.panel?.options.downPct ?? 20;
-    out.push(...panelSteps(data, row, data?.cost ? costFor(data, { downPct: down, solarOn: false }) : null, down, flow));
-    return out;
+    const ms = ctx.maya?.state, down = ctx.panel?.options.downPct ?? 20;
+    const intro = !!ms && !ms.introduced;
+    const { steps } = buildScript(l, data, ctx.insights.row(l.id), {
+      intro, told: ctx.voiceLines?.toldAbout(l.id) || new Set(), downPct: down,
+      cost: data?.cost ? costFor(data, { downPct: down, solarOn: false }) : null, amenities: amenityList(data),
+    });
+    if (steps[0]) steps[0].intro = intro;
+    return steps;
   }
   // Parked next to a home for a moment: have the story and Maya's own wording for it ready, so
   // she starts the instant the home is selected.
@@ -149,54 +141,16 @@ export function initReveal(ctx) {
     const data = await ctx.insights.get(l.id);
     if (!data || ctx.listingsSys.near !== l || cur) return null;
     const steps = script(l, data);
-    const p = { l, at: performance.now(), steps, lines: ctx.voiceLines?.request('reveal', steps, { intro: steps[0].intro }) || null };
+    const p = { l, at: performance.now(), steps, toldHome: !!ctx.voiceLines?.toldAbout(l.id).has('home'), lines: ctx.voiceLines?.request('reveal', steps, { intro: steps[0]?.intro }) || null };
     prep = p;
     // her opening line's voice is on its way too: in her own words if they come within a second
-    const first = () => {
-      const st = steps[0];
-      if (prep !== p || st.text) return;
-      const m = p.lines?.get(st.key);
-      st.text = m || st.stock; st.source = m ? 'model' : 'script';
-      ctx.maya?.preload?.(st.text);
-    };
-    if (p.lines?.live) { const t0 = performance.now(), t = setInterval(() => { if (prep !== p || p.lines.has('home') || performance.now() - t0 > 1300) { clearInterval(t); first(); } }, 80); } else first();
+    const first = () => { if (prep === p && steps[0] && !steps[0].text) ctx.maya?.preload?.(commitLine(steps[0], p.lines), { whole: true }); };
+    if (p.lines?.live) { const t0 = performance.now(), t = setInterval(() => { if (prep !== p || p.lines.has(steps[0]?.key) || performance.now() - t0 > 1300) { clearInterval(t); first(); } }, 80); } else first();
     return p;
   }
-  const commit = (st) => { if (!st.text) { const m = N?.lines?.get(st.key); st.text = m || st.stock; st.source = m ? 'model' : 'script'; } return st.text; };
-  function hideCap() { capEl.classList.remove('show', 'talking'); document.body.classList.remove('narrating'); }
-  let words = [], mouth = null;
-  function showStep(i) {
-    const st = N.steps[i];
-    // a figure that is a number reads large; one that is words (a rating, "Amenities") a little smaller
-    const wordy = !/\d/.test(st.figure || '') || String(st.figure).length > 12;
-    capEl.innerHTML = `<span class="rn-ava">${MAYA_AVATAR}<i class="rn-wave"></i></span><div class="rn-body">
-      <div class="rn-top"><b>${icon(st.icon || 'sparkles', 16)}${esc(st.title)}</b><span class="rn-count">${i + 1} of ${N.steps.length}</span><span class="rn-dots" aria-hidden="true">${N.steps.map((_, k) => `<i class="${k < i ? 'done' : k === i ? 'on' : ''}"></i>`).join('')}</span></div>
-      <div class="rn-fig${wordy ? ' wordy' : ''}"><strong>${esc(st.figure)}</strong>${st.unit ? `<em>${esc(st.unit)}</em>` : ''}</div>
-      ${st.sub ? `<small class="rn-sub">${esc(st.sub)}</small>` : ''}
-      <p class="rn-line">${st.text.split(/\s+/).map((w) => `<span>${esc(w)}</span>`).join(' ')}</p>
-      <div class="rn-keys"><span><kbd>Space</kbd> next</span><span><kbd>Shift</kbd> <kbd>Space</kbd> skip</span><button class="linkbtn" data-skip>Skip to the end</button></div></div>`;
-    capEl.classList.add('show');
-    capEl.style.setProperty('--rc', st.card ? SCORE_COLOR[st.card] || '#ffc940' : st.cat ? CAT_COLOR[st.cat] : '#ffc940');
-    document.body.classList.add('narrating');
-    capEl.querySelector('[data-skip]').addEventListener('click', () => skip());
-    words = [...capEl.querySelectorAll('.rn-line span')];
-    mouth = capEl.querySelector('.mouth');
-    N.lit = 0;
-  }
-  // the words of the line light up as she says them: an even pace over the time she speaks,
-  // all of them once she is done
-  function lightWords(dt) {
-    if (!words.length) return;
-    const speaking = !!ctx.maya?.speaking;
-    capEl.classList.toggle('talking', speaking);
-    if (mouth) mouth.setAttribute('ry', (2 + (ctx.maya?.level?.() || 0) * 8).toFixed(1));
-    let n;
-    if (N.free) n = words.length;
-    else if (N.heard || speaking) { N.spoke += speaking ? dt : 0; n = Math.min(words.length - 1, Math.floor(N.spoke * 2.7) + 1); }
-    else if (!ctx.maya || ctx.maya.state?.state === 'idle') { N.spoke += dt; n = Math.min(words.length, Math.floor((N.spoke / N.read) * words.length) + 1); }
-    else n = 0;
-    if (n > N.lit) { for (let k = N.lit; k < n; k++) words[k].classList.add('lit'); N.lit = n; }
-  }
+  // a step's words are settled when it is queued: hers from the model when they came in and
+  // passed the check, the script's otherwise
+  function commitLine(st, lines) { if (!st.text) { const m = lines?.get(st.key); st.text = m || st.stock; st.source = m ? 'model' : 'script'; } return st.text; }
   // the panel part of the story: the panel opens without its cards, and each card comes in as
   // she starts its line
   let told = false;
@@ -206,40 +160,55 @@ export function initReveal(ctx) {
     told = narrated;
     ctx.emit('reveal-panel', cur, ins, { narrated });
   }
-  // a step begins: its caption comes up and Maya starts its line
-  function enter(i) {
-    // the timeline calls a step's start on each frame of its short window: start it once
-    if (!N || !N.steps[i] || N.i === i) return;
-    const st = N.steps[i];
-    N.i = i; N.free = false; N.heard = false; N.gap = 0; N.el = 0; N.spoke = 0;
-    commit(st);
-    N.read = Math.max(1.6, st.text.length * 0.055); // time to read it when there is no voice
+  // queue step k in her voice (k = 0 or a skip interrupts whatever she was saying)
+  function speak(k, cut = false) {
+    const st = N?.steps[k];
+    if (!st) return;
+    N.queued = k;
+    const text = commitLine(st, N.lines);
     if (st.intro && ctx.maya?.state) ctx.maya.state.introduced = true;
-    showStep(i);
+    ctx.maya?.say(text, { caption: false, interrupt: cut, tag: `rv${N.id}:${k}`, whole: true });
+    ctx.voiceLines?.remember(text);
+  }
+  // she has started step k: its animation and card begin, and the line after it is queued
+  function enterStep(k) {
+    if (!N || !N.steps[k] || k <= N.i) return;
+    const st = N.steps[k];
+    N.i = k; N.stall = 0;
+    T = Math.max(T, st.t);
     if (st.card || st.key === 'rest') openPanel(true);
     if (st.card) ctx.panel?.focus(st.card);
     if (st.key === 'rest') ctx.panel?.revealAll();
-    ctx.maya?.say(st.text, { caption: false });
-    ctx.voiceLines?.remember(st.text);
     for (const c of chips) c.el.classList.toggle('now', !!c.step && c.step === st.key);
-    // the next line is settled now, and its voice asked for, so there is no pause between steps
-    const nx = N.steps[i + 1];
-    if (nx) ctx.maya?.preload?.(commit(nx));
-    window.__gpa.revealStep = { i: i + 1, n: N.steps.length, title: st.title, key: st.key, text: st.text, source: st.source };
+    if (TOPIC[st.key] && cur) ctx.voiceLines?.tell(cur.id, TOPIC[st.key]);
+    if (N.queued < k + 1 && k + 1 < N.steps.length) speak(k + 1);
+    window.__gpa.revealStep = { i: k + 1, n: N.steps.length, key: st.key, text: st.text, source: st.source, script: st.script };
   }
-  // the hold: the timeline stops just short of the next step until she has said this one
+  ctx.on('maya-line', (tag) => {
+    const m = /^rv(\d+):(\d+)$/.exec(String(tag || ''));
+    if (m && N && Number(m[1]) === N.id) enterStep(Number(m[2]));
+  });
+  // the hold: the timeline waits at the next step until she starts it
   function hold(dt) {
     const ms = ctx.maya?.state?.state;
     if (ms === 'listening' || ms === 'thinking') { endStory(false); return; } // the player is talking to her: the story steps aside
-    if (N.i >= 0 && !N.free) {
-      N.el += dt;
-      if (ctx.maya?.speaking) { N.heard = true; N.gap = 0; } else N.gap += dt;
-      if (N.heard ? N.gap > 0.3 && N.el > 0.9 : N.el > N.read) N.free = true;
+    const speaking = !!ctx.maya?.speaking;
+    N.stall = speaking ? 0 : N.stall + dt;
+    const first = N.steps[0];
+    if (N.queued < 0 && first && T >= first.t - 0.03) {
+      // her first line: in her own words when they arrive within a moment, the script's otherwise
+      N.wait += dt;
+      if (!N.lines?.live || N.lines.has(first.key) || N.wait > 0.9) speak(0, true);
     }
-    if (N.i >= 0) lightWords(dt);
+    // her voice never came (a live conversation has the floor, or the voice failed): carry on
+    // without it, at reading pace
+    const at = N.steps[Math.max(0, N.i)];
+    if (N.queued > N.i && N.stall > Math.max(2.4, (at?.text || '').length * 0.06)) enterStep(N.queued);
     const nx = N.steps[N.i + 1];
-    const limit = (nx ? nx.t : P.end) - 0.03;
-    if (!N.free && T > limit) T = limit;
+    if (nx && T > nx.t - 0.03) T = nx.t - 0.03;
+    // the last line is said: let the timeline run to the end
+    if (!nx && N.i >= 0 && N.stall > 0.4) N.done = true;
+    if (!nx && !N.done && T > P.end - 0.03) T = P.end - 0.03;
   }
   // the story is over (told to the end, skipped, or interrupted): everything is shown at once
   function endStory(hush = true) {
@@ -248,7 +217,6 @@ export function initReveal(ctx) {
     N.lines?.cancel();
     N = null;
     T = Math.max(T, 99);
-    hideCap();
     for (const c of chips) c.el.classList.remove('now');
     if (told) ctx.panel?.revealAll();
   }
@@ -256,13 +224,14 @@ export function initReveal(ctx) {
   // told: Maya tells the story step by step. ready: a story prepared while the car was parked here.
   function build(l, data, { told: tell = false, ready = null } = {}) {
     N = null; told = false;
-    const story = tell ? { steps: [], i: -1, free: true, heard: false, gap: 0, el: 0, read: 2, spoke: 0, lit: 0, lines: null } : null;
-    const all = story ? ready?.steps || script(l, data) : [];
-    const lines = story ? new Map(all.map((s) => [s.key, s])) : null;
+    const all = tell ? ready?.steps || script(l, data) : [];
+    const lines = tell ? new Map(all.map((s) => [s.key, s])) : null;
     const cards = all.filter((s) => s.card || s.key === 'rest');
-    P = plan(data, tell, cards.length);
-    // a step of the story begins at t on the timeline (only steps that have something to show are told)
-    const step = (t, key) => { const st = lines?.get(key); if (!st || st.t != null) return; st.t = t; story.steps.push(st); add(t, 0.05, () => enter(story.steps.indexOf(st)), smooth); };
+    const placesStep = lines?.get('places');
+    P = plan(data, tell, cards.length, placesStep ? placesStep.stock.split(/\s+/).length : 0);
+    const story = tell ? { id: ++storyId, steps: [], i: -1, queued: -1, stall: 0, wait: 0, done: false, lines: null } : null;
+    // a step of the story is at t on the timeline (only steps that have something to show are told)
+    const step = (t, key) => { const st = lines?.get(key); if (!st || st.t != null) return; st.t = t; story.steps.push(st); };
     const world = ctx.world;
     group = new THREE.Group();
     ctx.scene.add(group);
@@ -310,10 +279,12 @@ export function initReveal(ctx) {
       add(P.ring(i), 0.9, (k) => { fill.scale.setScalar(Math.max(0.001, k)); edge.scale.setScalar(Math.max(0.001, k)); c.on = k > 0.6; });
     });
 
-    // 3. nearest places: pins, routes, time chips
+    // 3. nearest places: pins, routes, time chips, in the order she names them
     let n = 0;
     const b2 = world.bounds;
-    for (const cat of PLACES) {
+    const order = placesStep?.order || PLACES;
+    if (P.guided) step(P.places, 'places');
+    for (const cat of [...order, ...PLACES.filter((x) => !order.includes(x))]) {
       const p = data?.places?.[cat]?.[0];
       if (!p) continue;
       const q = world.proj.toLocal(p.lat, p.lon);
@@ -339,9 +310,7 @@ export function initReveal(ctx) {
       const c = chip(`${icon(PLACE_ICON[cat], 14)}<b>${useWalk ? p.walkMin + ' min walk' : p.driveMin + ' min drive'}</b><span>${p.name && p.name !== PLACE_LABEL[cat] ? p.name : PLACE_LABEL[cat]}${far ? ' →' : ''}</span>`, 'place');
       c.el.style.setProperty('--c', CAT_COLOR[cat]);
       c.cat = cat;
-      c.step = `place_${cat}`;
       const t0 = P.place(n);
-      step(t0, `place_${cat}`);
       // the route: along the streets when the place is on the map, straight otherwise
       let line = null;
       const makeLine = () => {
@@ -396,35 +365,22 @@ export function initReveal(ctx) {
       add(P.solar + 0.1, 0.4, (k) => { c.on = k > 0.3; });
     }
 
-    // 5. flood zone: a gentle blue ripple
-    if (data?.risk?.flood?.sfha) {
-      const water = new THREE.Mesh(new THREE.CircleGeometry(150, 64), basic(0x2f7bff, 0));
-      water.rotation.x = -Math.PI / 2; water.position.set(hx, ground + 0.6, hz); water.renderOrder = 5;
-      group.add(water);
-      group.userData.water = water;
-      const c = chip(`${icon('waves', 14)}<b>${data.risk.flood.label}</b><span>FEMA flood map</span>`, 'flood');
-      c.pos.set(hx - 60, ground + 4, hz + 60);
-      c.step = 'flood';
-      step(P.flood, 'flood');
-      add(P.flood, 0.9, (k) => { water.material.opacity = 0.22 * k; c.on = k > 0.4; }, smooth);
-    }
-    // 6. the panel: told card by card (price and value, the monthly cost, energy, risk, HOA, then
-    // the rest of the cards together), or all at once in the quick pace
+    // 5. the panel: told card by card (price and value, the monthly cost and insurance, energy,
+    // HOA, then the rest of the cards together), or all at once in the quick pace
     cards.forEach((st, i) => step(P.card(i), st.key));
     // a little dimmer, so the highlights read
     baseExposure = 1;
     add(0.1, 1.0, (k) => { ctx.env.setDim(1 - 0.2 * k); }, smooth);
     // the panel opens here at the latest (with the story skipped or over, all its cards at once)
     add(P.panel, 0.1, () => openPanel(!!N && cards.length > 0), smooth);
-    add(P.end + 2.6, 0.05, () => { if (N) { N = null; for (const c of chips) c.el.classList.remove('now'); } hideCap(); }, smooth);
+    add(P.end + 2.6, 0.05, () => { if (N) { N.lines?.cancel(); N = null; for (const c of chips) c.el.classList.remove('now'); } }, smooth);
     if (story) {
       // steps were added as the map was built: tell them in the order they appear
       story.steps.sort((a, c) => a.t - c.t);
       N = story;
       // her own wording for every line, asked for once (or already on its way from the car)
       story.lines = ready?.lines || ctx.voiceLines?.request('reveal', story.steps, { intro: story.steps[0]?.intro }) || null;
-      if (story.steps[0]) ctx.maya?.preload?.(commit(story.steps[0]));
-      ctx.hud.caption('');           // a line from the drive does not sit over her caption
+      ctx.hud.caption('');           // a line from the drive is not left on screen
       ctx.emit('narration', true);   // the first run tutorial steps aside
     }
   }
@@ -454,7 +410,6 @@ export function initReveal(ctx) {
     for (const c of chips) c.el.remove();
     chips = []; anims = [];
     if (N) { N.lines?.cancel(); N = null; }
-    hideCap();
     if (baseExposure != null) { ctx.env.setDim(1); baseExposure = null; }
   }
 
@@ -474,7 +429,9 @@ export function initReveal(ctx) {
     ins = data;
     // Maya tells it unless the reveal is instant (a hop between homes, reduced motion) or quick
     const quiet = !!opts.instant || reduced();
-    const ready = prep && prep.l === l && performance.now() - prep.at < 120000 ? prep : null;
+    // a story prepared before the arrival line introduced the home would say the price again
+    let ready = prep && prep.l === l && performance.now() - prep.at < 120000 ? prep : null;
+    if (ready && ready.toldHome !== !!ctx.voiceLines?.toldAbout(l.id).has('home')) { ready.lines?.cancel(); ready = null; }
     prep = null;
     build(l, data, { told: guided() && !quiet, ready });
     if (quiet) T = 99;
@@ -482,15 +439,15 @@ export function initReveal(ctx) {
     return true;
   }
   function replay() { if (!cur) return; const l = cur, d = ins; if (N) ctx.maya?.interrupt(); teardown(); T = 0; stage = 1; build(l, d, { told: guided() && !reduced() }); }
-  function skip() { if (!cur) return; if (N) endStory(); else { T = Math.max(T, 99); hideCap(); } }
+  function skip() { if (!cur) return; if (N) endStory(); else T = Math.max(T, 99); }
   // on to the next step of the story: she drops the line she is on and starts the next
   function nextBeat() {
     if (!cur || !N) return skip();
-    const nx = N.steps[N.i + 1];
-    if (!nx) return skip();
+    const k = N.i + 1;
+    if (k >= N.steps.length) return skip();
     ctx.maya?.interrupt();
-    N.free = true;
-    T = Math.max(T, nx.t);
+    N.queued = N.i;
+    speak(k, true);
   }
   function close() {
     if (!cur) return;
@@ -545,7 +502,6 @@ export function initReveal(ctx) {
   ctx.on('post', () => {
     if (!cur || !chips.length) return;
     const cam = ctx.camera, W = innerWidth, H = innerHeight, placed = [];
-    const capBottom = capEl.classList.contains('show') ? capEl.getBoundingClientRect().bottom : 0;
     for (const c of chips) {
       if (c.ringR) {
         const rx = Math.cos(angle), rz = -Math.sin(angle);
@@ -557,10 +513,10 @@ export function initReveal(ctx) {
       let vis = c.on && !behind && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
       if (c.cat && c.on) { // a place off screen keeps its chip at the edge, in its direction
         if (behind) { x = W - x; y = H * 1.5; }
-        // the frame the chips stay in: clear of the dock and the step caption at the top, the
+        // the frame the chips stay in: clear of the dock at the top, the
         // panel on the right, and the minimap, its key and Maya along the bottom
         const x0 = 140, x1 = W - (ctx.panel?.el.classList.contains('show') ? ctx.panel.el.offsetWidth + 120 : 110);
-        const y0 = capBottom ? capBottom + 44 : 132, y1 = H - 168;
+        const y0 = 132, y1 = H - 168;
         let cx = Math.max(x0, Math.min(x1, x));
         const cy = Math.max(y0, Math.min(y1, y));
         if (cy > H - 262 && cx < 348) cx = 348;

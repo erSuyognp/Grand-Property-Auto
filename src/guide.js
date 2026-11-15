@@ -192,17 +192,29 @@ export function initGuide(ctx) {
       default: return { text: `${hello}This is the ${s.name.toLowerCase()}${size ? ', ' + size : ''}.` };
     }
   }
+  // What she has already told the buyer about this home (on arrival, in the reveal, earlier in
+  // this tour): she does not say it again. Flood zones and FEMA ratings are not part of her talk.
+  const toldNow = () => ctx.voiceLines?.toldAbout(G.listing?.id) || new Set();
+  const CARD_TOPIC = { value: 'value', cost: 'cost', energy: 'energy', outdoors: 'places', errands: 'places', hoa: 'hoa', rent: 'rent', activity: 'activity', noise: 'noise' };
+  const fresh = (x, said) => x && x.card !== 'risk' && !said.has(CARD_TOPIC[x.card] || x.card) && !/\bFEMA\b|flood/i.test(x.text);
+  const tell = (...topics) => ctx.voiceLines?.tell(G.listing?.id, ...topics);
   function recap() {
-    const l = G.listing, d = G.ins, row = ctx.insights.row(l.id);
+    const l = G.listing, d = G.ins, row = ctx.insights.row(l.id), said = toldNow();
     const p = d ? pitch(d, row) : { points: [], tradeoffs: [] };
-    const pts = p.points.slice(0, 2).map((x) => x.text);
-    const cost = d?.cost ? ` Owning it is an estimated ${usd(d.cost.total)} a month.` : row?.rent ? ` Rent starts at ${usd(row.rent)} a month.` : '';
+    const pts = p.points.filter((x) => fresh(x, said)).slice(0, 2).map((x) => x.text);
+    p.tradeoffs = p.tradeoffs.filter((x) => fresh(x, said));
+    const cost = said.has('cost') || said.has('rent') ? '' : d?.cost ? ` Owning it is an estimated ${usd(d.cost.total)} a month.` : row?.rent ? ` Rent starts at ${usd(row.rent)} a month.` : '';
     return { text: `${pickLine('tg-recap', ["That's the home.", 'And that is the whole home.', 'That was the tour.'])} ${pts.length ? `${pickLine('tg-recap-pts', ['What stands out', 'What I would remember', 'The highlights'])}: ${join(pts)}.` : ''}${p.tradeoffs[0] ? ` ${pickLine('tg-recap-trade', ['The trade off', 'The thing to weigh', 'One honest catch'])}: ${p.tradeoffs[0].text}.` : ''}${cost}`,
       ask: 'How does this one feel?', choices: [['I love it', 'love'], ['Show me the costs', 'costs'], ['Find me a better fit', 'better']], final: true };
   }
 
   // the next owning fact she has not said yet in this showing (insurance, HOA, amenities, ...)
-  const nextFact = () => extraFacts(G.ins)[G.factI || 0] || null;
+  const FACT_TOPIC = { insurance: 'insurance', hoa: 'hoa', amenities: 'hoa', tax: 'cost', energy: 'energy' };
+  const nextFact = () => {
+    const said = toldNow();
+    const left = extraFacts(G.ins).filter((x) => x.key !== 'risk' && FACT_TOPIC[x.key] && !said.has(FACT_TOPIC[x.key]));
+    return left[0] || null;
+  };
   // ---- what she says on the way to a room, like an agent walking a step ahead of you
   function hello() {
     const l = G.listing, ms = ctx.maya?.state;
@@ -210,7 +222,9 @@ export function initGuide(ctx) {
     const open = ms && ms.introduced ? pickLine('tg-hello', ['Welcome in.', 'Come on in.', 'Here we are.', 'Step inside.']) : pickLine('tg-hello-intro', ["Welcome in, I'm Maya, your real estate AI agent.", "Come on in. I'm Maya, your real estate AI agent.", "Hi, I'm Maya, your real estate AI agent. Welcome in."]);
     if (ms) ms.introduced = true;
     // the best thing about this home first, from its own data; a listing highlight when there is none
-    const top = G.ins ? pitch(G.ins, ctx.insights.row(l.id)).points[0] : null;
+    const said = toldNow();
+    const top = G.ins ? pitch(G.ins, ctx.insights.row(l.id)).points.find((x) => fresh(x, said)) || null : null;
+    if (top) tell(CARD_TOPIC[top.card] || top.card);
     const hl = top ? null : (l.highlights || []).find((x) => x && x.length < 40);
     if (hl) G.hl = 1;
     const best = top ? ` ${pickLine('tg-best', ["Here's my favorite thing about this one", 'What I like most here', 'The best part, if you ask me'])}: ${top.text}.` : hl ? ` The listing's headline here is ${hl.toLowerCase()}.` : '';
@@ -218,7 +232,10 @@ export function initGuide(ctx) {
     const rooms = [l.beds != null ? n(l.beds, 'bedroom') : null, l.baths != null ? n(l.baths, 'bath') : null].filter(Boolean);
     const facts = [rooms.length ? `It has ${rooms.join(' and ')}` : null, l.sqft ? `${rooms.length ? '' : 'It has '}${Number(l.sqft).toLocaleString('en-US')} square feet` : null].filter(Boolean).join(', ');
     const built = l.yearBuilt ? (facts ? `, and it was built in ${l.yearBuilt}` : `It was built in ${l.yearBuilt}`) : '';
-    return `${open}${best}${facts || built ? ` ${facts}${built}.` : ''} ${pickLine('tg-lead', ["Walk with me, I'll show you around. Stop me any time.", "Follow me and I'll show you around. Stop me whenever you like.", "I'll lead the way. Wander off whenever you want, I'll catch up."])}`;
+    // the size was said when she showed the home from above: only the year it was built, if known
+    const sized = said.has('home') ? (l.yearBuilt ? ` It was built in ${l.yearBuilt}.` : '') : facts || built ? ` ${facts}${built}.` : '';
+    tell('home');
+    return `${open}${best}${sized} ${pickLine('tg-lead', ["Walk with me, I'll show you around. Stop me any time.", "Follow me and I'll show you around. Stop me whenever you like.", "I'll lead the way. Wander off whenever you want, I'll catch up."])}`;
   }
   function onTheWay(s, from) {
     const fl = (x) => x?.panos?.[0]?.floor;
@@ -307,7 +324,7 @@ export function initGuide(ctx) {
     if (G.focus && G.focus === s.kind) m.text = `${pickLine('tg-focus', ['You said this is the room that matters most to you, so take your time here.', 'This is the room you said matters most, so take your time.', 'You told me this one matters most. Have a good look.'])} ${m.text}`;
     // a room with no question for the buyer carries one owning fact instead (insurance, HOA, amenities, ...)
     const fact = !m.ask && i > 0 ? nextFact() : null;
-    if (fact) { G.factI++; m.text = `${m.text.trim()} ${pickLine('tg-here', ['While we are here:', 'Worth knowing while we are here:', 'One more thing:'])} ${fact.text}`; }
+    if (fact) { G.factI++; tell(FACT_TOPIC[fact.key]); m.text = `${m.text.trim()} ${pickLine('tg-here', ['While we are here:', 'Worth knowing while we are here:', 'One more thing:'])} ${fact.text}`; }
     window.__gpa.guideLine = { i, key: s.key, source: m.source || 'script', text: m.text };
     G.ask = m.ask || null;
     G.choices = m.choices ? m.choices.map(([label, value]) => ({ label, value })) : null;
@@ -453,7 +470,7 @@ export function initGuide(ctx) {
       if (G.quiet && !G.filler && G.walkT > 2.2 && (fact || hl.length > G.hl)) {
         G.filler = true; G.walks++;
         const lead = pickLine('tg-walk', ['While we walk:', 'On the way:', 'Quick one while we walk:', 'Something worth knowing:']);
-        if (fact) { G.factI++; speak(`${lead} ${fact.text}`); }
+        if (fact) { G.factI++; tell(FACT_TOPIC[fact.key]); speak(`${lead} ${fact.text}`); }
         else {
           const a = hl[G.hl++], b = hl[G.hl] && G.hl % 2 ? hl[G.hl++] : null;
           speak(`${lead} the listing points out ${a.toLowerCase()}${b ? ` and ${b.toLowerCase()}` : ''}.`);

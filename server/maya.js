@@ -77,13 +77,13 @@ Rules for every line:
 - Add no fact, figure or claim that is not in the item. No opinions about the area or about who lives there.
 - Never say where something is or which way to go (next to, across from, along the street, at the edge of a ring, up ahead, over there): the item gives a time, not a place.
 - Keep the hedges. When the item says about, roughly, estimated or likely, your line says so too. An asking price stays an asking price.
-- Stay within the word limit shown for the item: one or two short spoken sentences.
+- Stay within the word limit shown for the item: one or two spoken sentences.
 - No questions.
 - Sound like a person showing a friend around, not a spec sheet. Change the shape of the sentences from item to item, use a connecting word now and then, and never start two lines in a row the same way.
 
 ${FAIR_HOUSING_RULES}`;
 const SAY_KIND = {
-  reveal: 'The moment: a flyover of one home. The map shows each thing as you say its line (the home, walking rings, the nearest places one by one, the roof), then the insight panel of the home opens one card at a time as you explain it (price against similar homes, the monthly cost, energy, risk, HOA, then the rest). Every line stays on its own item, and the lines run as one spoken walkthrough, so let them flow into each other.',
+  reveal: 'The moment: a flyover of one home, told as one continuous spoken walkthrough with no pauses. The map shows each thing as you start its line (the home, walking rings, the nearby places, the roof), then the insight panel of the home opens one card at a time (price against similar homes, the monthly cost, insurance, energy, HOA, then the rest). Every line stays on its own item, but they are heard back to back, so let each one follow on from the last, and never repeat a fact or a figure from an earlier line. Do not mention flood zones, FEMA or hazard ratings.',
   tour: 'The moment: you are walking the buyer through the rooms of one home, one line per room, while they look around it. Keep any invitation to press a key (R to measure) exactly.',
   line: 'The moment: single lines you say to the player while they drive.',
 };
@@ -254,7 +254,7 @@ ${JSON.stringify(facts)}` : '',
     const b = req.body || {};
     if (!ready()) return res.json({ scripted: true, reason: 'llm off' });
     const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 24)
-      .map((x) => ({ key: String(x?.key || '').toLowerCase(), text: String(x?.text || '').replace(/\s+/g, ' ').trim().slice(0, 320), must: (Array.isArray(x?.must) ? x.must : []).slice(0, 4).map((m) => String(m).slice(0, 60)), max: Math.max(8, Math.min(40, Number(x?.max) || 30)) }))
+      .map((x) => ({ key: String(x?.key || '').toLowerCase(), text: String(x?.text || '').replace(/\s+/g, ' ').trim().slice(0, 480), must: (Array.isArray(x?.must) ? x.must : []).slice(0, 5).map((m) => String(m).slice(0, 60)), max: Math.max(8, Math.min(64, Number(x?.max) || 30)) }))
       .filter((x) => /^[a-z0-9_]{1,32}$/.test(x.key) && x.text.length > 3);
     if (!lines.length) return res.json({ scripted: true, reason: 'no lines' });
     const short = (a, n, len) => (Array.isArray(a) ? a : []).slice(0, n).map((x) => String(x).replace(/\s+/g, ' ').trim().slice(0, len)).filter(Boolean);

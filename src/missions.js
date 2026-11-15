@@ -383,6 +383,8 @@ export function initMissions(ctx) {
     if (!M.prefetch.has(l.id)) prefetchNarration(l);
     const pf = M.prefetch.get(l.id);
     speak(pf.text || pf.fallback, { ms: 9000 });
+    // the arrival line gives the price and the size: the reveal that follows does not say them again
+    ctx.voiceLines?.tell(l.id, 'home');
     M.narrated.add(l.id);
   }
 

@@ -55,7 +55,7 @@ test('reveal: select a home, the world animates and the panel slides in', async 
   expect(errors, errors.join('\n')).toEqual([]);
 });
 
-test('reveal, step by step: one thing at a time with a caption, Space moves on', async ({ page }) => {
+test('reveal, step by step: Maya tells it in her voice (no caption), the map follows, Space moves on', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -66,15 +66,17 @@ test('reveal, step by step: one thing at a time with a caption, Space moves on',
   await page.evaluate((i) => { window.__gpa.select(i); }, id);
   // the story starts with the home, then the walk rings, then places one at a time
   await page.waitForFunction(() => window.__gpa.revealStep?.i >= 2, null, { timeout: 10_000 });
-  await expect(page.locator('#reveal-cap.show p')).toBeVisible();
+  // voice only: no caption on the map, and she is talking
+  expect(await page.locator('#reveal-cap').count()).toBe(0);
+  expect(await page.evaluate(() => window.__gpa.maya?.state)).toBe('talking');
   const total = await page.evaluate(() => window.__gpa.revealStep.n);
-  expect(total).toBeGreaterThanOrEqual(6);
+  expect(total).toBeGreaterThanOrEqual(5);
   // the panel has not arrived yet: the world is shown first
   expect(await page.locator('#ipanel.show').count()).toBe(0);
-  await page.waitForFunction(() => window.__gpa.revealStep.i >= 6, null, { timeout: 20_000 });
+  await page.waitForFunction(() => window.__gpa.revealStep.i >= 4, null, { timeout: 30_000 });
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${DIR}/24-reveal-step.png` });
-  console.log('step', JSON.stringify(await page.evaluate(() => window.__gpa.revealStep)), await page.locator('#reveal-cap p').innerText());
+  console.log('step', JSON.stringify(await page.evaluate(() => window.__gpa.revealStep)));
   // Space jumps to the next step
   const before = await page.evaluate(() => window.__gpa.revealStep.i);
   await page.keyboard.press('Space');

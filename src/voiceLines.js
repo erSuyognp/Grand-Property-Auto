@@ -72,6 +72,23 @@ export function initVoiceLines(ctx) {
     return h;
   }
 
+  // What she has already said about each home in the last twenty minutes (its price, the places
+  // nearby, the monthly cost, ...), so the arrival line, the reveal and the tour inside do not
+  // tell the buyer the same thing three times.
+  const told = new Map();
+  const TOLD_MS = 20 * 60 * 1000;
+  function tell(id, ...topics) {
+    if (id == null) return;
+    const m = told.get(String(id)) || new Map();
+    for (const t of topics) m.set(t, performance.now());
+    told.set(String(id), m);
+    window.__gpa.told = Object.fromEntries([...told].map(([k, v]) => [k, [...v.keys()]]));
+  }
+  function toldAbout(id) {
+    const m = told.get(String(id)), now = performance.now();
+    return new Set(m ? [...m].filter(([, at]) => now - at < TOLD_MS).map(([t]) => t) : []);
+  }
+
   pub();
-  return { request, remember, on, get recent() { return said.slice(-10); } };
+  return { request, remember, on, tell, toldAbout, get recent() { return said.slice(-10); } };
 }

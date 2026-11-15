@@ -126,8 +126,9 @@ export function initMaya(ctx) {
   }
   // Ask for the voice of a line before it is needed, so there is no pause when she gets to it
   // (the home reveal does this with the next step's line while she says the current one).
-  function preload(text) {
+  function preload(text, opts = {}) {
     if (!voiceOn() || !text) return;
+    if (opts.whole) { const t = String(text).trim(); if (t && !warm.has(t)) warm.set(t, makeAudio(t)); return; }
     const sp = splitter((s) => {
       s = s.trim();
       if (!s || warm.has(s)) return;
@@ -136,22 +137,30 @@ export function initMaya(ctx) {
     });
     sp.push(String(text) + ' '); sp.flush();
   }
-  function enqueue(text, { show = true } = {}) {
+  // A line waiting to be said. Its voice is asked for only when it is one of the next two in
+  // line, so a long story (the home reveal queues a line behind the one she is saying) does not
+  // send every request to the voice service at once.
+  function enqueue(text, { show = true, tag = null } = {}) {
     text = text.trim();
     if (!text) return;
-    queue.push({ text, show, audio: fetchAudio(text) });
+    queue.push({ text, show, tag, audio: undefined });
+    warmQueue();
     if (!playing) next();
   }
+  function warmQueue() { for (const it of queue.slice(0, 2)) if (it.audio === undefined) it.audio = fetchAudio(it.text); }
   async function next() {
     const token = speakToken;
     const item = queue.shift();
+    if (item && item.audio === undefined) item.audio = fetchAudio(item.text);
+    warmQueue();
     if (!item) { playing = null; if (S.state === 'talking') { setState('idle'); mouth.setAttribute('ry', '2'); setTimeout(() => { if (S.state === 'idle' && !playing) bubble(''); }, 3200); } ctx.emit('maya-quiet'); return; }
     playing = item;
     const a = item.audio || null;
     if (token !== speakToken) return;
     setState('talking');
     if (item.show) bubble(item.text);
-    const started = () => { S.lastVoice = item.synth || !item.el ? 'browser' : 'stream'; if (!firstAudioAt && heardAt) { firstAudioAt = performance.now(); S.lastLatency = Math.round(firstAudioAt - heardAt); console.info(`[maya] first spoken word ${S.lastLatency} ms after the question`); pub(); } };
+    // the moment a line is heard: what follows her voice (the home reveal's map) starts with it
+    const started = () => { if (!item.heard) { item.heard = true; ctx.emit('maya-line', item.tag, item.text); } S.lastVoice = item.synth || !item.el ? 'browser' : 'stream'; if (!firstAudioAt && heardAt) { firstAudioAt = performance.now(); S.lastLatency = Math.round(firstAudioAt - heardAt); console.info(`[maya] first spoken word ${S.lastLatency} ms after the question`); pub(); } };
     const done = () => { if (token === speakToken && playing === item) { playing = null; next(); } };
     const browserVoice = () => {
       if (muted() || !window.speechSynthesis) { started(); item.synth = true; setTimeout(done, ctx.params.has('demofast') ? 60 : Math.max(900, item.text.length * 45)); return; }
@@ -336,11 +345,14 @@ export function initMaya(ctx) {
     return ask(text);
   }
   // a line the game itself wants said in her voice (mission narration, tutorial)
+  // whole: the line goes to the voice in one piece (smoother than sentence by sentence)
+  // tag: comes back with the 'maya-line' event when she starts saying it
   function say(text, opts = {}) {
     if (!text || (live?.state.conv && !opts.force)) return;
     if (opts.interrupt !== false) interrupt();
     el.classList.add('show');
-    const sp = splitter((s) => enqueue(s, { show: opts.caption !== false }));
+    if (opts.whole) { enqueue(String(text), { show: opts.caption !== false, tag: opts.tag ?? null }); return; }
+    const sp = splitter((s) => enqueue(s, { show: opts.caption !== false, tag: opts.tag ?? null }));
     sp.push(text + ' '); sp.flush();
   }
 

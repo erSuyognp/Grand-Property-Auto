@@ -1,154 +1,123 @@
-// What Maya says while the map opens up around a home. One step per thing the reveal shows:
-// on the map the home, the walk rings, each nearest place, the roof and a flood zone; then the
-// insight panel, one card at a time (price and value, the monthly cost or the rent, energy,
-// risk, HOA), and a last line that opens the rest of the cards. A step carries
-//   title, figure, unit, sub   what the big caption shows (the number first, large)
-//   card                       the panel card the step opens and lights (panel steps only)
-//   stock                      one of several stock phrasings, picked at random and never the
-//                              one used last time, built only from the home's own insight file
-//   must, max                  what a line written by the model has to keep (src/lines.js)
-// With the model on, each stock line is said again in the model's own words and checked
-// against the stock line (src/voiceLines.js). Calculated numbers say "estimated" or "about".
+// What Maya says while the map opens up around a home, as one continuous walkthrough.
+//
+// buildScript() looks at the home (for sale, sold or for rent; how much of daily life is a
+// walk; how its price compares), picks one of the hundred scripts in src/revealScripts.js that
+// fits and has not been used lately, and fills it in with the home's own numbers. The result is
+// a list of steps, one per thing the map or the panel shows:
+//   home, walk (the rings), places (all the nearby places in one or two sentences), roof,
+//   card_value, card_cost, card_insurance, card_energy, card_hoa / card_amenities, card_rent,
+//   rest (the other cards)
+// Each step carries
+//   stock      the script's line for it (what she says when the model is off or slow)
+//   card       the panel card it opens and lights (panel steps only)
+//   must, max  what a line reworded by the model has to keep (src/lines.js)
+//   order      for the places step: the order the place pins appear in, matching the line
+// Nothing here talks about flood zones or FEMA ratings: insurance is said as the state average.
 import { pick } from './lines.js';
-import { PLACE_ICON, PLACE_LABEL } from './icons.js';
-import { factsText } from './format.js';
+import { PLACE_LABEL } from './icons.js';
+import { SCRIPTS, POOLS } from './revealScripts.js';
 
 const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
 const an = (n) => (/^(8|11|18|8\d)$/.test(String(n)) ? 'an' : 'a');
 const list = (a) => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-const low = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
-// a sentence after a linking word ("Next, ") keeps its own case; alone it starts with a capital
-const led = (lead, s) => (lead ? lead + s : cap(s));
+const shuffle = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+const PLACES = ['supermarket', 'school', 'park', 'transit', 'gym', 'hospital'];
+// the places said out loud, most useful first; the rest still appear on the map
+const SAY_ORDER = ['supermarket', 'park', 'transit', 'school', 'gym', 'hospital'];
 const FOR = { supermarket: 'for groceries', school: 'for school', park: 'for green space', transit: 'for transit', gym: 'for a workout', hospital: 'for a hospital' };
-const LINKS = ['Next, ', 'Then ', 'And ', 'After that, ', 'Also, ', 'Now '];
-const LINKS_WALK = LINKS;
 
-export function homeStep(l, d, row, intro) {
-  const f = d?.facts || {};
-  const beds = l.beds != null ? (Number(l.beds) === 0 ? 'a studio' : `${l.beds} bedroom${Number(l.beds) === 1 ? '' : 's'}`) : '';
-  const size = l.sqft ? `${Number(l.sqft).toLocaleString('en-US')} square feet` : '';
-  const what = [beds, size].filter(Boolean).join(' and ');
-  const hello = intro ? pick('rv-hello', ["I'm Maya, your agent. ", "Hi, I'm Maya, your agent. ", "Maya here, I'm your agent. "]) : '';
-  const must = intro ? ['Maya'] : [];
-  if (l.kind === 'apartments') {
-    const rent = l.rent || row?.rent || d?.apartment?.rentMin || 0;
-    const name = l.name || 'this community';
-    if (l.name) must.push(l.name);
-    return {
-      key: 'home', icon: 'building-2', title: 'This community', figure: rent ? `From ${usd(rent)}` : 'Apartments', unit: rent ? '/mo' : '', sub: l.name || 'Apartment community', must, max: 36,
-      stock: hello + pick('rv-home-apt', [
-        `This is ${name}${rent ? `. Rents here start at ${usd(rent)} a month` : ''}. Let me show you what living here is like.`,
-        `${cap(name)}${rent ? `, where rents start at ${usd(rent)} a month` : ''}. Watch the map, I'll walk you through what is around it.`,
-        `Here is ${name}${rent ? `, with rents from ${usd(rent)} a month` : ''}. Let's see what you get beyond the front door.`,
-        `Welcome to ${name}${rent ? `. Rent starts at ${usd(rent)} a month` : ''}. I'll take you around it from above.`,
-        `${rent ? `From ${usd(rent)} a month, this is ${name}` : `This is ${name}`}. Let me show you the neighborhood first.`,
-      ]),
-    };
-  }
-  let priced = '', tag = '';
-  if (l.price == null && l.rent != null) { priced = `it rents for ${usd(l.rent)} a month`; tag = 'rent'; }
-  else if (l.price != null && l.kind === 'sold') {
-    // Texas does not disclose sale prices: a sold home there shows its last asking price
-    const asking = f.askingOnly || /ask/i.test(f.priceLabel || '');
-    priced = asking ? `its last asking price was ${usd(l.price)}` : `it sold for ${usd(l.price)}`;
-    tag = asking ? 'last asking price' : 'sold for';
-  } else if (l.price != null) { priced = pick('rv-listed', [`it is listed at ${usd(l.price)}`, `it is on the market at ${usd(l.price)}`, `the asking price is ${usd(l.price)}`]); tag = 'asking price'; }
-  const figure = l.price != null ? usd(l.price) : l.rent != null ? usd(l.rent) : 'This home';
-  const sub = [tag, factsText(l)].filter(Boolean).join(' · ');
-  const stock = priced
-    ? pick('rv-home', [
-      `${cap(priced)}${what ? `, with ${what}` : ''}. Let me show you what living here is like.`,
-      `${what ? cap(what) : 'This home'}, and ${priced}. Watch the map, I'll walk you through what is around it.`,
-      `So, ${priced}${what ? `, with ${what}` : ''}. Here is what you get beyond the front door.`,
-      `${cap(priced)}${what ? `, and that buys ${what}` : ''}. Let's look at the neighborhood from above.`,
-      `Here's the one: ${what ? `${what}, and ` : ''}${priced}. I'll show you around it from up here.`,
-      `${what ? `${cap(what)}. ` : ''}${cap(priced)}. Now let's see what is around it.`,
-    ])
-    : pick('rv-home-bare', [`${what ? `This one has ${what}` : 'Here is the home'}. Let me show you what living here is like.`, `${what ? cap(what) : 'This is the home'}. Watch the map, I'll walk you through what is around it.`, `${what ? `Here's the one: ${what}` : 'Here is the one'}. Let's look around it from above.`]);
-  return { key: 'home', icon: 'house', title: 'This home', figure, unit: l.price == null && l.rent != null ? '/mo' : '', sub, stock: hello + stock, must, max: 36 };
+// ---- filling a template
+// {name} is replaced by vars.name ({Name} capitalizes it); [ ... ] is dropped when a placeholder
+// inside it is empty; a line with an empty placeholder outside brackets returns null
+export function fill(tpl, vars) {
+  if (!tpl) return null;
+  const val = (k) => { const v = vars[k.charAt(0).toLowerCase() + k.slice(1)]; return v == null || v === '' ? '' : (k.charAt(0) === k.charAt(0).toUpperCase() ? cap(String(v)) : String(v)); };
+  let out = tpl.replace(/\[([^\]]*)\]/g, (_, inner) => { const keys = [...inner.matchAll(/\{(\w+)\}/g)].map((m) => m[1]); return keys.some((k) => !val(k)) ? '' : inner; });
+  let missing = false;
+  out = out.replace(/\{(\w+)\}/g, (_, k) => { const v = val(k); if (!v) missing = true; return v; });
+  if (missing) return null;
+  out = out.replace(/\s+/g, ' ').replace(/\s+([,.;:])/g, '$1').replace(/([.,;:])\1+/g, '$1').trim();
+  return cap(out);
+}
+function fromPool(key, vars, slot = key) {
+  const ok = (POOLS[key] || []).map((t) => fill(t, vars)).filter(Boolean);
+  return ok.length ? pick(`pool-${slot}`, ok) : null;
 }
 
-export function walkStep(rings) {
-  const mins = [...rings].map((r) => r.min).sort((a, b) => a - b);
-  const said = list(mins.map(String));
-  const stock = mins.length > 1
-    ? pick('rv-walk', [
-      `Start on foot. These rings are roughly ${said} minutes from the door.`,
-      `First, how far you get without a car: roughly ${said} minutes of walking, one ring each.`,
-      `Each ring is a walk from the front door, roughly ${said} minutes. The times I give you next follow the real streets.`,
-      `On foot first. The rings mark roughly ${said} minutes from the door.`,
-      `Picture leaving the car at home. Roughly ${said} minutes on foot gets you to each of these rings.`,
-      `These circles are walking distance: roughly ${said} minutes out from the door.`,
-    ])
-    : pick('rv-walk1', [`This ring is roughly ${an(mins[0])} ${mins[0]} minute walk from the door.`, `On foot first: the ring marks roughly ${mins[0]} minutes from the door.`, `Everything inside this ring is roughly ${mins[0]} minutes away on foot.`]);
-  return { key: 'walk', icon: 'footprints', title: 'On foot', figure: mins.join(' · '), unit: 'min', sub: 'rough walking rings from the door', stock, must: [], max: 30 };
-}
-
-// k: the place's turn among the places (0 for the first), flow: the story's linking words
-export function placeStep(cat, p, k = 0, flow = null) {
-  const label = PLACE_LABEL[cat] || 'Place';
-  // a name that only says what it is ("Bus stop") reads as "the nearest bus stop", not as a proper name
+// ---- the places, said as one flowing line
+function placeName(cat, p) {
+  const label = PLACE_LABEL[cat] || 'place';
   const generic = !!p.name && /^(bus|tram|train|rail|metro|subway|light rail) (stop|station)$/i.test(p.name.trim());
   const named = !!p.name && p.name !== label && !generic;
-  const name = named ? p.name : `the nearest ${(generic ? p.name.trim() : label).toLowerCase()}`;
-  const walk = p.walkMin <= 15, n = walk ? p.walkMin : p.driveMin;
-  const why = FOR[cat] || `for the ${label.toLowerCase()}`;
-  const lead = k === 0 ? '' : flow ? flow.lead(walk ? LINKS_WALK : LINKS) : '';
-  const stock = walk
-    ? pick(`rv-walkto-${cat}`, [
-      led(lead, `${name} is ${an(n)} ${n} minute walk.`),
-      led(lead, `${why}, ${name} is ${n} minutes on foot.`),
-      led(lead, `${n} minutes on foot gets you to ${name}.`),
-      led(lead, `${name}: ${n} minutes, walking.`),
-      led(lead, `you can walk to ${name} in ${n} minutes.`),
-      led(lead, `${why}, it's ${an(n)} ${n} minute walk to ${name}.`),
-    ])
-    : pick(`rv-driveto-${cat}`, [
-      led(lead, `${name} is about ${an(n)} ${n} minute drive.`),
-      led(lead, `${why}, ${name} is about ${n} minutes by car.`),
-      led(lead, `by car, ${name} is about ${n} minutes away.`),
-      led(lead, `${name} is a drive, about ${n} minutes.`),
-      led(lead, `${why}, plan on about ${n} minutes in the car to ${name}.`),
-    ]);
-  return { key: `place_${cat}`, cat, icon: PLACE_ICON[cat] || 'map-pin', title: label, figure: String(n), unit: walk ? 'min walk' : 'min drive', sub: named ? p.name : label, stock, must: named ? [p.name] : [], max: 22 };
+  return { name: named ? p.name : `the nearest ${(generic ? p.name.trim() : label).toLowerCase()}`, named };
+}
+function placeClauses(items) {
+  const walkForms = shuffle([
+    (x) => `${x.name} is ${an(x.n)} ${x.n} minute walk`,
+    (x) => `${x.why}, ${x.name} is ${x.n} minutes on foot`,
+    (x) => `${x.name} is ${x.n} minutes away on foot`,
+    (x) => `you can walk to ${x.name} in ${x.n} minutes`,
+  ]);
+  const driveForms = shuffle([
+    (x) => `${x.name} is about ${an(x.n)} ${x.n} minute drive`,
+    (x) => `${x.why}, ${x.name} is about ${x.n} minutes by car`,
+    (x) => `${x.name} is about ${x.n} minutes by car`,
+  ]);
+  let w = 0, d = 0;
+  const out = items.map((x, i) => {
+    // the "for groceries, ..." shape only opens a sentence, where its comma reads cleanly
+    let f;
+    for (let k = 0; k < 4; k++) { f = x.walk ? walkForms[(w + k) % walkForms.length] : driveForms[(d + k) % driveForms.length]; if (!(i % 2) || !String(f(x)).startsWith(x.why)) break; }
+    if (x.walk) w++; else d++;
+    return f(x);
+  });
+  // two places to a sentence, so it reads like speech rather than a list
+  const parts = [];
+  for (let i = 0; i < out.length; i += 2) parts.push(out.slice(i, i + 2).join(', and '));
+  return parts.map((s, i) => (i ? cap(s) : s)).join('. ');
+}
+const nounList = (items, unit) => list(items.map((x, i) => `${x.name} in ${x.walk ? '' : 'about '}${x.n}${i === 0 ? ` ${unit}` : ''}`));
+
+// ---- what kind of home this is
+export function conditions(l, d) {
+  const kind = l.kind === 'apartments' || (l.price == null && (l.rent != null || d?.apartment)) ? 'rent' : l.kind === 'sold' ? 'sold' : 'sale';
+  const ps = PLACES.map((c) => d?.places?.[c]?.[0]).filter(Boolean);
+  const ratio = ps.length ? ps.filter((p) => p.walkMin <= 15).length / ps.length : null;
+  const walk = ratio == null ? 'none' : ratio >= 0.75 ? 'walkable' : ratio <= 0.25 ? 'drive' : 'mixed';
+  const v = d?.value;
+  const deal = v && v.n >= 2 && v.lowerThanPct != null ? (v.lowerThanPct >= 60 ? 'deal' : v.lowerThanPct <= 25 ? 'premium' : 'fair') : 'none';
+  return { kind, walk, deal };
 }
 
-export function roofStep(solar, aerial) {
-  if (solar?.panels) {
-    const save = usd(solar.savingsYear);
-    return {
-      key: 'roof', icon: 'sun', title: 'The roof', figure: save, unit: 'a year', sub: `solar estimate · about ${solar.panels} panels`, must: [], max: 30,
-      stock: pick('rv-roof', [
-        `The roof fits about ${solar.panels} solar panels, which could save an estimated ${save} a year.`,
-        `Up on the roof there is room for about ${solar.panels} panels. That is an estimated ${save} a year off the power bill.`,
-        `Solar would work here: about ${solar.panels} panels, for an estimated ${save} a year saved.`,
-        `Look at the roof. About ${solar.panels} panels would fit, worth an estimated ${save} a year.`,
-        `Those blue tiles are solar: about ${solar.panels} panels fit up there, saving an estimated ${save} a year.`,
-      ]),
-    };
-  }
-  if (!aerial?.solar) return null;
-  return {
-    key: 'roof', icon: 'sun', title: 'The roof', figure: 'Solar', unit: 'already on the roof', sub: 'seen from the air', must: [], max: 24,
-    stock: pick('rv-roof-has', ['Solar panels are already on the roof, seen from the air.', 'From the air you can see solar panels already on this roof.', 'This roof already carries solar panels: they show from the air.', 'One nice detail from the air: the roof already has solar panels.']),
-  };
+// ---- picking a script: one that fits, not used in the last forty showings
+let recent = null;
+const RECENT_KEY = 'gpa-scripts';
+function recall() {
+  if (recent) return recent;
+  try { recent = JSON.parse(globalThis.localStorage?.getItem(RECENT_KEY) || '[]'); } catch { recent = []; }
+  if (!Array.isArray(recent)) recent = [];
+  return recent;
+}
+export function chooseScript(cond) {
+  const fits = SCRIPTS.filter((s) => s.kind === cond.kind && Object.entries(s.when).every(([k, v]) => cond[k] === v));
+  const specific = fits.filter((s) => Object.keys(s.when).length);
+  const used = recall();
+  const fresh = (a) => a.filter((s) => !used.includes(s.id));
+  // scripts written for this kind of place come up a little more often than the general ones
+  let pool = specific.length && Math.random() < 0.55 ? fresh(specific) : [];
+  if (!pool.length) pool = fresh(fits);
+  if (!pool.length) pool = [...fits].sort((a, b) => used.indexOf(a.id) - used.indexOf(b.id)).slice(0, 3); // every one used lately: the least recent
+  const s = pool[Math.floor(Math.random() * pool.length)] || SCRIPTS[0];
+  used.push(s.id);
+  while (used.length > 40) used.shift();
+  try { globalThis.localStorage?.setItem(RECENT_KEY, JSON.stringify(used)); } catch { /* private mode */ }
+  return s;
 }
 
-export function floodStep(flood) {
-  const label = String(flood.label || 'High risk flood zone').replace(/\.$/, '');
-  return {
-    key: 'flood', icon: 'waves', title: 'Flood zone', figure: flood.zone ? `Zone ${flood.zone}` : 'Flood zone', unit: '', sub: 'FEMA flood map', must: [], max: 32,
-    stock: pick('rv-flood', [
-      `${label}. A lender will likely require flood insurance.`,
-      `One thing to know: ${low(label)}, so a lender will likely require flood insurance.`,
-      `The blue area is the flood map. ${label}, and a lender will likely require flood insurance.`,
-      `Worth knowing before you fall for it: ${low(label)}. A lender will likely ask for flood insurance.`,
-    ]),
-  };
-}
+// what the rest of the cards are called when she points to them
+const REST_NAME = { errands: 'errands and commute', outdoors: 'the outdoors', activity: 'shops and businesses nearby', schools: 'schools nearby', income: 'area facts', noise: 'a street noise check', value: 'price and value', energy: 'energy', hoa: 'HOA and community' };
 
-// ---- the insight panel, one card at a time
 // which cards the panel will have for this home (the same tests as src/panel.js)
 export function cardKeys(d) {
   if (!d) return [];
@@ -168,146 +137,100 @@ export function cardKeys(d) {
   return keys;
 }
 
-function valueStep(d, flow) {
-  const v = d.value, f = d.facts || {};
-  const asking = f.askingOnly ? ' That is its last asking price: Texas does not disclose sale prices.' : '';
-  const base = { key: 'card_value', card: 'value', icon: 'scale', title: 'Price and value', must: f.askingOnly ? ['asking'] : [], max: 40 };
-  if (v && v.n >= 2 && v.lowerThanPct != null) {
-    const pct = v.lowerThanPct, n = v.n, within = v.radiusKm != null ? ` within ${v.radiusKm} km` : ' nearby';
-    const lead = flow.lead(['Now the numbers. ', 'Over to the details. ', 'Now the panel. ', 'On to the money. '], 0.3);
-    return { ...base, figure: `${pct}%`, unit: 'lower than similar', sub: `${n} similar homes${within} · per square foot`,
-      stock: lead + pick('rv-value', [
-        `Per square foot, it is priced lower than ${pct}% of the ${n} similar homes${within}.`,
-        `Against ${n} similar homes nearby, it comes in lower than ${pct}% of them per square foot.`,
-        `Price first: lower than ${pct}% of ${n} similar homes${within}, by price per square foot.`,
-        `I compared it with ${n} similar homes${within}. Per square foot, it is priced lower than ${pct}% of them.`,
-      ]) + asking };
+// opts: intro (the first time she speaks this game), told (topics already said about this home,
+// so she does not repeat them), cost (costFor() result), downPct, amenities (amenityList())
+export function buildScript(l, d, row, opts = {}) {
+  const told = opts.told || new Set();
+  const cond = conditions(l, d);
+  const script = chooseScript(cond);
+  const f = d?.facts || {}, a = d?.apartment, h = d?.home || {}, c = opts.cost, so = d?.solar || {};
+  const beds = l.beds != null ? (Number(l.beds) === 0 ? 'a studio' : `${l.beds} bedroom${Number(l.beds) === 1 ? '' : 's'}`) : '';
+  const sqft = l.sqft ? `${Number(l.sqft).toLocaleString('en-US')} square feet` : '';
+  const vars = { beds, sqft, what: [beds, sqft].filter(Boolean).join(' and ') };
+  if (l.price != null) vars.price = usd(l.price);
+  if (cond.kind === 'sold' && l.price != null) {
+    // Texas does not disclose sale prices: a sold home there shows its last asking price
+    const asking = f.askingOnly || /ask/i.test(f.priceLabel || '');
+    vars.price_is = asking ? `its last asking price was ${usd(l.price)}` : `it sold for ${usd(l.price)}`;
   }
-  if (!f.ppsf) return null;
-  return { ...base, figure: usd(f.ppsf), unit: '/sq ft', sub: 'not enough similar homes nearby to compare',
-    stock: pick('rv-value-ppsf', [`It works out to ${usd(f.ppsf)} per square foot. There are not enough similar homes nearby to compare it with.`, `Per square foot it is ${usd(f.ppsf)}. Too few similar homes nearby for a fair comparison.`]) + asking };
-}
-
-function costStep(d, cost, downPct) {
-  if (!cost?.total) return null;
-  const total = usd(cost.total), loan = usd(cost.mortgage), tax = usd(cost.tax), ins = usd(cost.insurance);
-  const rv = d.rentVsBuy;
-  const vs = rv?.medianRent && rv.beds ? pick('rv-cost-vs', [` Renting a similar ${rv.beds} bed nearby is about ${usd(rv.medianRent)}.`, ` For comparison, a similar ${rv.beds} bed rents for about ${usd(rv.medianRent)} nearby.`, '']) : '';
-  return {
-    key: 'card_cost', card: 'cost', icon: 'wallet', title: 'True monthly cost', figure: total, unit: '/mo', sub: `estimate · ${downPct}% down`, must: [], max: 44,
-    stock: pick('rv-cost', [
-      `All in, owning it runs an estimated ${total} a month with ${downPct}% down. The biggest part is the ${loan} loan payment.`,
-      `The true monthly cost is an estimated ${total} at ${downPct}% down: the loan, ${tax} of property tax and ${ins} of insurance from the state average.`,
-      `Add up the loan, tax, insurance and power and you get an estimated ${total} a month, with ${downPct}% down.`,
-      `Here is what it really costs: an estimated ${total} a month at ${downPct}% down, and ${loan} of that is the loan.`,
-      `With ${downPct}% down, plan on an estimated ${total} a month all in. Insurance is the state average, not a quote.`,
-    ]) + vs,
-  };
-}
-
-function rentStep(d, row) {
-  const a = d.apartment, rent = a?.rentMin || d.facts?.rent || row?.rent || 0;
-  if (!rent) return null;
-  const open = a?.unitsAvailable;
+  const rentFrom = l.rent || row?.rent || a?.rentMin || f.rent || 0;
+  if (rentFrom) vars.rent = usd(rentFrom);
+  vars.place_name = l.name || (l.kind === 'apartments' ? 'this community' : 'a home for rent');
+  if (a?.unitsAvailable > 0) vars.open = String(a.unitsAvailable);
   const plans = (a?.plans || []).filter((p) => p.rentMin).length;
-  return {
-    key: 'card_rent', card: 'rent', icon: 'wallet', title: 'Rent', figure: usd(rent), unit: '/mo', sub: a ? 'lowest rent, from the listing' : 'rent, from the listing', must: [], max: 36,
-    stock: pick('rv-rent', [
-      `Rent starts at ${usd(rent)} a month${open ? `, and ${open} homes are open right now` : ''}.`,
-      `The lowest rent here is ${usd(rent)} a month${plans > 1 ? `, across ${plans} floor plans in the panel` : ''}.`,
-      `Money first: from ${usd(rent)} a month${open ? `, with ${open} homes available` : ''}.`,
-      `${plans > 1 ? `There are ${plans} floor plans, starting at ${usd(rent)} a month` : `It starts at ${usd(rent)} a month`}.`,
-    ]),
-  };
-}
+  if (plans > 1) vars.plans = String(plans);
 
-function energyStep(d, flow) {
-  const e = d.energy, so = d.solar || {};
-  if (!e?.billMonth) return null;
-  const bill = usd(e.billMonth);
-  const sun = so.panels && so.coverPct && !so.existing ? pick('rv-energy-sun', [` Solar could cover about ${so.coverPct}% of it.`, ` Panels on the roof could cover about ${so.coverPct}% of that.`, '']) : '';
-  const lead = flow.lead(['Then ', 'Next, ', 'And '], 0.4);
-  return {
-    key: 'card_energy', card: 'energy', icon: 'zap', title: 'Energy and solar', figure: bill, unit: '/mo', sub: 'electric bill · estimate', must: [], max: 34,
-    stock: pick('rv-energy', [
-      led(lead, `the electric bill is estimated at about ${bill} a month.`),
-      led(lead, `expect an electric bill of about ${bill} a month, as an estimate.`),
-      led(lead, `power runs an estimated ${bill} a month.`),
-      led(lead, `the estimated electric bill comes to about ${bill} a month.`),
-    ]) + sun,
-  };
-}
+  // the rings
+  const mins = (d?.rings?.walk || []).map((r) => r.min).sort((x, y) => x - y);
+  if (mins.length) vars.rings = mins.length > 1 ? `${list(mins.map(String))} minutes` : `${mins[0]} minutes`;
 
-function riskStep(d) {
-  const r = d.risk || {}, n = r.nri;
-  const top = (n?.top || []).slice(0, 2).map((x) => String(x.hazard).toLowerCase());
-  if (n?.rating) {
-    const rating = String(n.rating).toLowerCase();
-    return {
-      key: 'card_risk', card: 'risk', icon: 'shield', title: 'Risk and insurance', figure: n.rating, unit: '', sub: 'FEMA natural hazard risk', must: ['FEMA'], max: 36,
-      stock: pick('rv-risk', [
-        `FEMA rates natural hazard risk here ${rating}${top.length ? `, mostly ${list(top)}` : ''}. Ask an insurer for a real quote.`,
-        `On risk, FEMA rates this area ${rating}${top.length ? `, with ${list(top)} at the top of the list` : ''}.`,
-        `FEMA's hazard rating for this spot: ${rating}${top.length ? `. The main ones are ${list(top)}` : ''}.`,
-        `${top.length ? `${cap(list(top))} lead the hazard list here, and ` : ''}FEMA rates the overall risk ${rating}.`,
-      ]),
-    };
+  // the places: at most five said out loud, in the order their pins appear
+  const all = SAY_ORDER.map((cat) => ({ cat, p: d?.places?.[cat]?.[0] })).filter((x) => x.p)
+    .map(({ cat, p }) => { const walk = p.walkMin <= 15; return { cat, walk, n: walk ? p.walkMin : p.driveMin, why: FOR[cat] || 'nearby', ...placeName(cat, p) }; });
+  let spoken = all.slice(0, 4);
+  const walks = all.filter((x) => x.walk), drives = all.filter((x) => !x.walk);
+  if (cond.walk === 'walkable' || cond.walk === 'drive' || cond.walk === 'mixed') spoken = [...walks.slice(0, 4), ...drives.slice(0, Math.max(1, 5 - Math.min(4, walks.length)))].slice(0, 5);
+  if (all.length) {
+    vars.places = placeClauses(spoken);
+    const sw = spoken.filter((x) => x.walk), sd = spoken.filter((x) => !x.walk);
+    if (sw.length) vars.walk_list = nounList(sw, 'minutes');
+    if (sd.length) vars.drive_list = nounList(sd, 'minutes');
   }
-  if (r.flood?.label && !r.flood.sfha) {
-    const label = String(r.flood.label).replace(/\.$/, '');
-    return { key: 'card_risk', card: 'risk', icon: 'shield', title: 'Risk and insurance', figure: r.flood.zone ? `Zone ${r.flood.zone}` : 'Flood map', unit: '', sub: 'FEMA flood map', must: [], max: 30,
-      stock: pick('rv-risk-flood', [`On the FEMA flood map: ${low(label)}.`, `The FEMA flood map says ${low(label)}.`]) };
-  }
-  return null;
-}
 
-function hoaStep(d) {
-  const h = d.home || {}, a = d.apartment;
+  // the money
+  const v = d?.value;
+  if (v && v.n >= 2 && v.lowerThanPct != null) { vars.pct = `${v.lowerThanPct}%`; vars.n = String(v.n); vars.within = v.radiusKm != null ? `within ${v.radiusKm} km` : 'nearby'; }
+  if (f.ppsf) vars.ppsf = usd(f.ppsf);
+  if (c?.total) { vars.total = usd(c.total); vars.down = `${opts.downPct ?? 20}%`; vars.loan = usd(c.mortgage); vars.tax = usd(c.tax); }
+  const rv = d?.rentVsBuy;
+  if (rv?.medianRent && rv.beds) { vars.rv_rent = usd(rv.medianRent); vars.rv_beds = `${rv.beds} bed`; }
+  if (so.panels) { vars.panels = String(so.panels); vars.save = usd(so.savingsYear); }
+  if (d?.energy?.billMonth) vars.bill = usd(d.energy.billMonth);
+  if (so.panels && so.coverPct && !so.existing) vars.cover = `${so.coverPct}%`;
+  if (d?.cost?.insurance) vars.ins = usd(d.cost.insurance);
+  if (h.hoa?.fee) vars.hoa = usd(h.hoa.fee);
   const covers = (h.hoa?.lines || []).map((x) => (/include/i.test(x) ? x.replace(/^.*?include[s]?\s*/i, '').split(/,\s*/) : [])).flat().filter(Boolean).slice(0, 3).map((x) => x.toLowerCase());
-  const amen = (a ? a.amenities || [] : h.community || []).slice(0, 4).map((x) => String(x).toLowerCase());
-  const base = { key: 'card_hoa', card: 'hoa', icon: 'landmark', must: [], max: 36 };
-  if (h.hoa?.fee) {
-    const fee = usd(h.hoa.fee);
-    return { ...base, title: 'HOA and community', figure: fee, unit: '/mo', sub: 'HOA fee, from the listing',
-      stock: pick('rv-hoa', [
-        `There is an HOA fee of ${fee} a month${covers.length ? `, and it covers ${list(covers)}` : '. The listing does not say what it covers'}.`,
-        `Add ${fee} a month for the HOA${covers.length ? `. That includes ${list(covers)}` : ''}.`,
-        `The HOA here is ${fee} a month${covers.length ? `, covering ${list(covers)}` : ''}.`,
-      ]) };
-  }
-  // amenities alone are not an HOA: a key without "hoa" in it, so the wording is not led there
-  if (amen.length) return { ...base, key: 'card_amenities', title: a ? "What's included" : 'HOA and community', figure: 'Amenities', unit: '', sub: 'from the listing',
-    stock: pick('rv-amen', [`It comes with ${list(amen)}.`, `The listing names ${list(amen)}.`, `Amenities include ${list(amen)}.`, `You also get ${list(amen)}.`]) };
-  if (h.hoa || d.cost) return { ...base, title: 'HOA and community', figure: 'No HOA fee', unit: '', sub: 'none listed',
-    stock: pick('rv-nohoa', ['No HOA fee is listed for this one.', 'The listing shows no HOA fee.', 'And no HOA fee is listed.']) };
-  return null;
-}
+  if (covers.length) vars.covers = list(covers);
+  const amen = (opts.amenities || []).slice(0, 4).map((x) => String(x).toLowerCase());
+  if (amen.length) vars.amen = list(amen);
 
-// what the rest of the cards are called when she points to them
-const REST_NAME = { errands: 'errands and commute', outdoors: 'the outdoors', activity: 'shops and businesses nearby', schools: 'schools nearby', income: 'area facts', noise: 'a street noise check', value: 'price and value', energy: 'energy', risk: 'risk', hoa: 'HOA and community' };
-
-function restStep(rest) {
-  const names = rest.map((k) => REST_NAME[k]).filter(Boolean);
-  const said = list(names.slice(0, 4));
-  return {
-    key: 'rest', icon: 'sparkles', title: 'Everything else', figure: 'All the details', unit: '', sub: 'every card has an i for its source', must: [], max: 36,
-    stock: names.length
-      ? pick('rv-rest', [
-        `The rest is in the panel too: ${said}. Every card has an i that shows its source.`,
-        `Below that you'll find ${said}, each with its source behind the i.`,
-        `That's the tour from above. Scroll the panel for ${said}, and press the i on any card to see where it comes from.`,
-        `I'll leave you with the rest: ${said}. Every number there has a source.`,
-      ])
-      : pick('rv-rest-none', ['That is everything. Every card has an i that shows where its numbers come from.', 'And that is the whole picture. Each card shows its source behind the i.']),
-  };
-}
-
-// the panel part of the story, in the order of the cards in the panel
-export function panelSteps(d, row, cost, downPct, flow) {
-  if (!d) return [];
   const have = cardKeys(d);
-  const steps = [valueStep(d, flow), d.cost ? costStep(d, cost, downPct) : rentStep(d, row), energyStep(d, flow), riskStep(d), hoaStep(d)].filter((s) => s && have.includes(s.card));
-  const told = new Set(steps.map((s) => s.card));
-  steps.push(restStep(have.filter((k) => !told.has(k))));
-  return steps;
+  const steps = [];
+  const add = (key, stock, extra = {}) => { if (stock) steps.push({ key, stock, must: [], max: 36, ...extra }); };
+
+  // the opening: who she is (once per game), then the home, unless it was just introduced on arrival
+  const hello = opts.intro ? pick('rv-hello', ["I'm Maya, your agent. ", "Hi, I'm Maya, your agent. ", "Maya here, I'm your agent. "]) : '';
+  const intro = told.has('home') ? fromPool('intro_again', vars) : fill(script.intro, vars) || fromPool('intro_again', vars);
+  add('home', hello + intro, { must: opts.intro ? ['Maya'] : [], max: 40 });
+  if (vars.rings) add('walk', fill(script.walk, vars), { max: 26 });
+  if (all.length) {
+    const line = fill(script.places, vars) || fill('{Places}.', vars);
+    const named = spoken.filter((x) => x.named && line.includes(x.name)).map((x) => x.name);
+    add('places', line, { must: named.slice(0, 4), max: Math.min(64, line.split(/\s+/).length + 12), order: [...spoken.map((x) => x.cat), ...all.filter((x) => !spoken.includes(x)).map((x) => x.cat)] });
+  }
+  if (so.panels) add('roof', fromPool('roof', vars), { max: 30 });
+  else if (d?.aerial?.solar) add('roof', fromPool('roof_has', vars), { max: 24 });
+
+  if (cond.kind === 'rent') {
+    if (have.includes('rent') || vars.rent) add('card_rent', fill(script.rent, vars), { card: 'rent', max: 34 });
+  } else {
+    // a price well above similar homes gets a line written for that, not "lower than 3%"
+    const value = cond.deal === 'premium' && script.when.deal !== 'premium' ? fromPool('value_premium', vars) : fill(script.value, vars);
+    if (have.includes('value')) add('card_value', value || fromPool('value_ppsf', vars), { card: 'value', max: 40 });
+    if (have.includes('cost')) add('card_cost', fill(script.cost, vars), { card: 'cost', max: 40 });
+    if (vars.ins) add('card_insurance', fromPool('insurance', vars), { card: 'cost', must: ['insur', 'average'], max: 30 });
+  }
+  if (have.includes('energy') && vars.bill) add('card_energy', fromPool('energy', vars), { card: 'energy', max: 34 });
+  if (have.includes('hoa')) {
+    // amenities alone are not an HOA: their own key, so a reworded line is not led there
+    if (vars.hoa) add('card_hoa', fromPool('hoa', vars), { card: 'hoa', must: ['HOA'], max: 34 });
+    else if (vars.amen) add('card_amenities', fromPool('amen', vars), { card: 'hoa', max: 34 });
+    else if (d?.cost) add('card_hoa', fromPool('nohoa', vars), { card: 'hoa', must: ['HOA'], max: 20 });
+  }
+  const said = new Set(steps.map((s) => s.card).filter(Boolean));
+  const more = have.filter((k) => !said.has(k) && k !== 'risk' && REST_NAME[k]).map((k) => REST_NAME[k]).slice(0, 4);
+  if (more.length) vars.more = list(more);
+  add('rest', fill(script.close, vars) || fromPool('close', vars), { max: 30 });
+  for (const s of steps) s.script = script.id;
+  return { steps, script: script.id, cond };
 }
