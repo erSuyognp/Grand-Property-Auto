@@ -255,9 +255,11 @@ ${JSON.stringify(facts)}` : '',
         const form = new FormData();
         form.append('model', process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe');
         form.append('language', 'en');
-        form.append('file', new Blob([buf], { type }), type.includes('mp4') ? 'speech.mp4' : 'speech.webm');
+        // OpenAI reads the format from the file name
+        const ext = /mp4|m4a/.test(type) ? 'mp4' : /mpeg|mp3/.test(type) ? 'mp3' : /wav/.test(type) ? 'wav' : /ogg/.test(type) ? 'ogg' : 'webm';
+        form.append('file', new Blob([buf], { type }), `speech.${ext}`);
         const r = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { authorization: `Bearer ${openaiKey}` }, body: form, signal: AbortSignal.timeout(10000) });
-        if (!r.ok) return res.status(502).json({ error: 'stt provider ' + r.status });
+        if (!r.ok) { console.warn(`[maya] OpenAI speech to text answered ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`); return res.status(502).json({ error: 'stt provider ' + r.status }); }
         const text = String((await r.json()).text || '').replace(/\s+/g, ' ').trim();
         return res.json({ text: text.slice(0, 400), ms: Date.now() - started });
       } catch { return res.status(504).json({ error: 'stt timeout' }); }
