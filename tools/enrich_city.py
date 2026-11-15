@@ -57,12 +57,27 @@ def hav(lat1, lon1, lat2, lon2):
     return 2 * 6371000 * math.asin(math.sqrt(a))
 
 
-def drive_min(d):
-    return max(1, round(d * DETOUR / DRIVE_M_PER_MIN))
+# Driving, door to door: time to get going and park, 20 mph on local streets for the first 3 km
+# of road, 32 mph beyond that. `road` is the distance along real streets when a route was found;
+# without one the road is taken as 1.3 times the straight line. src/costmath.js uses the same model.
+DRIVE_START_MIN, DRIVE_LOCAL, DRIVE_FAST, DRIVE_LOCAL_M = 1.5, 20 * 1609.34 / 60, 32 * 1609.34 / 60, 3000.0
 
 
-def walk_min(d):
-    return max(1, round(d * DETOUR / WALK_M_PER_MIN))
+def drive_min(d, road=None):
+    r = road if road is not None else d * DETOUR
+    return max(1, round(DRIVE_START_MIN + min(r, DRIVE_LOCAL_M) / DRIVE_LOCAL + max(0.0, r - DRIVE_LOCAL_M) / DRIVE_FAST))
+
+
+def drive_reach_m(minutes):
+    """Straight line distance reachable by car in that many minutes (for the rings)."""
+    t = max(0.0, minutes - DRIVE_START_MIN)
+    local = DRIVE_LOCAL_M / DRIVE_LOCAL
+    road = t * DRIVE_LOCAL if t <= local else DRIVE_LOCAL_M + (t - local) * DRIVE_FAST
+    return road / DETOUR
+
+
+def walk_min(d, road=None):
+    return max(1, round((road if road is not None else d * DETOUR) / WALK_M_PER_MIN))
 
 
 def clamp(v, lo=0, hi=100):
@@ -207,12 +222,128 @@ def dist_to_lines(lat, lon, lines):
     return (round(best), name) if best is not None else (None, None)
 
 
-def nearest(lat, lon, items, k=3):
-    out = sorted(({**p, "distM": round(hav(lat, lon, p["lat"], p["lon"]))} for p in items), key=lambda p: p["distM"])[:k]
-    for p in out:
-        p["walkMin"], p["driveMin"], p["est"] = walk_min(p["distM"]), drive_min(p["distM"]), True
+# ------------------------------------------------------------------ routes along real streets
+# The street network of the neighborhood and 2 km around it, from OpenStreetMap. Walk and drive
+# distances are then the shortest path along those streets, worked out here on the laptop: only
+# the area's bounding box goes to OpenStreetMap, never a home's location.
+NO_WALK = {"motorway", "motorway_link", "trunk", "trunk_link"}
+NO_CAR = {"footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "elevator", "platform"}
+SKIP_WAY = {"proposed", "construction", "raceway", "rest_area", "bus_guideway", "abandoned", "razed"}
+CELL = 0.0006  # degrees, about 60 m: the grid used to find the street nearest to a point
+
+
+class Streets:
+    def __init__(self, ways, lat0):
+        self.kx, self.ky = 111320 * math.cos(math.radians(lat0)), 111320.0
+        self.adj = {"walk": {}, "drive": {}}
+        self.grid = {"walk": {}, "drive": {}}
+        for tags, pts in ways:
+            hw = tags.get("highway")
+            modes = []
+            if hw not in NO_WALK and tags.get("foot") != "no":
+                modes.append("walk")
+            if hw not in NO_CAR and tags.get("motor_vehicle") != "no" and not (hw == "service" and tags.get("service") in ("parking_aisle", "driveway")):
+                modes.append("drive")
+            for i in range(len(pts) - 1):
+                a, b = pts[i], pts[i + 1]
+                d = math.hypot((a[1] - b[1]) * self.kx, (a[0] - b[0]) * self.ky)
+                for m in modes:
+                    self.adj[m].setdefault(a, []).append((b, d))
+                    self.adj[m].setdefault(b, []).append((a, d))
+        for m in ("walk", "drive"):
+            for node in self.adj[m]:
+                self.grid[m].setdefault((int(node[0] / CELL), int(node[1] / CELL)), []).append(node)
+        self.ok = len(self.adj["walk"]) > 200
+
+    def snap(self, lat, lon, mode, reach=4, k=6):
+        """The street points nearest to a place and how far each is (up to about 250 m away).
+        Several, because the very nearest can be a short path that connects to nothing."""
+        cy, cx, found = int(lat / CELL), int(lon / CELL), []
+        for dy in range(-reach, reach + 1):
+            for dx in range(-reach, reach + 1):
+                for node in self.grid[mode].get((cy + dy, cx + dx), ()):
+                    d = math.hypot((node[1] - lon) * self.kx, (node[0] - lat) * self.ky)
+                    if d <= 250:
+                        found.append((d, node))
+        found.sort()
+        return found[:k]
+
+    def reach(self, lat, lon, mode, cutoff):
+        """Shortest street distance from a home to every street point within the cutoff."""
+        import heapq
+        starts = self.snap(lat, lon, mode, k=4)
+        if not starts:
+            return None
+        dist, heap, adj = {}, [], self.adj[mode]
+        for d0, node in starts:
+            dist[node] = d0
+            heap.append((d0, node))
+        heapq.heapify(heap)
+        while heap:
+            d, u = heapq.heappop(heap)
+            if d > dist.get(u, 1e18):
+                continue
+            for v, w in adj[u]:
+                nd = d + w
+                if nd <= cutoff and nd < dist.get(v, 1e18):
+                    dist[v] = nd
+                    heapq.heappush(heap, (nd, v))
+        return dist
+
+    def route_m(self, reached, p, mode):
+        if reached is None:
+            return None
+        ways = [reached[node] + d1 for d1, node in self.snap(p["lat"], p["lon"], mode) if node in reached]
+        return min(ways) if ways else None
+
+
+def osm_streets(area):
+    w, s, e, n = area["bbox"]
+    mlat, mlon = 2000 / 111320, 2000 / (111320 * math.cos(math.radians((s + n) / 2)))
+    bb = f"{s - mlat:.5f},{w - mlon:.5f},{n + mlat:.5f},{e + mlon:.5f}"
+    q = f"""[out:json][timeout:170];way["highway"]["area"!="yes"]["access"!~"^(private|no)$"]({bb});out geom qt;"""
+    v = None
+    for host in ("https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
+        v = fetch("osm", host, data={"data": q}, timeout=200, tries=2, gap=2)
+        if v and v.get("elements"):
+            break
+    ways = []
+    for el in (v or {}).get("elements", []):
+        tags = el.get("tags") or {}
+        if tags.get("highway") in SKIP_WAY:
+            continue
+        pts = [(p["lat"], p["lon"]) for p in el.get("geometry") or []]
+        if len(pts) >= 2:
+            ways.append((tags, pts))
+    st = Streets(ways, (s + n) / 2)
+    log(f"  OpenStreetMap streets: {len(ways)} ways, {len(st.adj['walk'])} walk points, {len(st.adj['drive'])} drive points")
+    return st if st.ok else None
+
+
+def nearest(lat, lon, items, k=3, net=None):
+    """The k nearest places of one kind. With a street network (net = streets, walk reach, drive
+    reach) they are ranked and timed by the route along real streets; otherwise by the straight
+    line with a 1.3 detour."""
+    cand = sorted(({**p, "distM": round(hav(lat, lon, p["lat"], p["lon"]))} for p in items), key=lambda p: p["distM"])[:(12 if net else k)]
+    for p in cand:
+        rw = rd = None
+        if net:
+            st, walked, driven = net
+            rw, rd = st.route_m(walked, p, "walk"), st.route_m(driven, p, "drive")
+            if rw is None and rd is not None:  # the paths at the place connect to nothing mapped: walk the streets a car would take
+                rw = rd
+            rw = max(rw, p["distM"]) if rw is not None else None
+            rd = max(rd, p["distM"]) if rd is not None else None
+        p["walkMin"], p["driveMin"], p["est"] = walk_min(p["distM"], rw), drive_min(p["distM"], rd), True
+        if rw is not None:
+            p["routeM"] = round(rw)
+        if rd is not None:
+            p["driveRouteM"] = round(rd)
+        p["routed"] = rw is not None
         p["lat"], p["lon"] = round(p["lat"], 6), round(p["lon"], 6)
-    return out
+    if net:
+        cand.sort(key=lambda p: p.get("routeM") or p["distM"] * DETOUR)
+    return cand[:k]
 
 
 # ------------------------------------------------------------------ Census, FEMA, EIA, FRED, NREL
@@ -423,7 +554,8 @@ def main():
     # ---- context: kit (real) or synthetic (mock)
     if mock:
         kit, pois, lines, airports = mock_context(area, listings, out)
-        src["places"] = {"name": "Synthetic demo data", "date": TODAY, "how": "Made up places for the mock neighborhood. Times are distance at 25 mph driving or 3 mph walking (Estimate)."}
+        streets = None
+        src["places"] = {"name": "Synthetic demo data", "date": TODAY, "how": "Made up places for the mock neighborhood. Times are from distance on a route 1.3 times the straight line: 3 mph walking; driving adds 1.5 minutes to get going, at 20 mph (Estimate)."}
     else:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "sponsor"))
         from kit_insights import kit_context
@@ -431,8 +563,12 @@ def main():
         log(f"  kit: {len(kit['homes'])} homes, {len(kit['apts'])} apartment communities, {len(kit['commercial'])} commercial properties within reach")
         pois, lines, airports, ok = osm_places(area)
         note("OpenStreetMap places", ok)
+        streets = osm_streets(area)
+        note("OpenStreetMap streets", bool(streets))
         src["places"] = {"name": "OpenStreetMap contributors", "date": TODAY,
-                         "how": "Nearest places by straight line distance. Drive times assume 25 mph and walk times 3 mph on a route 1.3 times the straight line (Estimate)."}
+                         "how": ("Nearest places by the shortest route along OpenStreetMap streets, walking at 3 mph. Driving adds 1.5 minutes to get going and park, at 20 mph on local streets and 32 mph beyond 3 km. "
+                                 "Places beyond the mapped streets use a route 1.3 times the straight line (Estimate)." if streets else
+                                 "Nearest places by straight line distance on a route 1.3 times the straight line, walking at 3 mph. Driving adds 1.5 minutes to get going and park, at 20 mph on local streets and 32 mph beyond 3 km (Estimate).")}
 
     # ---- city wide numbers
     g = GEO.get(city)
@@ -504,6 +640,7 @@ def main():
     two_years = (dt.date.today() - dt.timedelta(days=730)).isoformat()
     year_ago = (dt.date.today() - dt.timedelta(days=370)).isoformat()
     index, results = [], []
+    routed_n = routed_of = 0  # nearest places timed along real streets, of all nearest places
 
     for l in listings:
         try:
@@ -623,13 +760,16 @@ def main():
                                  "nearby": l.get("nearby") or {}}
 
             # 7, 8. places, times, rings
-            places = {cat: nearest(lat, lon, pois[cat]) for cat in GENERIC}
+            net = (streets, streets.reach(lat, lon, "walk", 4000), streets.reach(lat, lon, "drive", 7000)) if streets else None
+            places = {cat: nearest(lat, lon, pois[cat], net=net) for cat in GENERIC}
             ins_out["places"] = places
+            routed_n += sum(1 for c in places.values() for p in c[:1] if p.get("routed"))
+            routed_of += sum(1 for c in places.values() if c)
             dlat, dlon, dname = DOWNTOWN[city]
             dd = hav(lat, lon, dlat, dlon)
-            ins_out["drive"] = {"downtown": {"name": dname, "km": round(dd / 1000, 1), "min": drive_min(dd), "est": True}, "source": "Estimate from distance at 25 mph"}
+            ins_out["drive"] = {"downtown": {"name": dname, "km": round(dd / 1000, 1), "min": drive_min(dd), "est": True}, "source": "Estimate from distance: 1.5 minutes to get going, 20 mph on local streets, 32 mph beyond 3 km"}
             ins_out["rings"] = {"walk": [{"min": m, "radiusM": round(m * WALK_M_PER_MIN / DETOUR)} for m in (5, 10, 15)],
-                                "drive": [{"min": m, "radiusM": round(m * DRIVE_M_PER_MIN / DETOUR)} for m in (5, 10, 15)], "est": True}
+                                "drive": [{"min": m, "radiusM": round(drive_reach_m(m))} for m in (5, 10, 15)], "est": True}
             hd, hn = dist_to_lines(lat, lon, lines["highway"])
             rd, rn = dist_to_lines(lat, lon, lines["rail"])
             apn = min(airports, key=lambda a: hav(lat, lon, a["lat"], a["lon"])) if airports else None
@@ -785,6 +925,7 @@ def main():
     full = lambda key: sum(1 for r in results if r.get(key))  # noqa: E731
     for key in ("value", "rentVsBuy", "census", "energy", "cost"):
         print(f"{'insight: ' + key:38} {full(key):>4} {len(results):>4}")
+    print(f"{'nearest places routed on streets':38} {routed_n:>4} {routed_of:>4}")
     print(f"{'insight: solar estimate':38} {sum(1 for r in results if r['solar'].get('panels')):>4} {len(results):>4}")
 
 

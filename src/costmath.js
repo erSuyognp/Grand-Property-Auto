@@ -55,5 +55,8 @@ export function typicalElectric(money) {
 }
 
 // Time estimates when no routing service is available: a route 1.3 times the straight line.
-export const driveMin = (m) => Math.max(1, Math.round((m * 1.3) / ((25 * 1609.34) / 60)));
+// Driving, door to door: 1.5 minutes to get going and park, 20 mph on local streets for the
+// first 3 km of road, 32 mph beyond (the same model as tools/enrich_city.py). The insight files
+// time the nearest places along real streets; this is for places the player pins themselves.
+export const driveMin = (m) => { const road = m * 1.3; return Math.max(1, Math.round(1.5 + Math.min(road, 3000) / ((20 * 1609.34) / 60) + Math.max(0, road - 3000) / ((32 * 1609.34) / 60))); };
 export const walkMin = (m) => Math.max(1, Math.round((m * 1.3) / 80));

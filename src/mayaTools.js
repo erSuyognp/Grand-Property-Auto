@@ -192,7 +192,7 @@ export function makeTools(db) {
     const cat = { grocery: 'supermarket', groceries: 'supermarket', coffee: 'cafe', restaurants: 'restaurant', bus: 'transit', train: 'transit', schools: 'school', parks: 'park' }[category] || category;
     const list = ins.places?.[cat];
     if (!list) return { error: `Unknown category. Use one of: ${Object.keys(ins.places || {}).join(', ')}` };
-    return { category: cat, places: list.map((p) => ({ name: p.name, meters: p.distM, walkMin: p.walkMin, driveMinEstimate: p.driveMin })), note: 'Times are estimates from distance' };
+    return { category: cat, places: list.map((p) => ({ name: p.name, meters: p.distM, walkMin: p.walkMin, driveMinEstimate: p.driveMin })), note: 'Estimates: the shortest route along mapped streets, walking at 3 mph; driving includes time to get going and park' };
   }
 
   async function monthly_cost({ home, downPaymentPct = 20, solar = false }) {
@@ -223,7 +223,7 @@ export function makeTools(db) {
     const l = resolve(home);
     if (!l) return { error: 'No such home' };
     if (!extra.places?.length) return { error: 'The player has not pinned any places yet. Offer to pin one, for example their work.' };
-    return { home: alias(l.id), places: extra.places.map((p) => ({ name: p.name, driveMinEstimate: driveMin(meters(l, p)), walkMin: walkMin(meters(l, p)) })), note: 'Estimates from distance at 25 mph' };
+    return { home: alias(l.id), places: extra.places.map((p) => ({ name: p.name, driveMinEstimate: driveMin(meters(l, p)), walkMin: walkMin(meters(l, p)) })), note: 'Estimates from straight line distance, not a routed trip' };
   }
 
   async function room_fit({ home, itemLengthFt, room }) {

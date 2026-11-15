@@ -163,7 +163,7 @@ export function initReveal(ctx) {
       c.ringR = r.radiusM;
       const ci = P.guided ? rings.length - 1 - i : i;
       fill.material.color.setHex(RING_COLORS[ci]); edge.material.color.setHex(RING_COLORS[ci]); c.el.style.setProperty('--c', '#' + RING_COLORS[ci].toString(16).padStart(6, '0'));
-      beat(P.ring(i), 'How far you can walk', `Everything inside this ring is within a ${r.min} minute walk.`.replace('a 8 ', 'an 8 '));
+      beat(P.ring(i), 'How far you can walk', `This ring is roughly ${/^(8|11|18)$/.test(String(r.min)) ? 'an' : 'a'} ${r.min} minute walk from the door. The times on each place follow the real streets.`);
       add(P.ring(i), 0.9, (k) => { fill.scale.setScalar(Math.max(0.001, k)); edge.scale.setScalar(Math.max(0.001, k)); c.on = k > 0.6; });
     });
 
