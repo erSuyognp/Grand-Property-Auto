@@ -14,7 +14,7 @@ const ready = (page) => page.waitForFunction(() => window.__gpa?.ready === true,
 
 test('shot: title screen', async ({ page }) => {
   fs.mkdirSync(DIR, { recursive: true });
-  await page.goto(`/?mute=1${MODE}${CITY}${TILES}`);
+  await page.goto(`/?mute=1&nocover=1${MODE}${CITY}${TILES}`);
   await ready(page);
   // public (mock) shots: do not show the laptop's network address or a scannable code
   if (process.env.SHOT_MODE === 'mock') await page.addStyleTag({ content: '#qr .inner { display: none !important; }' });

@@ -331,3 +331,9 @@ Checked every insight file in Los Angeles, Houston and the mock neighborhood aga
 - The title screen now shows the supplied cover illustration (`public/title-art.jpg`) behind the logo instead of the aerial flyover.
 - The supplied picture carried a wordmark in the GTA typeface over a "VI" numeral and a corner badge shaped like the Rockstar one. The rule here is original art only, so both were removed from the file: a dark plate replaces the center, where the game's own "Grand Property Auto" logo and the buttons sit, and the badge is painted over. The illustrated panels are kept as supplied.
 - The picture has no Sponsor Data, so it is safe for mock mode and public screenshots.
+
+## Two opening screens: the cover picture, then the title (Nov 14)
+
+- Asked for by the user, replacing the entry above: the supplied cover picture is shown alone and unedited as a first screen (`public/cover.jpg`, `#cover` in `src/title.js`). It is fitted whole (`object-fit: contain`) on black, so it is never cropped; a wide screen shows black bars at the sides. Enter, Space, E or a click lifts it and shows the original title screen (flyover, logo, city switch, play button), unchanged. A second Enter starts the game. A phone connecting skips both.
+- The picture carries a wordmark in the GTA typeface, a "VI" numeral and a badge shaped like the Rockstar one, which the "original art only" rule would exclude. The user chose to show it as supplied. `?nocover` skips the cover; `npm run shot` uses it, so public screenshots start at the original title.
+- `vite.config.js` copies `public/cover.jpg` into `dist` (the build does not copy `public/`), so `npm run demo` shows it.

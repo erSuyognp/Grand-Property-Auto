@@ -1,8 +1,10 @@
 /* ---- title screen */
-#title { position: fixed; inset: 0; z-index: 6; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--paper); font-family: var(--font); background: linear-gradient(rgba(14, 17, 22, 0.1), rgba(14, 17, 22, 0) 30%, rgba(14, 17, 22, 0) 78%, rgba(14, 17, 22, 0.55)), url('/title-art.jpg') center / cover no-repeat, #10131a; text-align: center; }
-/* the cover art leaves a dark plate in its center: the logo and the buttons sit on it */
-#title .logo { transform: rotate(-4deg) skewX(-6deg) scale(0.82); margin: -1vw 0 0; }
-#title .powered { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); opacity: 0.9; }
+#title { position: fixed; inset: 0; z-index: 6; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--paper); font-family: var(--font); background: radial-gradient(ellipse at 50% 45%, rgba(14, 17, 22, 0.15), rgba(14, 17, 22, 0.72)); text-align: center; }
+/* the first screen: the cover picture alone, whole and never cropped, on black. Enter or a click moves on to the title */
+#cover { position: fixed; inset: 0; z-index: 30; display: none; background: #000; cursor: pointer; }
+#cover.show { display: block; }
+#cover.out { opacity: 0; transition: opacity 0.45s ease-out; pointer-events: none; }
+#cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 #title.show { display: flex; animation: titlein 0.8s ease-out; }
 @keyframes titlein { from { opacity: 0; } }
 .logo { display: flex; flex-direction: column; align-items: center; transform: rotate(-4deg) skewX(-6deg); filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.35)); margin-bottom: 14px; }

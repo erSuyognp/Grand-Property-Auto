@@ -23,7 +23,8 @@ const decoders = () => {
     fs.cpSync('node_modules/three/examples/jsm/libs/basis', `${to}/libs/basis`, { recursive: true });
   };
   // the CC0 car models live in public/models and go into the build as they are
-  const models = () => fs.cpSync('public/models', 'dist/models', { recursive: true });
+  // (and the cover picture of the first screen, which holds no Sponsor Data)
+  const models = () => { fs.cpSync('public/models', 'dist/models', { recursive: true }); fs.cpSync('public/cover.jpg', 'dist/cover.jpg'); };
   return { name: 'decoders', buildStart() { copy('public'); }, closeBundle() { if (fs.existsSync('dist')) { copy('dist'); models(); } } };
 };
 

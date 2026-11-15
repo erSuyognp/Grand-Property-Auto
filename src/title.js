@@ -28,6 +28,22 @@ export function initTitle(ctx) {
   const mark = () => { for (const b of cities.children) b.classList.toggle('on', b.dataset.city === ctx.city); };
   ctx.on('city', () => { mark(); if (ctx.state === 'title') ctx.cam.setMode('title'); });
 
+  // The cover: the picture alone comes first. Enter, Space or a click moves on to the title
+  // screen above. `?nocover` skips it (the screenshot script uses that).
+  const cover = document.createElement('div');
+  cover.id = 'cover';
+  cover.innerHTML = '<img src="/cover.jpg" alt="Grand Property Auto cover art. Press Enter to continue">';
+  document.body.append(cover);
+  let covered = false;
+  function uncover() {
+    if (!covered) return;
+    covered = false;
+    cover.classList.add('out');
+    setTimeout(() => cover.classList.remove('show', 'out'), 500);
+    ctx.audio.click?.();
+  }
+  cover.addEventListener('click', uncover);
+
   function show() {
     ctx.state = 'title';
     ctx.cam.setMode('title');
@@ -35,6 +51,7 @@ export function initTitle(ctx) {
     el.classList.add('show');
     document.body.classList.add('titled');
     mark();
+    if (!ctx.params.has('nocover')) { covered = true; cover.classList.remove('out'); cover.classList.add('show'); }
   }
   function start() {
     if (ctx.state !== 'title' || !ctx.world) return;
@@ -51,6 +68,7 @@ export function initTitle(ctx) {
   el.querySelector('.go').addEventListener('click', start);
   ctx.on('key', (code) => {
     if (ctx.state !== 'title') return;
+    if (covered) { if (code === 'Enter' || code === 'Space' || code === 'KeyE') uncover(); return; } // the first Enter only lifts the cover
     if (code === 'Enter' || code === 'Space' || code === 'KeyE') start();
     if (code === 'ArrowLeft' || code === 'ArrowRight') {
       const i = ctx.cities.indexOf(ctx.city);
@@ -58,6 +76,6 @@ export function initTitle(ctx) {
       if (next !== ctx.city) ctx.loadCity(next);
     }
   });
-  ctx.on('phone', (on) => { if (on && ctx.state === 'title') start(); });
-  return { show, start, el };
+  ctx.on('phone', (on) => { if (on && ctx.state === 'title') { uncover(); start(); } });
+  return { show, start, el, get covered() { return covered; } };
 }
