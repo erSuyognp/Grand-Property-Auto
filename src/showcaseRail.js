@@ -133,7 +133,7 @@ export async function attachRail(ctx, sdk, win, hooks = {}) {
   const OURS = new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft', 'ShiftRight']);
   const down = (e) => {
     if (OURS.has(e.code)) { ctx.input.keys.add(e.code); e.stopImmediatePropagation(); e.preventDefault(); return; }
-    if (/^(Escape|KeyT|KeyP|KeyG|KeyN|Space|KeyV)$/.test(e.code)) { e.stopImmediatePropagation(); e.preventDefault(); if (!e.repeat) ctx.emit('key', e.code, e); }
+    if (/^(Escape|KeyT|KeyP|KeyG|KeyN|Space|KeyV|KeyQ|Enter|Digit[1-4])$/.test(e.code)) { e.stopImmediatePropagation(); e.preventDefault(); if (!e.repeat) ctx.emit('key', e.code, e); }
   };
   const up = (e) => { if (OURS.has(e.code)) { ctx.input.keys.delete(e.code); e.stopImmediatePropagation(); } if (/^(Space|KeyV)$/.test(e.code)) ctx.emit('keyup', e.code, e); };
   // mouse look on top of the path direction while riding (when settled, Showcase's own drag look runs)

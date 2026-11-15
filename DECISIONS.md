@@ -291,3 +291,14 @@ Each step was shot at the same two spots in Houston before and after (`QUALITY=<
 - **Paced like a showing.** A hello at the door, a line on the way to each room ("Follow me into the kitchen", "I saved this one for last"), small talk from the listing's own highlights on a longer walk, the room line, then the question, which appears only once she has finished the sentence. The view turns slowly while she talks so the whole room is seen. If the buyer says nothing she waits about 11 seconds, says "No rush. Take a look around", waits again, then walks on. `Enter` moves on at once; `P` starts or stops her tour.
 - **Slower by hand too.** Walking pace on the route is 1.0 m/s (was 1.2), running 2.2, and the old automatic glide tops out at 0.95 m/s for homes with no named rooms.
 - **Captions can be turned off** in settings (U): Maya's words are then not written on screen (questions, answer buttons and controls stay). The step captions of the home reveal are explanation, not speech, and stay.
+
+## Maya shows every home (Nov 14)
+
+Asked for: a guided tour in every home, not only the ones whose scan has named rooms.
+
+- **Why some homes had none.** Her route needed two named rooms from the scan file. 46 of the 101 homes' main scans fell short (36 have no room names at all), and 297 of the 447 scans counting apartment floor plans have no scan file of ours, so they open in the Matterport view or the photo gallery, where she had no route.
+- **Scan without room names (or with fewer than two usable ones).** The scan points that stand close together on one floor are grouped into up to 6 unnamed stops ("Space 1", "Stop 1 of 4"), walked nearest first. She does not guess what a room is: she says the scan has no room names and reads only what the listing says (interior, flooring, kitchen, bedrooms and bathrooms, laundry, parking). No room sizes for these stops, since there is no room to measure.
+- **Matterport view.** The route is built from the scan positions the Showcase itself reports, and the Showcase flies between them. `Q`, `Enter` and `1` to `4` now reach the game from inside the Showcase frame.
+- **No scan at all.** She takes the buyer through up to 6 listing photos and says so up front.
+- **A route can be one stop** (a scan with a single position). She starts by herself once per space; after switching views with `T`, `Q` or `P` starts her again.
+- Tests: `tests/guide-all.spec.js` (unnamed spaces, photo tour, Matterport view).

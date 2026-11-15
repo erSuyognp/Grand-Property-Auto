@@ -176,7 +176,7 @@ export function initDemo(ctx) {
         let n = 0;
         const gliding = ctx.tour.active && ctx.tour.autoTour(fast() ? 6 : 45);
         while (alive() && performance.now() < end) { await wait(fast() ? 400 : 2400); if (!gliding && ctx.tour.active && ++n <= 3) { ctx.tour.look(0.5); ctx.tour.forward(); } }
-        if (alive() && ctx.tour.active && ctx.guide?.stops.length >= 2) {
+        if (alive() && ctx.tour.active && ctx.guide?.stops.length >= 1) {
           mark('guide');
           if (gliding) ctx.tour.autoTour();
           await ctx.guide.start();

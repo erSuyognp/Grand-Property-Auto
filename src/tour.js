@@ -476,16 +476,29 @@ export function initTour(ctx) {
           console.warn('[tour] rails are not available in this Showcase:', e.message);
         }
       }
+      // the scan positions, with where they are (model coordinates, z up, like our scan files):
+      // Maya plans her route from these when a space has no scan file of ours
       try {
-        const data = await sdk.Model.getData();
-        T.sweeps = (data.sweeps || []).map((s) => ({ id: s.uuid || s.sid || s.id }));
-      } catch { /* optional */ }
+        const list = await Promise.race([
+          new Promise((resolve) => { const sub = sdk.Sweep.data.subscribe({ onCollectionUpdated(c) { const l = Object.values(c); if (l.length) { resolve(l); sub.cancel(); } } }); }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('no sweep data')), 5000)),
+        ]);
+        if (token !== T.token) return true;
+        T.sweeps = list.filter((s) => s.enabled !== false && s.position && (!s.alignmentType || (/aligned/i.test(String(s.alignmentType)) && !/unaligned/i.test(String(s.alignmentType)))))
+          .map((s) => ({ id: s.id || s.sid, p: [s.position.x, -s.position.z, s.position.y], floor: s.floorInfo ? s.floorInfo.sequence : null }));
+      } catch {
+        try {
+          const data = await sdk.Model.getData();
+          T.sweeps = (data.sweeps || []).map((s) => ({ id: s.uuid || s.sid || s.id }));
+        } catch { /* optional */ }
+      }
       sdk.Sweep.current.subscribe((s) => {
         if (!s || !s.sid && !s.id) return;
         T.sweepId = s.id || s.sid;
-        const p = T.meta?.panos?.find((x) => x.id === T.sweepId);
+        const p = T.meta?.panos?.find((x) => x.id === T.sweepId) || (T.meta ? null : T.sweeps?.find((x) => x.id === T.sweepId));
         if (p) T.pano = p;
         updateOverlay();
+        ctx.emit('walk-arrive', T.sweepId);
       });
       try {
         sdk.Room.current.subscribe((r) => {
@@ -679,7 +692,7 @@ export function initTour(ctx) {
   }
   // P: glide the whole route in about 45 seconds with a gentle look around, then back to the start
   function autoTour(seconds = 45) {
-    if (ctx.guide && ctx.guide.stops.length >= 2 && !ctx.demo?.running && (T.path === 'W' || T.path === 'B')) { if (ctx.guide.active) ctx.guide.end(); else ctx.guide.start(); return true; }
+    if (ctx.guide && ctx.guide.stops.length >= 1 && !ctx.demo?.running) { if (ctx.guide.active) ctx.guide.end(); else ctx.guide.start(); return true; }
     if (T.path === 'A' && T.rail) { T.rail.tour(seconds); return true; }
     if (T.path === 'W') { walk.tour(seconds); return true; }
     return false;
@@ -782,7 +795,8 @@ export function initTour(ctx) {
 
   const api = {
     toggleTape, tapePick: (nx, ny) => tapeClick({ clientX: ((nx + 1) / 2) * window.innerWidth, clientY: ((1 - ny) / 2) * window.innerHeight }),
-    enter, exit, request, forward, look, toggleEmpty, switchPath, nextSpace, stepSweep,
+    enter, exit, request, forward, look, goTo,
+    galleryShow(i) { if (T.path === 'G' && T.gallery.length) { T.gi = i % T.gallery.length; galleryStep(0); } }, toggleEmpty, switchPath, nextSpace, stepSweep,
     get active() { return T.active; },
     get path() { return T.path; },
     info() {

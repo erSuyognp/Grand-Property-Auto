@@ -24,23 +24,69 @@ const KIND = [
 ];
 const SKIP = /closet|stair|hall|pantry|other|storage|corridor|undefined/i;
 
+// Scans without room names: group the scan points that stand close together on one floor into
+// "spaces", then order them as a walk from where we stand (nearest next, stairs last).
+// Scan points are in model coordinates: p[0], p[1] on the floor plan, p[2] is height.
+const flat = (a, b) => Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1]);
+const sameFloor = (a, b) => (a.floor != null && b.floor != null ? a.floor === b.floor : Math.abs(a.p[2] - b.p[2]) < 1.5);
+export function groupSpaces(panos, from, max = 6) {
+  if (!panos.length || max < 1) return [];
+  let groups = [];
+  for (let r = 3.5; ; r += 1.5) {
+    groups = [];
+    for (const p of panos) {
+      const g = groups.find((x) => sameFloor(x, p) && flat(x, p) < r);
+      if (g) { g.panos.push(p); for (const k of [0, 1, 2]) g.p[k] = g.panos.reduce((t, q) => t + q.p[k], 0) / g.panos.length; } else groups.push({ p: [...p.p], floor: p.floor, panos: [p] });
+    }
+    if (groups.length <= max || r > 14) break;
+  }
+  // a small scan that falls into one group still gets a walk: its scan points one by one
+  if (groups.length === 1 && panos.length > 1 && max > 1) {
+    const step = Math.max(1, Math.ceil(panos.length / max));
+    groups = panos.filter((_, i) => i % step === 0).map((p) => ({ p: [...p.p], floor: p.floor, panos: [p] }));
+  }
+  const out = [];
+  let at = from || groups[0];
+  const left = [...groups];
+  while (left.length && out.length < max) {
+    left.sort((a, b) => flat(a, at) + (sameFloor(a, at) ? 0 : 30) - flat(b, at) - (sameFloor(b, at) ? 0 : 30));
+    at = left.shift();
+    out.push(at);
+  }
+  return out;
+}
+
 export function initGuide(ctx) {
   const el = document.createElement('div');
   el.id = 'guide';
   document.body.append(el);
   const G = { target: null, idle: 0, quiet: true, nudged: false, pan: 0, showAsk: false, active: false, stops: [], i: -1, listing: null, ins: null, meta: null, focus: null, answers: {}, seen: new Set(), phase: 'off', line: '', choices: null, offered: false };
   const T = () => ctx.tour._state;
-  const pub = () => { window.__gpa.guide = { active: G.active, phase: G.phase, i: G.i, n: G.stops.length, room: G.stops[G.i]?.title || null, kind: G.stops[G.i]?.kind || null, line: G.line, choices: (G.showAsk && G.choices ? G.choices : []).map((c) => c.label), stops: G.stops.map((s) => s.title), available: G.stops.length >= 2 }; };
+  const pub = () => { window.__gpa.guide = { active: G.active, phase: G.phase, i: G.i, n: G.stops.length, room: G.stops[G.i]?.title || null, kind: G.stops[G.i]?.kind || null, line: G.line, choices: (G.showAsk && G.choices ? G.choices : []).map((c) => c.label), stops: G.stops.map((s) => s.title), available: G.stops.length >= 1 }; };
 
   // ---- the route: one stop per real room, in a sensible order
+  // where the route comes from: our own scan file, or (Matterport view) the scan positions the
+  // Showcase reports, or (no scan at all) the listing photos
+  function sourcePanos() {
+    const t = T();
+    if (ctx.tour.path !== 'A') return t.meta?.panos || [];
+    const sw = t.sweeps || [], ids = new Set(sw.map((x) => x.id));
+    const own = (t.meta?.panos || []).filter((p) => ids.has(p.id));
+    return own.length ? own : sw.filter((x) => x.p);
+  }
   function buildStops() {
-    const meta = T().meta;
+    const t = T(), meta = t.meta;
     G.stops = [];
-    if (!meta?.panos?.length) return;
+    if (ctx.tour.path === 'G') {
+      G.stops = (t.gallery || []).slice(0, 6).map((_, i) => ({ key: `photo${i}`, name: 'photo', title: `Photo ${i + 1}`, kind: 'photo', area: 0, panos: [], gi: i, n: i }));
+      return;
+    }
+    const panos = sourcePanos();
+    if (!panos.length) return;
     const walkable = ctx.tour.path === 'W' ? new Set(ctx.tour.walk.state.panos.map((o) => o.p)) : null;
     const rooms = new Map();
-    for (const p of meta.panos) {
-      const r = (meta.rooms || []).find((x) => x.id === p.room);
+    for (const p of panos) {
+      const r = (meta?.rooms || []).find((x) => x.id === p.room);
       const name = p.roomLabel || r?.label;
       if (!name || SKIP.test(name) || (walkable && !walkable.has(p))) continue;
       const key = p.room || name;
@@ -60,6 +106,32 @@ export function initGuide(ctx) {
     if (list.length > 7) list = list.filter((r) => r.kind !== 'laundry' && r.kind !== 'garage');
     if (list.length > 7) list = list.filter((r) => r.kind !== 'bath');
     G.stops = list.slice(0, 8);
+    // fewer than two named rooms (most often a scan without room names): the rest of the home
+    // is shown as unnamed spaces, so every home gets a showing
+    if (G.stops.length < 2) {
+      const used = new Set(G.stops.flatMap((x) => x.panos));
+      const rest = panos.filter((p) => !used.has(p) && (!walkable || walkable.has(p)));
+      const named = G.stops.length;
+      const sp = groupSpaces(rest, G.stops[0]?.panos[0] || t.pano || panos[0], 6 - named);
+      G.stops = [...G.stops, ...sp.map((g, n) => ({ key: `space${n}`, name: 'space', title: sp.length > 1 ? `Space ${n + 1}` : 'The space', kind: 'space', area: 0, panos: g.panos, n, alone: !named }))];
+    }
+  }
+  const generic = (x) => x?.kind === 'space' || x?.kind === 'photo';
+  // facts for stops that have no room name: only what the listing itself says
+  function factLines() {
+    const l = G.listing, f = l.features || {}, h = (G.ins || {}).home || {};
+    const low = (a) => a.map((x) => String(x).toLowerCase());
+    const pick = (sec, n) => low((f[sec] || []).filter((x) => !/\d+ (bed|full|half|sq)/i.test(x)).slice(0, n));
+    const out = [];
+    const add = (a, fn) => { if (a.length) out.push(fn(join(a))); };
+    add(pick('Interior Spaces', 2), (x) => `Inside, the listing calls out ${x}.`);
+    add(pick('Flooring', 2), (x) => `The floors are ${x}.`);
+    add(h.kitchen?.length ? low(h.kitchen.slice(0, 3)) : pick('Kitchen', 3), (x) => `For the kitchen, the listing includes ${x}.`);
+    add(pick('Bedrooms and Bathrooms', 2), (x) => `The listing mentions ${x}.`);
+    add(low((h.laundry || []).slice(0, 2)), (x) => `Laundry in the listing: ${x}.`);
+    add(low((h.parking || []).slice(0, 2)), (x) => `Parking in the listing: ${x}.`);
+    if (l.beds != null && l.baths != null) out.push(`The listing counts ${l.beds === 0 ? 'a studio' : l.beds + ' bedrooms'} and ${l.baths} bathrooms in all.`);
+    return out;
   }
 
   // ---- what she says in each room
@@ -98,6 +170,24 @@ export function initGuide(ctx) {
         return { text: `${hello}${focus}Step outside: the ${s.name.toLowerCase()}${size ? ', ' + size : ''}. ${a.pool ? 'There is a pool, seen from the air. ' : ''}${a.treeCoverPct >= 10 ? `Tree cover on the lot is ${a.treeCoverPct} percent. ` : ''}${park ? `And ${park.name} is ${an(park.walkMin)} ${park.walkMin} minute walk when you want more green.` : ''}`,
           ask: 'What would you do out here?', choices: [['Morning coffee', 7.5], ['Evening grill', 18], ['Grow plants', 13]], on: (v) => (ctx.buyer?.sunLine ? ctx.buyer.sunLine(l, v).split(' Sunrise')[0] : 'It gets you outside without leaving home.') };
       }
+      case 'space': case 'photo': {
+        const facts = factLines(), fact = s.n < facts.length ? ' ' + facts[s.n] : '';
+        const photo = s.kind === 'photo';
+        const open = photo ? (s.n === 0 ? `There is no 3D scan to walk through here, so I'll take you through the listing photos.` : ['Here is another view.', 'One more photo from the listing.'][s.n % 2])
+          : first ? `We'll start here.${s.alone ? ` This scan has no room names, so I'll tell you what the listing says as we go.` : ''}` : ['Have a look around this part of the home.', 'Take in this space.'][s.n % 2];
+        const tape = !photo && s.n === 1 && ctx.tour.path === 'W' ? ' Press R to measure anything.' : '';
+        const m = { text: `${open}${fact}${tape}` };
+        if (first) {
+          const sup = d.places?.supermarket?.[0], park = d.places?.park?.[0], cafe = d.places?.cafe?.[0];
+          m.ask = 'What matters most to you in a home?';
+          m.choices = [['The kitchen', 'kitchen'], ['Space to work', 'flex'], ['Outdoor space', 'outdoor'], ['The bedrooms', 'bedroom']];
+          m.on = (v) => (v === 'kitchen' && sup ? `Good to know. For groceries, ${sup.name} is ${sup.walkMin <= 15 ? `${an(sup.walkMin)} ${sup.walkMin} minute walk` : `about ${an(sup.driveMin)} ${sup.driveMin} minute drive`}.`
+            : v === 'flex' && cafe ? `Good to know. For a change of scene, ${cafe.name} is ${an(cafe.walkMin)} ${cafe.walkMin} minute walk.`
+              : v === 'outdoor' && park ? `Good to know. ${park.name} is ${an(park.walkMin)} ${park.walkMin} minute walk.`
+                : v === 'bedroom' && l.beds ? `Good to know. The listing counts ${l.beds} bedrooms.` : 'Good to know.');
+        }
+        return m;
+      }
       default: return { text: `${hello}This is the ${s.name.toLowerCase()}${size ? ', ' + size : ''}.` };
     }
   }
@@ -118,6 +208,8 @@ export function initGuide(ctx) {
   function onTheWay(s, from) {
     const fl = (x) => x?.panos?.[0]?.floor;
     const stairs = from && fl(from) != null && fl(s) != null && fl(from) !== fl(s) ? (fl(s) > fl(from) ? ' It is upstairs.' : ' It is downstairs.') : '';
+    if (s.kind === 'photo') return 'Next photo.';
+    if (s.kind === 'space') return ['Come this way.', 'There is more over here.', 'Let us keep going.'][s.n % 3] + stairs;
     const last = G.stops.indexOf(s) === G.stops.length - 1 && G.stops.length > 2;
     const t = { entry: 'Let us start at the front door.', living: 'Come on through to the living room.', dining: 'The dining room is just through here.', kitchen: 'Follow me into the kitchen.', flex: `This way. I want to show you the ${s.name.toLowerCase()}.`,
       bedroom: /2|3|4/.test(s.title) ? 'One more bedroom, just over here.' : 'The bedrooms are this way.', bath: 'A quick look at the bathroom.', laundry: 'Laundry is right here.', garage: 'Let me show you the garage.', outdoor: 'Now step outside with me.' }[s.kind] || `Next, the ${s.name.toLowerCase()}.`;
@@ -127,8 +219,8 @@ export function initGuide(ctx) {
   // ---- the card: Maya's face, the room, her words, the buyer's choices
   function render() {
     const s = G.stops[G.i];
-    const title = G.phase === 'offer' || G.phase === 'hello' ? 'Maya' : G.phase === 'recap' ? 'Before you go' : G.phase === 'walking' ? `To the ${(G.target?.title || '').toLowerCase()}` : s?.title || 'Maya';
-    const sub = G.phase === 'room' ? `Room ${G.i + 1} of ${G.stops.length}${s?.area ? ` · ${Math.round(s.area * 10.764)} sq ft` : ''}` : G.phase === 'walking' ? 'Walking with Maya' : 'Your agent';
+    const title = G.phase === 'offer' || G.phase === 'hello' ? 'Maya' : G.phase === 'recap' ? 'Before you go' : G.phase === 'walking' ? (G.target?.kind === 'photo' ? 'Next photo' : G.target?.kind === 'space' ? 'This way' : `To the ${(G.target?.title || '').toLowerCase()}`) : s?.title || 'Maya';
+    const sub = G.phase === 'room' ? `${s?.kind === 'photo' ? 'Photo' : s?.kind === 'space' ? 'Stop' : 'Room'} ${G.i + 1} of ${G.stops.length}${s?.area ? ` · ${Math.round(s.area * 10.764)} sq ft` : ''}` : G.phase === 'walking' ? 'Walking with Maya' : 'Your agent';
     el.innerHTML = `<div class="gcard${G.phase === 'walking' || G.phase === 'hello' ? ' slim' : ''}" role="dialog" aria-label="Guided tour with Maya">
       <div class="ghead"><span class="gava">${MAYA_AVATAR}</span><div><b>${esc(title)}</b><small>${esc(sub)}</small></div>
         ${G.active ? `<span class="gdots">${G.stops.map((x, k) => `<i class="${G.seen.has(x.key) && k !== G.i ? 'done' : k === G.i && G.phase !== 'walking' ? 'on' : ''}"></i>`).join('')}</span>` : ''}</div>
@@ -137,7 +229,7 @@ export function initGuide(ctx) {
       ${G.choices && G.showAsk ? `<div class="gchoices">${G.choices.map((c, i) => `<button data-c="${i}"><kbd>${i + 1}</kbd>${esc(c.label)}</button>`).join('')}</div>` : ''}
       <div class="gkeys">${G.phase === 'offer' ? `<button class="act primary" data-a="start"><kbd>Q</kbd>Show me around</button><button class="act ghost" data-a="hide">Not now</button>`
         : G.phase === 'recap' ? `<button class="act ghost" data-a="end"><kbd>Q</kbd>Done</button>`
-          : G.phase === 'room' ? `<button class="act primary" data-a="next"><kbd>Enter</kbd>${[...G.stops].every((x) => G.seen.has(x.key)) ? 'Wrap up' : 'Next room'}</button><span class="ghint">or look around, I'll wait${ctx.mayaLive?.available() ? '. Press V to ask me anything' : ''}</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`
+          : G.phase === 'room' ? `<button class="act primary" data-a="next"><kbd>Enter</kbd>${[...G.stops].every((x) => G.seen.has(x.key)) ? 'Wrap up' : generic(s) ? 'Next' : 'Next room'}</button><span class="ghint">or look around, I'll wait${ctx.mayaLive?.available() ? '. Press V to ask me anything' : ''}</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`
             : `<span class="ghint">Maya is walking you there</span><button class="act ghost" data-a="end"><kbd>Q</kbd>End tour</button>`}</div></div>`;
     el.classList.add('show');
     for (const b of el.querySelectorAll('[data-c]')) b.addEventListener('click', () => answer(Number(b.dataset.c)));
@@ -154,6 +246,7 @@ export function initGuide(ctx) {
 
   const rep = (s) => { // the scan point nearest the middle of the room
     const ps = s.panos;
+    if (!ps.length) return null;
     const cx = ps.reduce((t, p) => t + p.p[0], 0) / ps.length, cz = ps.reduce((t, p) => t + p.p[2], 0) / ps.length;
     return [...ps].sort((a, b) => Math.hypot(a.p[0] - cx, a.p[2] - cz) - Math.hypot(b.p[0] - cx, b.p[2] - cz))[0];
   };
@@ -162,13 +255,16 @@ export function initGuide(ctx) {
   function lead(i) {
     const s = G.stops[i], from = G.stops[G.i];
     clearTimeout(walkTimer);
-    const here = T().pano && s.panos.includes(T().pano);
+    const here = s.kind === 'photo' ? T().gi === s.gi : T().pano && s.panos.includes(T().pano);
     if (here && !(ctx.tour.path === 'W' && ctx.tour.walk.moving)) return present(i);
     G.target = s; G.targetIndex = i; G.phase = 'walking'; G.ask = null; G.choices = null; G.walkT = 0; G.filler = false;
     speak(onTheWay(s, from));
     render();
     const p = rep(s);
-    G.targetPano = p.id;
+    G.targetPano = p ? p.id : s.key;
+    if (s.kind === 'photo') { ctx.tour.galleryShow(s.gi); walkTimer = setTimeout(() => arrive(s.key), 1300); return; }
+    // Matterport view: the Showcase flies there and reports the scan position it lands on
+    if (ctx.tour.path === 'A') { ctx.tour.goTo(p); walkTimer = setTimeout(() => arrive(p.id), 8000); return; }
     if (ctx.tour.path === 'W') ctx.tour.walk.goTo(p); else { ctx.tour._show(p); walkTimer = setTimeout(() => arrive(p.id), 1600); return; }
     walkTimer = setTimeout(() => arrive(p.id), 45000); // never stuck on the way
   }
@@ -193,10 +289,10 @@ export function initGuide(ctx) {
     ctx.audio.blip(880, 0.06);
     // have the sharp photo of the next room ready before we walk there
     const nx = G.stops.find((x) => !G.seen.has(x.key));
-    if (nx && ctx.tour.path === 'W') ctx.tour.walk.preload(rep(nx));
+    if (nx && nx.panos.length && ctx.tour.path === 'W') ctx.tour.walk.preload(rep(nx));
   }
   async function start() {
-    if (!ctx.tour.active || G.stops.length < 2 || G.active) return false;
+    if (!ctx.tour.active || G.stops.length < 1 || G.active) return false;
     G.active = true; G.seen = new Set(); G.answers = {}; G.i = -1;
     G.ins = G.ins || (await ctx.insights.get(G.listing.id));
     const at = T().pano?.p;
@@ -211,7 +307,7 @@ export function initGuide(ctx) {
     G.phase = 'hello'; G.ask = null; G.choices = null;
     speak(hello());
     render();
-    if (ctx.tour.path === 'W') ctx.tour.walk.preload(rep(G.stops[0]));
+    if (ctx.tour.path === 'W' && G.stops[0].panos.length) ctx.tour.walk.preload(rep(G.stops[0]));
     return true;
   }
   function next() {
@@ -241,7 +337,7 @@ export function initGuide(ctx) {
     }
     const s = G.stops[G.i];
     G.answers[s.kind] = c.value;
-    if (s.kind !== 'entry') ctx.maya?.remember?.(`${s.name.toLowerCase()}: ${c.label.toLowerCase()}`);
+    if (generic(s)) ctx.maya?.remember?.(`matters most: ${c.label.toLowerCase()}`); else if (s.kind !== 'entry') ctx.maya?.remember?.(`${s.name.toLowerCase()}: ${c.label.toLowerCase()}`);
     const reply = G.on ? G.on(c.value) : '';
     G.ask = null; G.choices = null;
     speak(reply || 'Got it.');
@@ -269,27 +365,36 @@ export function initGuide(ctx) {
   ctx.on('key', touch);
 
   // ---- when it shows up
-  let lastMeta = null, offerTimer = 0;
+  let lastMeta = null, offerTimer = 0, ledKey = '';
   const leads = () => (ctx.params.get('guide') || ctx.settings?.tourGuide || 'auto') !== 'ask';
-  ctx.on('tour-enter', (l) => { G.listing = l; G.ins = null; G.offered = false; G.focus = null; lastMeta = null; ctx.insights.get(l.id).then((d) => { if (G.listing === l) G.ins = d; }); });
+  ctx.on('tour-enter', (l) => { G.listing = l; G.ins = null; G.offered = false; G.focus = null; lastMeta = null; ledKey = ''; ctx.insights.get(l.id).then((d) => { if (G.listing === l) G.ins = d; }); });
   ctx.on('tour-exit', () => { clearTimeout(offerTimer); end(true); G.stops = []; el.classList.remove('show'); pub(); });
   ctx.on('update', (dt) => {
     if (!ctx.tour.active) return;
     const t = T();
     // a home (or another space of an apartment community) finished loading: plan the route.
     // Maya then starts showing it by herself, the way an agent meets you at the door.
-    if (t.meta && t.meta !== lastMeta && (ctx.tour.path === 'B' || (ctx.tour.path === 'W' && ctx.tour.walk.ready))) {
-      lastMeta = t.meta;
+    // The route is planned from whatever this view has: our scan file (walking and photo spot
+    // views), the Showcase's scan positions (Matterport view), or the listing photos.
+    const path = ctx.tour.path;
+    const src = path === 'B' || (path === 'W' && ctx.tour.walk.ready) ? t.meta
+      : path === 'A' && t.sdk && t.sweeps?.some((x) => x.p) ? t.sweeps
+        : path === 'G' && t.gallery?.length ? t.gallery : null;
+    if (src && src !== lastMeta) {
+      lastMeta = src;
       end(true);
       buildStops();
       pub();
-      if (G.stops.length >= 2 && !ctx.demo?.running && !ctx.params.has('noguide')) {
+      // she starts by herself once per space; after switching views (T) it is Q to start again
+      const key = `${t.listing?.id}|${t.modelIndex}`;
+      if (G.stops.length >= 1 && key !== ledKey && !ctx.demo?.running && !ctx.params.has('noguide')) {
+        ledKey = key;
         clearTimeout(offerTimer);
         offerTimer = setTimeout(() => {
           if (!ctx.tour.active || G.active) return;
           if (leads()) { start(); return; }
           G.phase = 'offer'; G.ask = null; G.choices = null;
-          G.line = `Want me to show you around? ${G.stops.length} rooms, a few minutes, and you can wander off any time.`;
+          G.line = `Want me to show you around? ${G.stops.length} ${G.stops.some(generic) ? 'stops' : 'rooms'}, a few minutes, and you can wander off any time.`;
           if (!G.offered) { G.offered = true; ctx.maya?.say('Want me to show you around?', { caption: false, force: true }); }
           render();
         }, 1500);
@@ -323,7 +428,7 @@ export function initGuide(ctx) {
   });
   ctx.on('key', (code) => {
     if (!ctx.tour.active) return;
-    if (code === 'KeyQ') { if (G.active) end(); else if (G.stops.length >= 2) start(); }
+    if (code === 'KeyQ') { if (G.active) end(); else if (G.stops.length >= 1) start(); }
     else if (!G.active) return;
     else if (code === 'Enter') { if (G.phase === 'recap') end(); else if (G.phase === 'hello') lead(0); else next(); }
     else { const m = /^Digit([1-4])$/.exec(code); if (m) answer(Number(m[1]) - 1); }
@@ -334,6 +439,6 @@ export function initGuide(ctx) {
     get active() { return G.active; },
     get stops() { return G.stops; },
     get asked() { return G.phase === 'room' ? !!G.ask : null; },
-    brief: () => (G.active ? `Guided tour in progress: ${G.phase === 'recap' ? 'wrapping up' : `in the ${G.stops[G.i]?.title}`}. You just said to the player: "${G.line}"${G.ask ? ` and asked: "${G.ask}"` : ''}. Their answers so far: ${JSON.stringify(G.answers)}. If they speak, answer briefly and stay on this room.` : ''),
+    brief: () => (G.active ? `Guided tour in progress: ${G.phase === 'recap' ? 'wrapping up' : `at: ${G.stops[G.i]?.title}`}. You just said to the player: "${G.line}"${G.ask ? ` and asked: "${G.ask}"` : ''}. Their answers so far: ${JSON.stringify(G.answers)}. If they speak, answer briefly and stay on this room.` : ''),
   };
 }
