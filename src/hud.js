@@ -25,8 +25,12 @@ export function initHud(ctx) {
   const el = {
     fps: $('<div id="fps" class="chip">-- fps</div>'),
     cityBar: $('<div id="citybar"></div>'),
-    speedo: $('<div id="speedo"><b>0</b><span>mph</span></div>'),
-    loading: $('<div id="loading"><div class="spinner"></div><span>Loading the neighborhood</span></div>'),
+    // a 270 degree dial: the gold arc fills with speed (0 to 140 mph) and turns hot on the boost
+    speedo: $(`<div id="speedo" role="img" aria-label="Speed in miles per hour"><svg viewBox="0 0 120 120" aria-hidden="true">
+      <path class="trk" pathLength="100" d="M 24.64 95.36 A 50 50 0 1 1 95.36 95.36"/>
+      <path class="tks" pathLength="100" d="M 30.3 89.7 A 42 42 0 1 1 89.7 89.7"/>
+      <path class="arc" pathLength="100" d="M 24.64 95.36 A 50 50 0 1 1 95.36 95.36"/></svg><b>0</b><span>mph</span></div>`),
+    loading: $('<div id="loading"><div class="lcard"><div class="lmark"><i></i><i></i><i></i></div><b>Loading the neighborhood</b><div class="lbar"><i></i></div><span>Aerial imagery, listings and 3D tours</span></div></div>'),
     card: $('<aside id="card" class="panel"></aside>'),
     ccard: $('<aside id="ccard" class="panel"></aside>'),
     legend: $('<div id="legend"></div>'),
@@ -37,7 +41,7 @@ export function initHud(ctx) {
     toast: $('<div id="toast"></div>'),
     chooser: $('<div id="chooser" class="panel"></div>'),
     lightbox: $('<div id="lightbox" class="clickable"><img alt=""/></div>'),
-    help: $('<div id="help" class="chip">WASD drive · Space handbrake · Shift boost · V talk · C view · M map · G Google 3D · L time of day · R reset</div>'),
+    help: $(`<div id="help" class="chip"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>drive</span><span><kbd>Space</kbd>brake</span><span><kbd>Shift</kbd>boost</span><span><kbd>E</kbd>select</span><span><kbd>V</kbd>talk</span><span><kbd>C</kbd>view</span><span><kbd>M</kbd>map</span><span><kbd>L</kbd>time of day</span>${ctx.mock ? '' : '<span><kbd>G</kbd>3D city</span>'}<span><kbd>R</kbd>reset</span></div>`),
     fade: $('<div id="fade"></div>'),
     typebox: $('<form id="typebox"><input type="text" maxlength="140" placeholder="Say what you are looking for" autocomplete="off"/></form>'),
   };
@@ -58,12 +62,18 @@ export function initHud(ctx) {
   ctx.on('fps', (v) => { el.fps.textContent = `${v} fps · ${ctx.quality.label}${ctx.mock ? ' · MOCK DATA' : ''}`; });
 
   // ---- speedometer
-  const num = el.speedo.querySelector('b');
+  const num = el.speedo.querySelector('b'), dial = el.speedo.querySelector('.arc');
   let shownSpeed = -1;
   ctx.on('update', () => {
     const mph = Math.round(Math.abs(ctx.car.state.speed) * 2.237);
-    if (mph !== shownSpeed) { shownSpeed = mph; num.textContent = mph; }
+    if (mph === shownSpeed) return;
+    shownSpeed = mph; num.textContent = mph;
+    dial.style.strokeDashoffset = String(100 - Math.min(100, (mph / 140) * 100));
+    el.speedo.classList.toggle('hot', mph > 74); // above what the car reaches without the boost
   });
+  ctx.on('city-loading', (city) => { el.loading.querySelector('b').textContent = `Loading ${NAMES[city] || 'the neighborhood'}`; });
+  // a line spoken outside must not sit over the walking view
+  ctx.on('tour-enter', () => caption(''));
 
   // ---- legend and kind filters (keys 1 to 4)
   function renderLegend() {
@@ -158,7 +168,14 @@ export function initHud(ctx) {
     el.card.querySelector('[data-act="drone"]')?.addEventListener('click', () => ctx.emit('key', 'KeyQ', null));
   }
   ctx.on('near-listing', (l) => { showCard(l); if (l) showCommercial(null); });
-  ctx.on('saved', () => { if (current) showCard(current); el.saved.querySelector('b').textContent = ctx.saved.size; el.saved.classList.toggle('has', ctx.saved.size > 0); });
+  let savedCount = 0;
+  ctx.on('saved', () => {
+    if (current) showCard(current);
+    el.saved.querySelector('b').textContent = ctx.saved.size;
+    el.saved.classList.toggle('has', ctx.saved.size > 0);
+    if (ctx.saved.size > savedCount) { el.saved.classList.remove('pop'); void el.saved.offsetWidth; el.saved.classList.add('pop'); }
+    savedCount = ctx.saved.size;
+  });
   el.saved.addEventListener('click', () => ctx.emit('key', 'Tab', null));
 
   function showCommercial(c) {
@@ -237,7 +254,9 @@ export function initHud(ctx) {
     return new Promise((r) => setTimeout(r, ms));
   }
 
-  setTimeout(() => el.help.classList.add('hide'), 14000);
+  // the key hints show for a while after the page opens, and again once the car has landed
+  let helpTimer = setTimeout(() => el.help.classList.add('hide'), 14000);
+  ctx.on('play-start', () => { clearTimeout(helpTimer); el.help.classList.remove('hide'); helpTimer = setTimeout(() => el.help.classList.add('hide'), 13000); });
 
   return {
     root, $, esc, el, showCard, photoSources, interiorStills, showCommercial, caption, live, toast, arrow, choose, closeChooser, lightbox, fade, renderLegend,

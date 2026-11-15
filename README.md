@@ -14,7 +14,7 @@ All images here come from mock mode: a synthetic neighborhood with invented home
 
 ## What you can do
 
-- **Drive.** WASD or arrows, Space for the handbrake, Shift to boost, C for a top down view, R to get back on the road. A gamepad works too.
+- **Drive.** WASD or arrows, Space for the handbrake, Shift to boost, C for a top down view, R to get back on the road. A gamepad works too. The homes nearest the car carry their asking price or rent above the marker, so the street reads like a map of the market.
 - **Pull up to a home.** A card slides in with the price, beds and baths, the listing's highlights, and facts read from the aerial view: a pool, solar panels, tree cover, a park nearby.
 - **Walk inside** with E. On your own laptop this opens the real Matterport tour. "See it empty" swaps to the same room with the furniture removed, where that exists.
 - **Talk to it.** Hold V and speak. Follow up the way you would with a person: "something cheaper", "a bigger yard", "closer to a park", "more like this one".
@@ -75,6 +75,7 @@ Useful switches:
 - `GAME_MODE=mock` in `.env` (or `?mode=mock` in the address bar) loads only the synthetic neighborhood. Use this for anything public.
 - `LLM_ENABLED=true` lets Claude parse what you say and write the arrival narration. With it off, a local keyword parser and narration templates do the same job with no network.
 - `?autostart=1` skips the title screen. `?q=low` forces low graphics.
+- `?haze=classic` uses the fixed haze colors instead of the color read from the sky.
 
 Tests and screenshots:
 

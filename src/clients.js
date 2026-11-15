@@ -5,6 +5,7 @@
 // (The older src/missions.js is the voice search and GPS guide; this file is the client work.)
 import { icon } from './icons.js';
 import { money } from './format.js';
+import { confetti } from './confetti.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
@@ -280,6 +281,8 @@ export function initClients(ctx) {
     ctx.state = 'result';
     shownAt = performance.now(); // the Enter that submitted must not also dismiss the result
     if (out.stars > 0) { ctx.audio.fanfare?.(); for (let i = 0; i < out.stars; i++) setTimeout(() => ctx.audio.star?.(i), 500 + i * 320); ctx.cam.shake?.(0.5); } else ctx.audio.blip(220, 0.3, 'triangle');
+    // three stars: paper flies as the third one lands
+    if (out.stars === 3) setTimeout(() => { if (result.classList.contains('show')) confetti(ctx); }, 1180);
     const done = (then) => { result.classList.remove('show'); if (ctx.state === 'result') ctx.state = 'play'; then?.(); };
     result.querySelector('[data-a="ok"]').addEventListener('click', () => done());
     result.querySelector('[data-a="inbox"]').addEventListener('click', () => done(() => show()));

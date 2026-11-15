@@ -1,0 +1,148 @@
+/* Finishing pass. Loaded last. Three jobs:
+   1. nothing on the HUD covers anything else at the sizes the game is shown at (1280x720 up
+      to 1920x1080; the demo laptop is 1440x900),
+   2. the first minute looks like a game: boot splash, title, the drop into the city, the dial,
+   3. small things done the same way everywhere (press states, scroll containment). */
+
+/* ------------------------------------------------------------------ 1. HUD layout */
+/* the legend is a map key: a short column beside the minimap, clear of Maya at every width */
+#legend { left: 228px; bottom: 18px; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; max-width: none; }
+#legend button { min-width: 162px; gap: 7px; padding: 4px 11px 4px 5px; border-radius: 10px; text-align: left; }
+#legend em { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
+body.g3d #legend { bottom: 22px; }
+body.revealing #legend { opacity: 0; pointer-events: none; }
+#ringkey { left: 228px; bottom: 152px; }
+/* the Google credit line runs along the bottom edge: Maya sits just above it */
+body.g3d #maya { bottom: 22px; }
+
+/* key hints: keycaps in one bar, out of the way the moment anything else needs the space */
+#help { display: flex; align-items: center; gap: 13px; padding: 6px 14px 6px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
+#help span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+#help kbd { min-width: 19px; padding: 1px 5px; font-size: 10.5px; }
+#help kbd:last-of-type { margin-right: 3px; }
+#hud:has(#arrow.show) #help, #hud:has(#coach.show) #help, #hud:has(#card.show) #help, #hud:has(#tracker.show) #help, #hud:has(#locard.show) #help { opacity: 0 !important; transition-duration: 0.25s; }
+
+/* spoken lines stay beside the listing card and the insight panel, never under them */
+#hud:has(#card.show) #caption { max-width: min(760px, calc(100vw - 772px)); }
+#hud:has(#card.show) #maya { max-width: min(720px, calc(100vw - 772px)); }
+body.revealing #caption { left: calc(50% - min(226px, 19vw)); max-width: min(760px, calc(100vw - min(452px, 38vw) - 120px)); }
+/* with a home open Maya moves left of the panel; what she says stays clear of the minimap */
+body.revealing #maya, body.revealing #hud:has(#card.show) #maya { max-width: min(720px, calc(100vw - 2 * min(226px, 19vw) - 464px)); }
+body.revealing #live, body.revealing #toast { left: calc(50% - min(226px, 19vw)); }
+/* a toast drops below whatever card holds the top of the screen */
+#hud:has(#reveal-cap.show) #toast { top: 212px; }
+#hud:has(#coach.show) #toast { top: 222px; }
+/* the chooser sits above the middle so the line being spoken stays readable under it */
+#chooser { top: 43%; }
+
+/* ------------------------------------------------------------------ 2. speedometer */
+#speedo { right: 20px; bottom: 44px; width: 124px; height: 124px; border: 0; background: radial-gradient(circle at 50% 36%, rgba(46, 54, 68, 0.9), rgba(11, 14, 19, 0.9) 74%); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+#speedo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#speedo path { fill: none; }
+#speedo .trk { stroke: rgba(255, 255, 255, 0.13); stroke-width: 5; stroke-linecap: round; }
+#speedo .tks { stroke: rgba(255, 255, 255, 0.42); stroke-width: 3; stroke-dasharray: 0.9 9.01; }
+#speedo .arc { stroke: var(--gold); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 0.14s linear, stroke 0.25s; filter: drop-shadow(0 0 4px rgba(255, 201, 64, 0.7)); }
+#speedo.hot .arc { stroke: var(--accent); filter: drop-shadow(0 0 7px rgba(255, 90, 44, 0.9)); }
+#speedo b { position: relative; font-size: 38px; margin-top: 4px; font-variant-numeric: tabular-nums; transition: color 0.25s; }
+#speedo.hot b { color: #ffd9c9; }
+#speedo span { position: relative; margin-top: 2px; }
+
+/* ------------------------------------------------------------------ 3. loading and boot */
+#loading { z-index: 9; background: radial-gradient(ellipse at 50% 42%, rgba(24, 30, 40, 0.86), rgba(8, 10, 14, 0.94)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+#loading .lcard { display: grid; justify-items: center; gap: 12px; text-align: center; color: var(--paper); }
+#loading .lcard b { font: 30px/1 var(--display); letter-spacing: 0.02em; }
+#loading .lcard span { font: 600 12.5px var(--ui); letter-spacing: 0.04em; color: var(--muted); }
+.lmark { display: grid; gap: 5px; padding: 12px 14px; border-radius: 12px; background: var(--gold); border: 3px solid var(--ink); transform: rotate(-4deg) skewX(-6deg); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35); }
+.lmark i { display: block; width: 34px; height: 7px; border-radius: 4px; background: var(--ink); transform-origin: left; animation: lmark 1.1s ease-in-out infinite; }
+.lmark i:nth-child(2) { animation-delay: 0.14s; }
+.lmark i:nth-child(3) { animation-delay: 0.28s; }
+@keyframes lmark { 0%, 100% { scale: 1 1; } 50% { scale: 0.45 1; } }
+.lbar { width: 220px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.lbar i { display: block; width: 40%; height: 100%; border-radius: 999px; background: linear-gradient(to right, var(--gold), var(--accent)); animation: lbar 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes lbar { from { translate: -110% 0; } to { translate: 260% 0; } }
+
+/* ------------------------------------------------------------------ 4. title screen */
+/* the HUD layer rides above the title while it shows, so the phone code is crisp and clickable */
+body.titled #hud { z-index: 7; }
+#title { background: radial-gradient(ellipse at 50% 44%, rgba(10, 12, 18, 0.08), rgba(10, 12, 18, 0.66)); }
+#title .bar { position: absolute; left: 0; right: 0; height: 7vh; background: #000; transition: height 0.6s var(--out); }
+#title .bar.top { top: 0; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45); }
+#title .bar.bot { bottom: 0; box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.45); }
+#title.show .bar { animation: barin 0.7s var(--out) both; }
+@keyframes barin { from { height: 0; } }
+@keyframes tin { from { opacity: 0; translate: 0 14px; filter: blur(5px); } }
+#title.show .tag { animation: tin 0.6s var(--out) 0.3s both; }
+#title.show .cities { animation: tin 0.6s var(--out) 0.42s both; }
+#title.show .powered { animation: tin 0.6s var(--out) 0.75s both; }
+#title .tag { font-size: clamp(16px, 1.9vw, 24px); letter-spacing: 0.005em; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.75); }
+/* the plate under the logo catches the light every few seconds */
+.logo .l3 { position: relative; overflow: hidden; }
+.logo .l3::after { content: ""; position: absolute; inset: -20% -10%; background: linear-gradient(105deg, rgba(255, 255, 255, 0) 42%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0) 58%); translate: -110% 0; animation: sheen 5.2s ease-in-out 1.4s infinite; pointer-events: none; }
+@keyframes sheen { 0% { translate: -110% 0; } 26%, 100% { translate: 110% 0; } }
+/* the start button: it rises in, then breathes; hover and press are its own */
+#title .go { position: relative; padding: 15px 34px; font-size: 20px; letter-spacing: 0.01em; background: linear-gradient(180deg, #fffdf6, #f3e9d2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(20, 24, 31, 0.14); animation: none; }
+#title.show .go { animation: tin 0.6s var(--out) 0.55s both, gobob 1.7s ease-in-out 1.3s infinite; }
+@keyframes gobob { 50% { translate: 0 -4px; } }
+#title .go::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(255, 250, 240, 0.55); animation: goring 1.7s ease-out 1.3s infinite; pointer-events: none; }
+@keyframes goring { 0% { box-shadow: 0 0 0 0 rgba(255, 250, 240, 0.5); } 80%, 100% { box-shadow: 0 0 0 16px rgba(255, 250, 240, 0); } }
+#title .go kbd { margin: 0 3px; }
+#title .cities { padding: 4px; }
+#title .cities button { padding: 9px 24px; transition: background 0.18s, color 0.18s, transform 0.25s var(--spring); }
+#title .cities button.on { background: linear-gradient(100deg, #ff7a45, #ff4d6d); box-shadow: 0 4px 14px rgba(255, 90, 44, 0.4); }
+/* where the world comes from: three sources, each named for what it brings */
+#title .powered { bottom: calc(3.5vh - 13px); width: 100%; opacity: 1; font-size: 11.5px; letter-spacing: 0.04em; line-height: 1.5; color: rgba(255, 250, 240, 0.72); }
+#title .powered br { display: none; }
+#title .srcs { display: flex; justify-content: center; align-items: center; gap: 10px 26px; flex-wrap: wrap; font-size: 12.5px; color: rgba(255, 250, 240, 0.78); }
+#title .srcs span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+#title .srcs b { color: var(--paper); font-weight: 700; letter-spacing: 0.02em; font-size: 13.5px; }
+#title .srcs .ic { color: var(--gold); }
+/* Google's credit must stay in view whenever its city is on screen. On the title the bottom
+   bar would cover it, so it rides in the top bar, at the right, until the game starts. */
+body.titled #g-attr { z-index: 8; top: calc(3.5vh - 7px); bottom: auto; left: auto; right: 20px; transform: none; max-width: 56vw; }
+/* leaving: the logo comes at you and is gone, the bars open, the camera is already falling */
+#title.out { pointer-events: none; opacity: 0; transition: opacity 0.55s var(--out); }
+#title.out .logo { scale: 1.22; filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.35)) blur(7px); transition: scale 0.6s cubic-bezier(0.3, 0, 0.6, 1), filter 0.6s; }
+#title.out .bar { height: 0; }
+#title.out .go, #title.out .go::after { animation: none; }
+
+/* the name of the place, set as the car lands */
+#locard { position: absolute; left: 26px; bottom: 248px; display: grid; gap: 3px; padding: 2px 0 2px 16px; border-left: 4px solid var(--gold); color: var(--paper); text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.6); opacity: 0; translate: -26px 0; transition: opacity 0.5s var(--out), translate 0.8s var(--out); pointer-events: none; max-width: 60vw; }
+#locard.show { opacity: 1; translate: 0 0; }
+#locard small { font: 700 12px var(--ui); letter-spacing: 0.24em; text-transform: uppercase; color: #ffe08a; }
+#locard b { font: clamp(40px, 4.2vw, 62px)/0.95 var(--display); letter-spacing: 0.01em; }
+#locard span { font: 600 14px var(--ui); letter-spacing: 0.01em; opacity: 0.92; margin-top: 3px; }
+
+/* ------------------------------------------------------------------ 5. price tags in the world */
+#tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ptag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 7px; border-radius: 999px; background: rgba(10, 13, 18, 0.8); border: 1px solid rgba(255, 255, 255, 0.17); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); font: 700 13px/1.25 var(--ui); color: #fff; white-space: nowrap; opacity: 0; transition: opacity 0.25s; will-change: transform; }
+.ptag::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--k, #fff); box-shadow: 0 0 8px var(--k, #fff); }
+.ptag.on { opacity: var(--o, 1); }
+.ptag span { font-weight: 600; font-size: 11.5px; color: rgba(255, 255, 255, 0.68); }
+.ptag.hl { border-color: rgba(255, 201, 64, 0.9); box-shadow: 0 0 0 1px rgba(255, 201, 64, 0.45), 0 4px 18px rgba(255, 201, 64, 0.35); }
+body.revealing #tags { opacity: 0; }
+
+/* ------------------------------------------------------------------ 6. mission result, small moments */
+#confetti { position: fixed; inset: 0; z-index: 12; width: 100%; height: 100%; pointer-events: none; }
+/* a home saved: the heart in the corner answers */
+#saved.pop svg { animation: heartpop 0.5s var(--spring); }
+@keyframes heartpop { 0% { scale: 1; } 40% { scale: 1.7; } 100% { scale: 1; } }
+/* the demo's opening page of flat listings scrolls under its own header, not over it */
+#flat .fhead { position: relative; z-index: 1; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08); }
+
+/* the insight panel's corners agree with the cards inside it and with every other sheet */
+#ipanel { border-radius: 22px; }
+#ipanel .iclose { top: 12px; right: 12px; }
+
+/* ------------------------------------------------------------------ 7. the same everywhere */
+/* a press is 0.96, never on a disabled control */
+#hud button:not(:disabled):active, #title button:not(:disabled):active, #compare button:not(:disabled):active, #tour button:not(:disabled):active, .act:not(:disabled):not(.off):active { transform: scale(0.96); }
+#hud button:disabled:active, .act.off:active { transform: none; }
+/* scrolling a panel to its end never moves anything behind it */
+#card, .icards, #inbox .mlist, #inbox .mdetail, #compare .scroll, #bsheet .bcard, #cresult .rcard, #settings .bcard { overscroll-behavior: contain; }
+/* numbers that change do not jiggle */
+.price, .bigno, .ring b, .comps td, .legend2 b, #arrow .lbl b, #fps { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lmark i, .lbar i, .logo .l3::after, #title .go, #title .go::after, #title.show .bar, #title.show .tag, #title.show .cities, #title.show .powered { animation: none !important; }
+  #locard, .ptag, #title.out, #title.out .logo, #title .bar { transition-duration: 0.01s !important; }
+}

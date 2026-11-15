@@ -66,10 +66,21 @@ export function initListings(ctx) {
       return { l, b, x, z, top, size, ground: world.heightAt(x, z) };
     });
     const count = Math.max(1, items.length);
+    // the icons glow in their own color (for sale green, for rent blue, the target gold), so
+    // they read at midday, at night and against the photo city alike
     const iconMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.25 });
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.34, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-    const beamGeo = new THREE.CylinderGeometry(0.55, 0.9, 1, 8, 1, true);
+    iconMat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n  totalEmissiveRadiance = vColor.rgb * 0.5;\n#endif');
+    };
+    // a beam of light, not a tube: brightest at the ground, gone before its top
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.62, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const beamGeo = new THREE.CylinderGeometry(0.55, 0.9, 1, 12, 6, true);
     beamGeo.translate(0, 0.5, 0);
+    {
+      const p = beamGeo.attributes.position, c = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = Math.pow(1 - Math.min(1, Math.max(0, p.getY(i))), 1.5);
+      beamGeo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    }
     meshes = {
       house: new THREE.InstancedMesh(houseGeo(), iconMat, count),
       tower: new THREE.InstancedMesh(towerGeo(), iconMat, count),

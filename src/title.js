@@ -1,11 +1,15 @@
 // Title screen: an aerial flyover behind an original logo, city choice and "Press Enter or
 // scan to play". Then the camera drops from the sky to the car.
+import { icon } from './icons.js';
+
 const NAMES = { houston: 'Houston', la: 'Los Angeles', mock: 'Mockingbird Heights' };
 
 export function initTitle(ctx) {
   const el = document.createElement('div');
   el.id = 'title';
+  // film bars top and bottom; they open as the camera drops into the city
   el.innerHTML = `
+    <i class="bar top"></i><i class="bar bot"></i>
     <div class="logo" aria-label="Grand Property Auto">
       <span class="l1">GRAND</span>
       <span class="l2">PROPERTY</span>
@@ -14,7 +18,7 @@ export function initTitle(ctx) {
     <p class="tag">Drive the neighborhood. Say what you want. Walk inside.</p>
     <div class="cities"></div>
     <button class="go">Press <kbd>Enter</kbd> or scan to play</button>
-    <p class="powered">Powered by CoStar, Matterport, Vexcel</p>`;
+    <div class="powered"><div class="srcs" aria-label="Powered by Vexcel, CoStar and Matterport"><span>${icon('plane', 15)}<b>Vexcel</b>aerial imagery</span><span>${icon('house', 15)}<b>CoStar</b>listings</span><span>${icon('footprints', 15)}<b>Matterport</b>3D tours</span></div></div>`;
   document.body.append(el);
   const cities = el.querySelector('.cities');
   for (const c of ctx.cities) {
@@ -41,6 +45,8 @@ export function initTitle(ctx) {
     cover.classList.add('out');
     setTimeout(() => cover.classList.remove('show', 'out'), 500);
     ctx.audio.click?.();
+    // the title makes its entrance as the picture lifts, not unseen behind it
+    if (el.classList.contains('show')) { el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
   }
   cover.addEventListener('click', uncover);
 
@@ -55,7 +61,10 @@ export function initTitle(ctx) {
   }
   function start() {
     if (ctx.state !== 'title' || !ctx.world) return;
-    el.classList.remove('show');
+    // the title leaves over half a second (the logo comes forward, the bars open) while the
+    // camera is already on its way down
+    el.classList.add('out');
+    setTimeout(() => el.classList.remove('show', 'out'), 620);
     document.body.classList.remove('titled');
     ctx.state = 'intro';
     ctx.audio.chime();
@@ -77,5 +86,30 @@ export function initTitle(ctx) {
     }
   });
   ctx.on('phone', (on) => { if (on && ctx.state === 'title') { uncover(); start(); } });
-  return { show, start, el, get covered() { return covered; } };
+
+  // The name of the place and what is on the market there, set on screen as the car lands
+  // and again after a city switch. The counts are the listings loaded for this city.
+  const loc = document.createElement('div');
+  loc.id = 'locard';
+  const locLead = document.createElement('small'), locName = document.createElement('b'), locFacts = document.createElement('span');
+  loc.append(locLead, locName, locFacts);
+  ctx.hud.root.append(loc);
+  let locTimer = 0, landed = false;
+  function announce() {
+    const w = ctx.world;
+    if (!w) return;
+    const n = {};
+    for (const l of w.listings) n[l.kind] = (n[l.kind] || 0) + 1;
+    locLead.textContent = 'Welcome to';
+    locName.textContent = w.area?.name || NAMES[ctx.city] || '';
+    locFacts.textContent = [[n.sale, 'for sale'], [n.rent, 'for rent'], [n.apartments, n.apartments === 1 ? 'apartment community' : 'apartment communities'], [n.sold, 'recently sold']]
+      .filter(([count]) => count).map(([count, what]) => `${count} ${what}`).join(' · ');
+    loc.classList.add('show');
+    clearTimeout(locTimer);
+    locTimer = setTimeout(() => loc.classList.remove('show'), 4800);
+  }
+  ctx.on('play-start', () => { landed = true; announce(); });
+  ctx.on('city', () => { if (landed && ctx.state === 'play') announce(); });
+  ctx.on('select', (l) => { if (l) loc.classList.remove('show'); });
+  return { show, start, el, announce, get covered() { return covered; } };
 }

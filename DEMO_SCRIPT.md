@@ -2,6 +2,8 @@
 
 Setup before the judges arrive: `npm run demo`, open http://localhost:8787 in Chrome, full screen (F11), Houston selected, sound on. Title screen showing. Check the bottom right says ULTRA and the fps is near 60.
 
+What happens on Enter: the film bars open, the camera drops to the car and "Welcome to Houston" shows at the left for about five seconds with the counts of what is on the market. Talk over it or wait for it. While you drive, the nearest homes carry their price above the marker; after a search only the lit homes do.
+
 If anything goes wrong: press `0`. Demo mode drives this whole script by itself while you talk. If the wifi drops, everything below still works: Maya switches to her scripted lines and the browser voice, and voice input falls back to typing (`T`).
 
 The order puts the most useful things first: what it costs, what it's worth, what living there is like.

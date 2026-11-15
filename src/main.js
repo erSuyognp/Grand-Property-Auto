@@ -56,6 +56,7 @@ ctx.loadCity = async function loadCity(city) {
   const token = ++loadToken;
   if (!CITIES.includes(city)) city = CITIES[0];
   document.body.classList.add('loading');
+  ctx.emit('city-loading', city);
   ctx.emit('city-unload');
   if (ctx.world) { ctx.world.dispose(); ctx.world = null; }
   const world = await createWorld(ctx, city);
@@ -87,6 +88,9 @@ let stored = null;
 try { stored = localStorage.getItem('gpa-city'); } catch { /* ignore */ }
 await ctx.loadCity(params.get('city') || stored || CITIES[0]);
 ctx.emit('boot');
+// the world is up: lift the boot splash (index.html) off whatever screen comes first
+const splash = document.getElementById('boot');
+if (splash) { splash.classList.add('out'); setTimeout(() => splash.remove(), 380); }
 
 const timer = new THREE.Timer();
 let frames = 0, fpsTime = 0, slow = 0;

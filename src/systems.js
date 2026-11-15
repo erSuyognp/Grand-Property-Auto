@@ -23,6 +23,7 @@ import { initClients } from './clients.js';
 import { initBuyer } from './buyer.js';
 import { loadSettings, initSettings } from './settings.js';
 import { initGuide } from './guide.js';
+import { initTags } from './tags.js';
 
 export async function initSystems(ctx) {
   ctx.settings = loadSettings();
@@ -49,6 +50,7 @@ export async function initSystems(ctx) {
   ctx.buyer = initBuyer(ctx);
   ctx.settingsUI = initSettings(ctx);
   ctx.guide = initGuide(ctx);
+  ctx.tags = initTags(ctx);
   ctx.on('hover-listing', (l) => ctx.listingsSys.setHover(l));
   // a soft click on every button
   addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button')) ctx.audio.click?.(); }, true);

@@ -15,10 +15,12 @@ test('server health responds', async ({ request }) => {
 test('config never leaks server secrets', async ({ request }) => {
   const cfg = await (await request.get('http://localhost:8787/api/config')).json();
   expect(['real', 'mock']).toContain(cfg.mode);
-  expect(Object.keys(cfg).sort()).toEqual(['googleMapsKey', 'httpsPort', 'lanIp', 'llm', 'matterportSdkKey', 'maya', 'mayaAgent', 'mayaTts', 'mode', 'sdkUrl', 'showcaseBase', 'stt', 'tts']);
+  expect(Object.keys(cfg).sort()).toEqual(['googleMapsKey', 'httpsPort', 'lanIp', 'llm', 'matterportSdkKey', 'maya', 'mayaAgent', 'mayaTts', 'mode', 'sdkUrl', 'showcaseBase', 'stt', 'tts', 'voiceProvider']);
   // maya and mayaTts are booleans (is the model on, is her voice on), never keys
   expect(typeof cfg.maya).toBe('boolean');
   expect(typeof cfg.mayaTts).toBe('boolean');
+  // voiceProvider is the name of the voice service in use, or null: never a key
+  expect([null, 'openai', 'elevenlabs']).toContain(cfg.voiceProvider);
 });
 
 test('data window: Nov 13 4:30 PM to Nov 15 4:00 PM ET', () => {

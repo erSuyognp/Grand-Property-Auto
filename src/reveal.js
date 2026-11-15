@@ -383,13 +383,18 @@ export function initReveal(ctx) {
       let vis = c.on && !behind && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
       if (c.cat && c.on) { // a place off screen keeps its chip at the edge, in its direction
         if (behind) { x = W - x; y = H * 1.5; }
-        const x0 = 140, x1 = W - (ctx.panel?.el.classList.contains('show') ? ctx.panel.el.offsetWidth + 120 : 110), y0 = 96, y1 = H - 150;
+        // the frame the chips stay in: clear of the dock and the step caption at the top, the
+        // panel on the right, and the minimap, its key and Maya along the bottom
+        const x0 = 140, x1 = W - (ctx.panel?.el.classList.contains('show') ? ctx.panel.el.offsetWidth + 120 : 110);
+        const y0 = capEl.classList.contains('show') ? 236 : 132, y1 = H - 168;
         let cx = Math.max(x0, Math.min(x1, x));
         const cy = Math.max(y0, Math.min(y1, y));
-        if (cy > H - 260 && cx < 340) cx = 340;
+        if (cy > H - 262 && cx < 348) cx = 348;
         c.el.classList.toggle('edge', cx !== x || cy !== y);
         x = cx; y = cy; vis = true;
-        for (let guard = 0; guard < 8 && placed.some((p) => Math.abs(p.x - x) < 210 && Math.abs(p.y - y) < 30); guard++) y += 31;
+        // chips that would cover each other stack: upward in the lower half, downward above it
+        const dir = y > H / 2 ? -31 : 31;
+        for (let guard = 0; guard < 8 && placed.some((p) => Math.abs(p.x - x) < 210 && Math.abs(p.y - y) < 30); guard++) y += dir;
         placed.push({ x, y });
       }
       c.el.classList.toggle('on', vis);

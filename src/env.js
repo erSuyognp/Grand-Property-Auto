@@ -9,12 +9,13 @@ const PRESETS = {
   day: {
     skyElev: 48, azim: 148, lightElev: 48, turbidity: 3.2, rayleigh: 1.1, mie: 0.004, clouds: 0.38,
     sun: 0xfff0dc, sunI: 3.1, hemiSky: 0xe4eaf4, hemiGround: 0x8a8272, hemiI: 0.95, envI: 0.06,
-    fog: 0xb4c8dc, fogNear: 320, fogFar: 2100, exposure: 0.46, night: 0,
+    fog: 0xb4c8dc, fogNear: 520, fogFar: 3200, exposure: 0.46, night: 0,
   },
   golden: {
+    // a low warm sun over a cool, well filled shade: the shadow side of a street stays readable
     skyElev: 15, azim: 252, lightElev: 17, turbidity: 5, rayleigh: 3, mie: 0.0015, clouds: 0.45,
-    sun: 0xffb46e, sunI: 8, hemiSky: 0xe0d6e0, hemiGround: 0x8a6a52, hemiI: 1.1, envI: 0.12,
-    fog: 0xc9a288, fogNear: 300, fogFar: 2000, exposure: 0.2, night: 0.25,
+    sun: 0xffb46e, sunI: 5.6, hemiSky: 0xc9d2f2, hemiGround: 0x8a6a52, hemiI: 2.3, envI: 0.2,
+    fog: 0xc9a288, fogNear: 480, fogFar: 3000, exposure: 0.3, night: 0.25,
   },
   night: {
     skyElev: -14, azim: 300, lightElev: 46, turbidity: 2, rayleigh: 0.6, mie: 0.002, clouds: 0.25,
@@ -45,6 +46,50 @@ export function createEnv(ctx) {
   envScene.add(envSky);
   const pmrem = new THREE.PMREMGenerator(renderer);
   let envRT = null;
+
+  // The haze takes its color from the sky itself. A small camera looks at the sky just above
+  // the horizon in six directions and the result is read back; far ground then fades into the
+  // sky it meets instead of into a darker band under it. (Night keeps its own haze color: the
+  // sky is black there and the haze is the glow of the city.)
+  const probeRT = new THREE.WebGLRenderTarget(8, 2, { type: THREE.HalfFloatType, depthBuffer: false });
+  const probeCam = new THREE.PerspectiveCamera(4, 4, 1, 3000);
+  const probeBuf = new Uint16Array(8 * 2 * 4);
+  const horizon = new THREE.Color(), horizonTo = new THREE.Color();
+  let horizonKnown = false;
+  const skyHaze = ctx.params.get('haze') !== 'classic'; // ?haze=classic: the fixed haze colors of the presets
+  function readHorizon() {
+    if (!skyHaze) return;
+    try {
+      const prev = renderer.getRenderTarget();
+      const rows = [];
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        probeCam.lookAt(Math.cos(a), Math.tan(rad(3)), Math.sin(a));
+        renderer.setRenderTarget(probeRT);
+        renderer.render(envScene, probeCam);
+        renderer.readRenderTargetPixels(probeRT, 0, 0, 8, 2, probeBuf);
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < 16; i++) { r += THREE.DataUtils.fromHalfFloat(probeBuf[i * 4]); g += THREE.DataUtils.fromHalfFloat(probeBuf[i * 4 + 1]); b += THREE.DataUtils.fromHalfFloat(probeBuf[i * 4 + 2]); }
+        rows.push([r / 16, g / 16, b / 16]);
+      }
+      renderer.setRenderTarget(prev);
+      // the direction of the sun is far brighter than the rest of the horizon: leave it out
+      rows.sort((p, q) => (p[0] + p[1] + p[2]) - (q[0] + q[1] + q[2]));
+      const use = rows.slice(0, 5);
+      const avg = [0, 1, 2].map((c) => use.reduce((s, p) => s + p[c], 0) / use.length);
+      // nothing read back (a browser that cannot read this kind of target): keep the preset
+      if (!avg.every((x) => Number.isFinite(x) && x >= 0) || avg[0] + avg[1] + avg[2] < 1e-4) return;
+      horizonTo.setRGB(Math.min(avg[0], 6), Math.min(avg[1], 6), Math.min(avg[2], 6));
+      if (!horizonKnown) { horizon.copy(horizonTo); horizonKnown = true; }
+    } catch (e) { console.warn('[env] horizon probe failed, keeping the preset haze:', e.message || e); }
+  }
+  function fogColor() {
+    scene.fog.color.copy(cur.fog);
+    // The block city takes most of the sky's color: its far ground is bare and a darker band
+    // there is all you would see. The photo city (which sets its own haze distances) takes
+    // less, so a skyline on the horizon keeps its outline.
+    if (horizonKnown) scene.fog.color.lerp(horizon, (haze ? 0.4 : 0.84) * (1 - THREE.MathUtils.smoothstep(cur.night, 0.45, 1)));
+  }
 
   const stars = (() => {
     const n = 1400, pos = new Float32Array(n * 3);
@@ -97,7 +142,7 @@ export function createEnv(ctx) {
       sun.intensity = cur.sunI * sunOverride.strength;
     }
     hemi.color.copy(cur.hemiSky); hemi.groundColor.copy(cur.hemiGround); hemi.intensity = cur.hemiI;
-    scene.fog.color.copy(cur.fog); scene.fog.near = haze ? haze[0] : cur.fogNear; scene.fog.far = haze ? haze[1] : cur.fogFar;
+    fogColor(); scene.fog.near = haze ? haze[0] : cur.fogNear; scene.fog.far = haze ? haze[1] : cur.fogFar;
     scene.environmentIntensity = cur.envI;
     renderer.toneMappingExposure = cur.exposure * dim;
     stars.material.opacity = Math.max(0, cur.night - 0.45) * 1.8;
@@ -115,6 +160,8 @@ export function createEnv(ctx) {
     if (envRT) envRT.dispose();
     envRT = rt;
     envDirty = false;
+    readHorizon();
+    fogColor();
   }
 
   function set(name, instant = false) {
@@ -138,6 +185,12 @@ export function createEnv(ctx) {
       if (envClock > 0.4 || state.t === 1) { envClock = 0; envDirty = true; }
     }
     if (envDirty) bakeEnv();
+    // the haze follows the sky smoothly while the time of day turns
+    if (horizonKnown && !horizon.equals(horizonTo)) {
+      horizon.lerp(horizonTo, 1 - Math.exp(-dt * 5));
+      if (Math.abs(horizon.r - horizonTo.r) + Math.abs(horizon.g - horizonTo.g) + Math.abs(horizon.b - horizonTo.b) < 0.002) horizon.copy(horizonTo);
+      fogColor();
+    }
     const c = ctx.camera.position;
     sky.position.copy(c);
     stars.position.set(c.x, 0, c.z);

@@ -354,6 +354,8 @@ for n, c in enumerate([c for c in commercial if c["type"] == "Retail"]):
                      **({"kind": "bizsale", "price": [1850000, 2400000, 3100000][n % 3], "capRate": 6.1} if sale
                         else {"kind": "bizlease", "rateLow": 24, "rateHigh": 31, "availableSqft": 6200})})
 (OUT / "business.json").write_text(json.dumps(business))
+# no drone views in the mock neighborhood: an empty file, so the game does not ask for one that is missing
+(OUT / "splats.json").write_text(json.dumps({}))
 
 # ---------------------------------------------------------------- listing "photos": simple drawn houses
 print("drawing photos and interiors")
