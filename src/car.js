@@ -215,8 +215,10 @@ export function createCar(ctx) {
     vel.set(s.vx, s.vz);
     let vf = vel.dot(fwd);                      // forward speed
     let vl = vel.x * -fwd.y + vel.y * fwd.x;    // lateral speed (right positive)
-    const maxSpeed = inp.boost ? 46 : 31;
-    const accel = inp.boost ? 26 : 17;
+    const maxSpeed = inp.boost ? 60 : 31;
+    const accel = inp.boost ? 40 : 17;
+    // how hard the boost is on, eased, for the camera and the speed blur
+    s.boost = (s.boost || 0) + ((inp.boost && inp.throttle > 0 ? 1 : 0) - (s.boost || 0)) * Math.min(1, dt * 4);
     if (inp.throttle > 0) vf += accel * inp.throttle * dt * (vf < 0 ? 2.2 : 1 - Math.max(0, vf / maxSpeed) ** 2);
     else if (inp.throttle < 0) vf += (vf > 1 ? -34 : -11) * -inp.throttle * dt;
     vf = Math.max(-11, vf);

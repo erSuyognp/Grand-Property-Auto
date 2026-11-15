@@ -103,7 +103,7 @@ export function initCompare(ctx) {
       <table><tr><th></th>${list.map((h) => `<th>${esc(h.name || h.address)}<small>${esc(h.status || KIND_LABEL[h.kind])}</small></th>`).join('')}</tr>
       ${[['Price', (h) => priceText(h) + (full[list.indexOf(h)]?.facts?.askingOnly ? ' (last asking price)' : '')],
         ['Beds / baths / size', (h) => `${h.beds ?? '-'} / ${h.baths ?? '-'} / ${h.sqft ? Number(h.sqft).toLocaleString('en-US') + ' sqft' : '-'}`],
-        ['Monthly cost (Estimate)', (h, d) => (d?.cost ? `${usd(d.cost.total)}: loan ${usd(d.cost.mortgage)}, tax ${usd(d.cost.tax)}, insurance ${usd(d.cost.insurance)}, HOA ${usd(d.cost.hoa)}, electric ${usd(d.cost.electric)}` : row(h.id).rent ? `Rent from ${usd(row(h.id).rent)}` : 'Not available')],
+        ['Monthly cost at 20% down (Estimate)', (h, d) => (d?.cost ? `${usd(d.cost.total)}: loan ${usd(d.cost.mortgage)}, tax ${usd(d.cost.tax)}, insurance ${usd(d.cost.insurance)}, HOA ${usd(d.cost.hoa)}, electric ${usd(d.cost.electric)}` : row(h.id).rent ? `Rent from ${usd(row(h.id).rent)}` : 'Not available')],
         ['Price per sqft', (h, d) => (d?.value ? `${usd(d.value.ppsf)}, lower than ${d.value.lowerThanPct}% of ${d.value.n} similar homes nearby` : 'Not available')],
         ['Renting nearby', (h, d) => (d?.rentVsBuy ? `Similar ${d.rentVsBuy.beds} bed: about ${usd(d.rentVsBuy.medianRent)} a month` : 'Not available')],
         ['Electric and solar (Estimate)', (h, d) => (d?.energy ? `${usd(d.energy.billMonth)} a month` + (d.solar?.panels ? `; solar could save ${usd(d.solar.savingsYear)} a year` : '') : 'Not available')],

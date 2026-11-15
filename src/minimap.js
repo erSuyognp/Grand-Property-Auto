@@ -47,21 +47,30 @@ export function initMinimap(ctx) {
     }
     const L = ctx.listingsSys;
     if (L) {
-      const tgt = L.target;
-      for (const it of L.items) {
+      const tgt = L.target, hs = L.highlights;
+      const pulse = 1 + 0.18 * Math.sin(performance.now() / 260);
+      // lit up homes are drawn last, ringed in gold; the rest step back while something is lit
+      for (const pass of [0, 1]) for (const it of L.items) {
         if (!L.visible[it.l.kind]) continue;
         if (Math.abs(it.x - s.x) > SPAN || Math.abs(it.z - s.z) > SPAN) continue;
-        const isT = tgt && tgt.id === it.l.id;
-        g.beginPath(); g.arc(it.x, it.z, isT ? 9 : it.l.kind === 'sold' ? 3.6 : 5.5, 0, Math.PI * 2);
-        g.fillStyle = isT ? '#ffc940' : KIND_COLOR[it.l.kind];
+        const isT = tgt && tgt.id === it.l.id, hl = isT || (hs ? hs.has(it.l.id) : false);
+        if ((pass === 1) !== hl) continue;
+        const dim = hs && !hl;
+        g.globalAlpha = dim ? 0.55 : 1;
+        g.beginPath(); g.arc(it.x, it.z, isT ? 9 : hl ? 7 : dim ? 3.2 : it.l.kind === 'sold' ? 3.6 : 5.5, 0, Math.PI * 2);
+        g.fillStyle = isT ? '#ffc940' : dim ? '#9aa3ad' : KIND_COLOR[it.l.kind];
         g.fill(); g.lineWidth = 1.4; g.strokeStyle = '#10141a'; g.stroke();
+        if (hl) { g.beginPath(); g.arc(it.x, it.z, (isT ? 13 : 10.5) * pulse, 0, Math.PI * 2); g.lineWidth = 2.6; g.strokeStyle = '#ffd24a'; g.stroke(); }
       }
-      // target off the map: pin it to the rim
-      if (tgt) {
-        const dx = tgt.mx - s.x, dz = tgt.mz - s.z, d = Math.hypot(dx, dz), lim = SPAN / 2 - 10;
+      g.globalAlpha = 1;
+      // lit up homes off the map: pinned to the rim, in their direction (the target largest)
+      const rim = hs ? L.items.filter((it) => hs.has(it.l.id) && L.visible[it.l.kind]).map((it) => it.l) : [];
+      if (tgt && !rim.includes(tgt)) rim.push(tgt);
+      for (const l of rim.slice(0, 12)) {
+        const isT = l === tgt, dx = l.mx - s.x, dz = l.mz - s.z, d = Math.hypot(dx, dz), lim = SPAN / 2 - 10;
         if (d > lim) {
-          g.beginPath(); g.arc(s.x + (dx / d) * lim, s.z + (dz / d) * lim, 8, 0, Math.PI * 2);
-          g.fillStyle = '#ffc940'; g.fill(); g.strokeStyle = '#10141a'; g.lineWidth = 2; g.stroke();
+          g.beginPath(); g.arc(s.x + (dx / d) * lim, s.z + (dz / d) * lim, isT ? 8 : 5.5, 0, Math.PI * 2);
+          g.fillStyle = isT ? '#ffc940' : KIND_COLOR[l.kind]; g.fill(); g.strokeStyle = isT ? '#10141a' : '#ffd24a'; g.lineWidth = 2; g.stroke();
         }
       }
     }

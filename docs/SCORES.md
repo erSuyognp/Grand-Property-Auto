@@ -49,5 +49,10 @@ How quick the everyday trips are.
 ## Monthly cost (not a score)
 Estimate = loan payment (30 year fixed at the weekly Freddie Mac average rate, default 20% down)
 + property tax + the state average homeowners insurance premium + HOA + the electric estimate,
-minus solar savings when the solar switch is on. Mortgage insurance for down payments under 20%
-is not included. Not financial, legal or insurance advice.
+minus solar savings when the solar switch is on. The monthly solar line is the yearly saving
+divided by 12 and rounded half up, and that same dollar amount is what the total subtracts.
+Homes that already have panels do not get that switch: the electric estimate is a state average
+and does not know about those panels. Mortgage insurance for down payments under 20%
+is not included, and the cost card says so. The "home price that fits" uses the same loan, tax,
+insurance and a typical electric bill, and leaves HOA out because HOA is not a function of price.
+Not financial, legal or insurance advice.

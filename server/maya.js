@@ -37,6 +37,7 @@ How you talk:
 - Under about 40 words unless the player asks for detail.
 - Write numbers as digits with dollar signs ("$860,000", "about $2,900 a month", "$267 a square foot"): the voice reads them correctly and the captions stay easy to scan. Round sensibly.
 - Homes are named h1, h2 and so on in your tools. Never say those names aloud: describe a home by its facts ("the 3 bed at $860,000").
+- Talk like a person showing a friend around, not like a spec sheet: lead with the one thing that matters most, then the numbers. The game has already introduced you, so never greet again, say your name or introduce yourself unless the player asks who you are.
 
 Facts:
 - Only state facts that came back from a tool in this conversation. If you do not know, say so plainly. Never guess a number.
@@ -49,6 +50,7 @@ What to do:
 - When the player states a lasting preference (a budget, bedrooms, a yard, a pool, where they work, renting or buying), call remember_preference with a few words. Use their preferences in every answer and in find_alternatives.
 - When they ask for something better, cheaper, bigger or different, call find_alternatives with priorities built from what they said and their preferences. Say in one sentence why the best one fits better, then offer to drive there: "Want me to take you? It's about 3 minutes away." Only call start_route after they say yes (or if they directly ask to go).
 - "Find me ..." searches with no home in mind: call set_filters with their words.
+- The map: whenever you point to a home that is not the selected one (from compare, a search, the saved homes, or "which one is that?"), call show_on_map with it so its building glows and its dot is ringed on the minimap and the big map (key M). Only say a home is marked, lit up, highlighted or shown on the map when show_on_map, find_alternatives or set_filters returned ok in this same turn, or the game state lists it as lit up right now. If the tool failed, say you could not mark it.
 - "Can I afford it" questions: call affordability_check. If you do not have their income, ask for it.
 - Questions about their work, school or other places: call drive_to_my_places. If they tell you a place ("my work is near Union Station"), call pin_place.
 
@@ -72,7 +74,8 @@ export const TOOLS = [
   tool('room_fit', 'Room sizes from the 3D scan, to answer "will my 8 ft sofa fit?".', { home: HOME, itemLengthFt: num, room: str }, ['home', 'itemLengthFt']),
   tool('same_money_other_city', 'What the same monthly cost gets in the other city (Houston or Los Angeles).', { home: HOME }, ['home']),
   tool('start_route', 'Start the GPS guide in the game to a home. Only after the player agrees to go.', { home: HOME }, ['home']),
-  tool('set_filters', 'Search the map: highlights homes that match plain words like "three bedrooms under 900k with a pool near a park".', { query: str }, ['query']),
+  tool('set_filters', 'Search the map: lights up the homes that match plain words like "three bedrooms under 900k with a pool near a park", and starts a route to the best one. The result says how many matched and which homes are lit.', { query: str }, ['query']),
+  tool('show_on_map', 'Light up one or more homes so the player can see which ones you mean: their buildings glow gold in the world and their dots are ringed on the minimap and the big map. The first one is the main one.', { homes: { type: 'string', description: 'Home names separated by commas, for example "h3, h7". Up to 6. "selected" is the selected home.' } }, ['homes']),
   tool('start_mission', 'Open the client inbox, or start a client mission by its id (1 to 11).', { missionId: str }),
   tool('show_card', 'Flash a card on the home panel while you talk about it.', { cardName: { type: 'string', enum: ['value', 'cost', 'rent', 'errands', 'outdoors', 'energy', 'risk', 'activity', 'schools', 'hoa', 'income', 'noise'] } }, ['cardName']),
   tool('remember_preference', 'Remember something lasting the player said they want, in a few words ("budget 900k", "wants a yard", "works downtown").', { preference: str }, ['preference']),
@@ -143,6 +146,7 @@ export function createMaya({ root, mode, enabled }) {
       extra.profile ? `Their profile: income $${extra.profile.income} a year, monthly debts $${extra.profile.debts}, savings $${extra.profile.savings}.` : '',
       extra.places.length ? `Their pinned places: ${extra.places.map((p) => p.name).join(', ')}.` : '',
       (b.saved || []).length ? `Saved homes: ${(b.saved || []).slice(0, 6).map((id) => T.alias(id)).filter((a) => a !== 'h0').join(', ')}.` : '',
+      Array.isArray(b.lit) && b.lit.length ? `Lit up on the map right now: ${b.lit.slice(0, 6).map((id) => d.listings.find((l) => String(l.id) === String(id))).filter(Boolean).map((l) => `${T.alias(l.id)} (${label(l, d.row(l.id))})`).join(', ')}.` : 'No homes are lit up on the map right now.',
       b.mission ? `Active client mission: ${String(b.mission).slice(0, 200)}.` : '',
       b.offered ? `You offered to drive to ${T.alias(b.offered)} in your last turn.` : '',
       history.length ? 'Your earlier replies in this conversation were built from tool results that are not repeated here; their numbers were verified then.' : '',
@@ -177,7 +181,14 @@ ${JSON.stringify(facts)}` : '',
           for (const k of ['home', 'homeA', 'homeB']) if (k in input) input[k] = fix(input[k]);
           let out;
           try {
-            if (CLIENT_TOOLS.includes(block.name)) {
+            if (block.name === 'show_on_map') {
+              const ls = [...new Set(String(input.homes || '').split(/[\s,]+/).filter(Boolean).map((h) => T.resolve(fix(h))).filter(Boolean))].slice(0, 6);
+              if (ls.length) send('action', { name: 'show_on_map', input: { ids: ls.map((l) => String(l.id)) } });
+              out = ls.length ? { ok: true, marked: ls.length, homes: ls.map((l) => label(l, d.row(l.id))) } : { error: 'No such home, nothing was marked' };
+            } else if (block.name === 'set_filters') {
+              send('action', { name: block.name, input });
+              out = { ok: true, note: 'The game is lighting up the matches and announces how many it found itself. Do not state a count or describe the matches; one short lead-in is enough.' };
+            } else if (CLIENT_TOOLS.includes(block.name)) {
               const l = input.home ? T.resolve(input.home) : null;
               send('action', { name: block.name, input: { ...input, id: l ? String(l.id) : undefined } });
               out = block.name === 'start_route' ? (l ? { ok: true, started: true, to: label(l, d.row(l.id)) } : { error: 'No such home' }) : { ok: true };

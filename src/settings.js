@@ -66,9 +66,9 @@ export function initSettings(ctx) {
       sel.innerHTML = group('My voices') + group('Stock');
     };
     if (voiceList) fill(voiceList); else fetch('/api/maya/voices').then((r) => (r.ok ? r.json() : null)).then((j) => { voiceList = j; fill(j); }).catch(() => fill(null));
-    sel.addEventListener('change', () => { S.voiceId = sel.value; apply(); ctx.maya?.say("Hi, I'm Maya. This is how I sound now."); });
+    sel.addEventListener('change', () => { S.voiceId = sel.value; apply(); ctx.maya?.say('This is how I sound now.'); });
     sel.addEventListener('keydown', (e) => e.stopPropagation());
-    el.querySelector('[data-a="hear"]').addEventListener('click', () => ctx.maya?.say("Hi, I'm Maya. Ask me about any home and I'll tell you what the listing doesn't."));
+    el.querySelector('[data-a="hear"]').addEventListener('click', () => ctx.maya?.say("Ask me about any home and I'll tell you what the listing doesn't."));
   }
   function show() { if (ctx.state !== 'play') return; open = true; ctx.state = 'settings'; render(); el.classList.add('show'); }
   function hide() { if (!open) return; open = false; if (el.contains(document.activeElement)) document.activeElement.blur(); el.classList.remove('show'); if (ctx.state === 'settings') ctx.state = 'play'; }

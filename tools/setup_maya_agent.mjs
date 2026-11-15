@@ -50,7 +50,7 @@ const PROMPT = `${SYSTEM}
 
 How this conversation works:
 - You are speaking live with the player through their microphone while they play. Keep turns short so they can cut in.
-- The game sends you notes marked [game state]: which home is selected and its facts, the player's preferences, their pinned places, an active client mission. Treat the newest note as the current state. The facts of the selected home in a note count as a tool result.
+- The game sends you notes marked [game state]: which home is selected and its facts, which homes are lit up on the map right now, the player's preferences, their pinned places, an active client mission. Treat the newest note as the current state. The facts of the selected home in a note count as a tool result.
 - For the selected home pass "selected" as the home. Other homes are named h1, h2 and so on in tool results; never say those names aloud.
 - Your tools run inside the game on the player's own computer. If a tool returns an error, say plainly that you could not get that and offer something else.
 - Do not read out long lists. Two or three facts, then stop and let them answer.`;
@@ -76,7 +76,8 @@ const patch = {
   name: 'Maya',
   conversation_config: {
     agent: {
-      first_message: "Hi, I'm Maya. Pick a home and ask me anything, or tell me what you're looking for.",
+      // said on the first call of a game only; later calls open with a short line (src/mayaLive.js)
+      first_message: "Hi, I'm Maya, your real estate AI agent. Pick a home and ask me anything, or tell me what you're looking for.",
       language: 'en',
       prompt: { prompt: PROMPT, llm: LLM, temperature: 0, tool_ids: ids, ignore_default_personality: true },
     },

@@ -67,21 +67,32 @@ export function initPanel(ctx) {
     return card('value', { icon: 'scale', title: 'Price and value', score: d.scores?.value?.score, reason: d.scores?.value?.reason, headline, body, src: ['value'] });
   }
 
+  function setDown(p) {
+    opts.downPct = p;
+    try { localStorage.setItem('gpa-down', String(p)); } catch { /* private mode */ }
+    ctx.emit('down-payment', p);
+    refreshCost();
+  }
   function costBody(l, d) {
-    const c = costFor(d, opts);
-    const total = c.total, solar = d.solar?.panels ? d.solar : null;
+    const solar = d.solar?.panels ? d.solar : null;
+    // Panels already on the roof are not a second saving. The electric line is a state average.
+    const addSolar = !!(solar && !solar.existing && opts.solarOn);
+    const c = costFor(d, { downPct: opts.downPct, solarOn: addSolar });
+    const total = c.total;
     const segs = COST_PARTS.filter(([k]) => c[k] > 0);
     const sum = segs.reduce((a, [k]) => a + c[k], 0) || 1;
     const rv = d.rentVsBuy;
     const aff = ctx.buyer?.affordLine?.(total) || '';
+    const partsSum = segs.reduce((a, [k]) => a + c[k], 0) + (c.solar || 0);
     return `<p class="headline"><b class="bigno" data-count="${total}" data-prefix="$">$0</b> a month <em class="est">Estimate</em></p>
       <div class="stack" role="img" aria-label="Monthly cost parts">${segs.map(([k, label, col]) => `<i style="flex:${c[k] / sum};background:${col}" title="${label} ${usd(c[k])}"></i>`).join('')}</div>
       <ul class="legend2">${segs.map(([k, label, col]) => `<li><i style="background:${col}"></i>${label}<b>${usd(c[k])}</b></li>`).join('')}${c.solar ? `<li><i style="background:#ffe14d"></i>Solar savings<b>-${usd(-c.solar)}</b></li>` : ''}</ul>
       <div class="ctrl"><span>Down payment</span><div class="seg" role="group" aria-label="Down payment">${[3.5, 10, 20].map((p) => `<button data-down="${p}" class="${opts.downPct === p ? 'on' : ''}" aria-pressed="${opts.downPct === p}">${p}%</button>`).join('')}</div><small>${usd(c.down)} down</small></div>
-      ${solar ? `<label class="ctrl tog"><input type="checkbox" data-solar ${opts.solarOn ? 'checked' : ''}/><span>Add rooftop solar</span><small>saves about ${usd(solar.savingsYear / 12)} a month</small></label>` : ''}
-      ${rv ? `<p class="versus">${icon('building-2', 15)}Renting a similar ${rv.beds} bed nearby: about <b>${usd(rv.medianRent)}</b> a month <small>(${total > rv.medianRent ? usd(total - rv.medianRent) + ' less than owning' : usd(rv.medianRent - total) + ' more than owning'})</small></p>` : ''}
+      ${solar && !solar.existing ? `<label class="ctrl tog"><input type="checkbox" data-solar ${addSolar ? 'checked' : ''}/><span>Add rooftop solar</span><small>saves ${usd(d.cost.solarMonth)} a month</small></label>` : ''}
+      ${solar?.existing ? '<p class="fine">Solar panels are already on the roof. The electric line is a state average and does not subtract them.</p>' : ''}
+      ${rv ? `<p class="versus">${icon('building-2', 15)}Renting a similar ${rv.beds} bed nearby: about <b>${usd(rv.medianRent)}</b> a month <small>(${total > rv.medianRent ? usd(total - rv.medianRent) + ' less than owning' : total < rv.medianRent ? usd(rv.medianRent - total) + ' more than owning' : 'the same as owning'})</small></p>` : ''}
       ${aff}
-      <p class="fine">${esc(d.cost.taxSource ? 'Property tax: ' + d.cost.taxSource + '. ' : '')}Insurance is the state average, not a quote. Not financial, legal or insurance advice.</p>`;
+      <p class="fine">${esc(d.cost.taxSource ? 'Property tax: ' + d.cost.taxSource + '. ' : '')}Insurance is the state average, not a quote.${opts.downPct < 20 ? ' Mortgage insurance is not included. Lenders usually charge it when the down payment is under 20%.' : ''} The lines above add up to ${usd(partsSum)}. Not financial, legal or insurance advice.</p>`;
   }
   function costCard(l, d) {
     if (!d.cost) return '';
@@ -114,7 +125,7 @@ export function initPanel(ctx) {
     const a = d.aerial || {}, p = d.places?.park?.[0], s = d.scores?.outdoors;
     return card('outdoors', { icon: 'trees', title: 'Outdoors', score: s?.score, reason: s?.reason, src: ['places', 'aerial'],
       headline: p ? `${esc(p.name)} is a <b>${p.walkMin} minute walk</b>` : 'No park found nearby',
-      body: `<ul class="rows">${row('tree-pine', 'Tree cover on the lot', a.treeCoverPct != null ? a.treeCoverPct + '%' : NA)}${a.treeCoverPct != null ? `<li class="wide">${bar(a.treeCoverPct * 2.5, '#3ddc84')}</li>` : ''}
+      body: `<ul class="rows">${row('tree-pine', 'Tree cover on the lot', a.treeCoverPct != null ? a.treeCoverPct + '%' : NA)}${a.treeCoverPct != null ? `<li class="wide">${bar(a.treeCoverPct, '#3ddc84')}</li>` : ''}
         ${row('waves', 'Pool', a.pool ? `Seen from the air${a.poolAreaSqft ? ' · ' + a.poolAreaSqft + ' sq ft' : ''}` : 'None seen from the air')}
         ${a.lotSqft ? row('ruler', 'Lot', `${a.lotSqft.toLocaleString('en-US')} sq ft`) : ''}</ul>${a.pool && !l.listingPool ? '<p class="fine warn">The listing does not mention a pool, but the aerial view shows one.</p>' : ''}` });
   }
@@ -125,7 +136,7 @@ export function initPanel(ctx) {
     return card('energy', { icon: 'zap', title: 'Energy and solar', est: true, score: s?.score, reason: s?.reason, src: ['energy', 'solar', 'aerial'],
       headline: `Electric bill about <b data-count="${e.billMonth}" data-prefix="$">$0</b> a month`,
       body: `<ul class="rows">${row('zap', 'Estimated use', `${e.kwhYear.toLocaleString('en-US')} kWh a year`)}${row('activity', `Price (${esc(e.priceMonth || '')})`, `${e.priceCents}¢ per kWh`)}
-        ${so.panels ? row('sun', 'Solar potential', `${so.panels} panels · covers ${so.coverPct}%`) + `<li class="wide">${bar(so.coverPct, '#ffe14d')}</li>` + row('piggy-bank', 'Solar could save', `${usd(so.savingsYear)} a year`) : row('sun', 'Solar potential', esc(so.why || 'Not available'))}
+        ${so.panels ? row('sun', 'Solar potential', `${so.panels} panels · covers ${so.coverPct}% of the estimated bill`) + `<li class="wide">${bar(so.coverPct, '#ffe14d')}</li>` + row('piggy-bank', so.existing ? 'A system this size would be worth' : 'Solar could save', `${usd(so.savingsYear)} a year`) : row('sun', 'Solar potential', esc(so.why || 'Not available'))}
         ${so.existing || a.solar ? row('check', 'Solar panels', 'Already on the roof') : ''}
         ${row('house', 'Roof', `${esc(a.roofMaterial || 'Unknown')}${a.roofCondition ? ` · condition ${a.roofCondition} of 5` : ''}`)}</ul>${sun}` });
   }
@@ -233,7 +244,7 @@ export function initPanel(ctx) {
     ctx.buyer?.wirePanel?.(el, cur, ins);
   }
   function wireCost() {
-    for (const b of el.querySelectorAll('[data-down]')) b.addEventListener('click', () => { opts.downPct = Number(b.dataset.down); try { localStorage.setItem('gpa-down', String(opts.downPct)); } catch { /* private mode */ } refreshCost(); });
+    for (const b of el.querySelectorAll('[data-down]')) b.addEventListener('click', () => setDown(Number(b.dataset.down)));
     el.querySelector('[data-solar]')?.addEventListener('change', (e) => { opts.solarOn = e.target.checked; refreshCost(); });
   }
   function refreshCost() {
@@ -281,8 +292,8 @@ export function initPanel(ctx) {
     }
     if (!cur || !el.classList.contains('show')) return;
     if (code === 'KeyH') { const any = openInfo.size > 0; for (const b of el.querySelectorAll('.ibtn')) toggleInfo(b.dataset.info, !any); }
-    else if ((code === 'BracketLeft' || code === 'BracketRight') && ins?.cost) { const steps = [3.5, 10, 20], i = steps.indexOf(opts.downPct); opts.downPct = steps[Math.max(0, Math.min(2, i + (code === 'BracketRight' ? 1 : -1)))]; refreshCost(); }
-    else if (code === 'KeyY' && ins?.solar?.panels) { opts.solarOn = !opts.solarOn; refreshCost(); }
+    else if ((code === 'BracketLeft' || code === 'BracketRight') && ins?.cost) { const steps = [3.5, 10, 20], i = Math.max(0, steps.indexOf(opts.downPct)); setDown(steps[Math.max(0, Math.min(2, i + (code === 'BracketRight' ? 1 : -1)))]); }
+    else if (code === 'KeyY' && ins?.solar?.panels && !ins.solar.existing) { opts.solarOn = !opts.solarOn; refreshCost(); }
     else if (code === 'Enter' && ctx.clients?.active && !ctx.clients.active.game) ctx.clients.submit(cur);
   });
 

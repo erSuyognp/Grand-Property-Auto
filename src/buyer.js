@@ -8,7 +8,7 @@
 // Everything is saved in this browser only.
 import * as THREE from 'three';
 import * as SunCalc from 'suncalc';
-import { affordability, affordTier, driveMin } from './costmath.js';
+import { affordability, affordTier, driveMin, monthlyCost, typicalElectric } from './costmath.js';
 import { meters } from './mayaTools.js';
 import { icon } from './icons.js';
 import { money } from './format.js';
@@ -67,10 +67,26 @@ export function initBuyer(ctx) {
   // ---- the numbers
   function recompute() {
     const m = ctx.insights.money || {};
-    B.aff = B.profile?.income ? affordability(B.profile, { ratePct: m.rate?.rate || 7, taxRatePct: m.taxRatePct || 1.2, insuranceYear: m.insurance?.homeowners || 0 }) : null;
+    B.aff = B.profile?.income ? affordability(B.profile, { ratePct: m.rate?.rate || 7, taxRatePct: m.taxRatePct || 1.2, insuranceYear: m.insurance?.homeowners || 0, electricMonth: typicalElectric(m) }) : null;
     B.places = B.placesByCity[ctx.city] || [];
   }
-  const monthlyOf = (row) => (row ? row.cost ?? row.rent ?? null : null);
+  function downPct() {
+    const d = Number(localStorage.getItem('gpa-down'));
+    return [3.5, 10, 20].includes(d) ? d : 20;
+  }
+  // Same monthly total the cost card shows: loan at the chosen down payment, plus this home's
+  // tax, the state average insurance, its HOA and its electric estimate. Rentals stay at their rent.
+  function monthlyOf(row) {
+    if (!row) return null;
+    if (row.cost == null || !row.price) return row.cost ?? row.rent ?? null;
+    const m = ctx.insights.money || {};
+    if (!m.rate?.rate) return row.cost;
+    return monthlyCost({
+      price: row.price, ratePct: m.rate.rate, downPct: downPct(), taxYear: row.taxYear || 0,
+      insuranceYear: m.insurance?.homeowners || 0, hoa: row.hoa || 0, electric: row.bill || row.costParts?.electric || 0,
+    }).total;
+  }
+  ctx.on('down-payment', () => { if (B.aff || B.places.length) rings(); });
   function tierOf(l) { const r = ctx.insights.row(l.id); const t = monthlyOf(r); return B.aff && t ? affordTier(t, B.aff) : null; }
   const weekly = (l) => B.places.reduce((t, p) => t + driveMin(meters(l, p)) * 2 * (p.trips || 5), 0);
 
@@ -129,9 +145,9 @@ export function initBuyer(ctx) {
         const v = read(), m = ctx.insights.money || {};
         const box = root.querySelector('.bresult');
         if (!v.income) { box.innerHTML = '<p>Enter your income to see your range.</p>'; return; }
-        const a = affordability(v, { ratePct: m.rate?.rate || 7, taxRatePct: m.taxRatePct || 1.2, insuranceYear: m.insurance?.homeowners || 0 });
+        const a = affordability(v, { ratePct: m.rate?.rate || 7, taxRatePct: m.taxRatePct || 1.2, insuranceYear: m.insurance?.homeowners || 0, electricMonth: typicalElectric(m) });
         const n = ctx.insights.rows().filter((r) => monthlyOf(r) && monthlyOf(r) <= a.budget).length;
-        box.innerHTML = `<div><b>${usd(a.budget)}</b><span>comfortable each month<br><small>limited by ${esc(a.limitedBy)}</small></span></div><div><b>${money(a.maxPrice)}</b><span>home price that fits<br><small>with ${usd(v.savings)} down</small></span></div><div><b>${n}</b><span>homes here in range<br><small>of ${ctx.insights.rows().length}</small></span></div>`;
+        box.innerHTML = `<div><b>${usd(a.budget)}</b><span>comfortable each month<br><small>limited by ${esc(a.limitedBy)}</small></span></div><div><b>${money(a.maxPrice)}</b><span>home price that fits<br><small>with ${usd(v.savings)} down, before HOA</small></span></div><div><b>${n}</b><span>homes here in range<br><small>of ${ctx.insights.rows().length}, using each home's own monthly estimate</small></span></div>`;
       };
       for (const i of root.querySelectorAll('input')) { i.addEventListener('input', show); i.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') closeSheet(); }); }
       show();

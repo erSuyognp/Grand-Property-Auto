@@ -356,7 +356,8 @@ def monthly_cost(price, rate_pct, down_pct, tax_year, ins_year, hoa, electric, s
     r = rate_pct / 100 / 12
     pi = loan * r / (1 - (1 + r) ** -360) if r else loan / 360
     parts = {"mortgage": round(pi), "tax": round((tax_year or 0) / 12), "insurance": round((ins_year or 0) / 12), "hoa": round(hoa or 0), "electric": round(electric or 0)}
-    return {**parts, "solar": -round(solar_month or 0), "total": round(sum(parts.values()) - (solar_month or 0)), "downPct": down_pct, "down": round(price * down_pct / 100)}
+    solar = int(math.floor((solar_month or 0) + 0.5))  # half up, same as the browser's Math.round
+    return {**parts, "solar": -solar, "total": sum(parts.values()) - solar, "downPct": down_pct, "down": round(price * down_pct / 100)}
 
 
 def poly_area_m2(coords, lat):
@@ -705,7 +706,7 @@ def main():
                 cost = monthly_cost(l["price"], rate["rate"], 20, tax_year, (ins or {}).get("homeowners"), l.get("hoa"), (energy or {}).get("billMonth"))
                 cost.update({"price": l["price"], "ratePct": rate["rate"], "rateDate": rate["date"], "taxYear": round(tax_year) if tax_year else None, "taxSource": tax_src,
                              "insuranceYear": (ins or {}).get("homeowners"), "insuranceDataYear": (ins or {}).get("year"),
-                             "solarMonth": round(solar["savingsYear"] / 12) if solar else 0, "est": True})
+                             "solarMonth": int(math.floor(solar["savingsYear"] / 12 + 0.5)) if solar else 0, "est": True})
             ins_out["cost"] = cost
 
             # 15. scores

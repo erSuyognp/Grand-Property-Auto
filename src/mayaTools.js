@@ -5,7 +5,7 @@
 // db = { city, listings, row(id), ins(id) -> Promise, other() -> Promise<{city, name, rows}> }
 // Homes are named to the model by short aliases (h1, h2, ...) and described by numbers only:
 // no street address, listing id, agent or tenant names.
-import { costFor, monthlyCost, affordability, affordTier, driveMin, walkMin } from './costmath.js';
+import { costFor, monthlyCost, affordability, affordTier, driveMin, walkMin, typicalElectric } from './costmath.js';
 
 const usd = (n) => (n == null ? null : '$' + Math.round(n).toLocaleString('en-US'));
 const short = (n) => (n >= 1e6 ? '$' + (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : n >= 1e4 ? '$' + Math.round(n / 1e3) + 'K' : usd(n));
@@ -171,9 +171,10 @@ export function makeTools(db) {
     const l = resolve(home);
     const ins = l && (await db.ins(l.id));
     if (!ins?.cost) return { error: 'This home has no purchase cost (it is a rental or has no price)' };
-    const c = costFor(ins, { downPct: downPaymentPct, solarOn: solar });
+    const already = !!ins.solar?.existing;
+    const c = costFor(ins, { downPct: downPaymentPct, solarOn: solar && !already });
     return { home: alias(l.id), total: c.total, loanPayment: c.mortgage, propertyTax: c.tax, insuranceStateAverage: c.insurance, hoa: c.hoa, electric: c.electric, solarSavings: -c.solar, downPayment: c.down, downPaymentPct,
-      ratePct: ins.cost.ratePct, rentingSimilarNearby: ins.rentVsBuy?.medianRent ?? null, note: 'Estimate, not financial advice. Mortgage insurance for small down payments is not included.' };
+      ratePct: ins.cost.ratePct, rentingSimilarNearby: ins.rentVsBuy?.medianRent ?? null, note: `${already && solar ? 'Panels are already on the roof, so this does not subtract a second solar saving. ' : ''}Estimate, not financial advice. Mortgage insurance for down payments under 20% is not included.` };
   }
 
   // "Can I afford it?": the 28% / 36% guideline
@@ -181,7 +182,7 @@ export function makeTools(db) {
     const prof = yearlyIncome ? { income: yearlyIncome, debts: monthlyDebts, savings, target: targetMonthly } : extra.profile;
     if (!prof?.income) return { error: 'Ask the player for their yearly income first (and monthly debts, savings for a down payment if they want)' };
     const money = db.money || {};
-    const aff = affordability(prof, { ratePct: money.rate?.rate || 7, taxRatePct: money.taxRatePct || 1.2, insuranceYear: money.insurance?.homeowners || 0 });
+    const aff = affordability(prof, { ratePct: money.rate?.rate || 7, taxRatePct: money.taxRatePct || 1.2, insuranceYear: money.insurance?.homeowners || 0, electricMonth: typicalElectric(money) });
     const l = resolve(home);
     const row = l ? db.row(l.id) : null;
     const total = row ? row.cost ?? row.rent : null;
@@ -224,4 +225,4 @@ export function makeTools(db) {
 }
 
 // Tools the game itself carries out (the server only passes them through).
-export const CLIENT_TOOLS = ['start_route', 'set_filters', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'fast_travel', 'set_sun_time', 'print_shortlist', 'measure'];
+export const CLIENT_TOOLS = ['start_route', 'set_filters', 'show_on_map', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'fast_travel', 'set_sun_time', 'print_shortlist', 'measure'];

@@ -94,7 +94,7 @@ export function createCamera(ctx) {
     if (topDown && mode === 'chase' && !script && car) cam.up.set(-Math.sin(car.state.heading), 0, -Math.cos(car.state.heading));
     else cam.up.set(0, 1, 0);
     cam.lookAt(look);
-    const targetFov = mode === 'chase' && car ? (view === 0 ? 46 : 60) + Math.min(8, Math.max(0, Math.abs(car.state.speed) - 22) * 0.4) : 58;
+    const targetFov = mode === 'chase' && car ? (view === 0 ? 46 : 60) + Math.min(16, Math.max(0, Math.abs(car.state.speed) - 22) * 0.4) + (car.state.boost || 0) * 3 : 58;
     if (Math.abs(cam.fov - targetFov) > 0.05) { cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 3); cam.updateProjectionMatrix(); }
   }
 

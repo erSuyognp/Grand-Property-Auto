@@ -7,7 +7,7 @@
 import { label } from './mayaTools.js';
 
 export function initMayaLive(ctx, ui) {
-  const L = { log: [], conv: null, status: 'off', mode: 'listening', lastActivity: 0, tools: [], startedAt: 0, failed: 0, heard: '', said: '' };
+  const L = { log: [], conv: null, status: 'off', mode: 'listening', lastActivity: 0, tools: [], startedAt: 0, failed: 0, heard: '', said: '', calls: 0 };
   const available = () => !!ctx.config.mayaAgent && !ctx.params.has('mute') && ctx.settings?.liveVoice !== false && !ctx.muteVoice && L.failed < 2;
   const pub = () => { window.__gpa.mayaLive = { log: L.log, start: (o) => start(o), stop: () => stop(), send: (t) => { L.conv?.sendUserMessage(t); L.lastActivity = performance.now(); }, status: L.status, mode: L.mode, tools: [...L.tools], heard: L.heard, said: L.said, available: available() }; };
 
@@ -22,6 +22,14 @@ export function initMayaLive(ctx, ui) {
       lines.push(`Selected home: ${T.alias(l.id)} (${label(l, ctx.insights.row(l.id))}).`);
       if (facts) lines.push(`Result of get_property for the selected home: ${JSON.stringify(facts)}`);
     } else lines.push('No home is selected right now. The player is driving.');
+    // what the player can see lit up: the map and the world show exactly these
+    const hs = ctx.listingsSys.highlights, byId = (id) => ctx.world.listings.find((x) => x.id === id);
+    const lit = hs ? [...hs].map(byId).filter(Boolean).slice(0, 6) : [];
+    lines.push(lit.length ? `Lit up on the map right now (gold glow on the building, ringed dot on the minimap and the big map): ${lit.map((x) => `${T.alias(x.id)} (${label(x, ctx.insights.row(x.id))})`).join(', ')}.` : 'No homes are lit up on the map right now.');
+    const mt = ctx.missions?.active ? ctx.missions.target : null;
+    if (mt) lines.push(`A gold route line on the road leads to ${T.alias(mt.id)} (${label(mt, ctx.insights.row(mt.id))}).`);
+    const nr = ctx.listingsSys.near;
+    if (nr && nr !== l) lines.push(`The car is parked next to ${T.alias(nr.id)} (${label(nr, ctx.insights.row(nr.id))}).`);
     const prefs = ui.S.prefs.map((p) => p.text);
     if (prefs.length) lines.push(`Player preferences so far: ${prefs.join('; ')}.`);
     const b = ctx.buyer;
@@ -56,13 +64,17 @@ export function initMayaLive(ctx, ui) {
       const input = fix(p);
       const l = input.home ? T.resolve(input.home) : null;
       if (name === 'start_route' && !l) return JSON.stringify({ error: 'No such home' });
-      try { await ui.act(name, { ...input, id: l ? String(l.id) : undefined }); } catch (e) { return JSON.stringify({ error: String(e.message || e).slice(0, 120) }); }
+      if (name === 'show_on_map') input.ids = String(input.homes || '').split(/[\s,]+/).filter(Boolean).map((h) => (/^selected$/i.test(h) ? ui.selected() : T.resolve(h))).filter(Boolean).map((x) => String(x.id));
+      let r = null;
+      try { r = await ui.act(name, { ...input, id: l ? String(l.id) : undefined }); } catch (e) { return JSON.stringify({ error: String(e.message || e).slice(0, 120) }); }
       if (name === 'start_route' || name === 'fast_travel') note(1500);
-      return JSON.stringify(name === 'start_route' ? { ok: true, started: true, to: label(l, ctx.insights.row(l.id)) } : { ok: true });
+      if (name === 'show_on_map' || name === 'set_filters') note(900);
+      // game tools that report what really happened (what got lit up) answer with that
+      return JSON.stringify(name === 'start_route' ? { ok: true, started: true, to: label(l, ctx.insights.row(l.id)) } : r || { ok: true });
     };
     const out = {};
     for (const n of ['get_property', 'compare', 'find_alternatives', 'nearby', 'monthly_cost', 'affordability_check', 'drive_to_my_places', 'room_fit', 'same_money_other_city']) out[n] = data(n);
-    for (const n of ['start_route', 'set_filters', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'set_sun_time', 'print_shortlist', 'measure', 'fast_travel']) out[n] = game(n);
+    for (const n of ['start_route', 'set_filters', 'show_on_map', 'start_mission', 'show_card', 'remember_preference', 'pin_place', 'open_compare', 'set_sun_time', 'print_shortlist', 'measure', 'fast_travel']) out[n] = game(n);
     return out;
   }
 
@@ -76,11 +88,15 @@ export function initMayaLive(ctx, ui) {
       const { token, signedUrl } = await res.json();
       const { Conversation } = await import('@elevenlabs/client');
       const voiceId = ctx.settings?.voiceId || undefined;
+      // she introduces herself on the first call of a game only; after that a short line opens the call
+      const again = ui.S.introduced ? { agent: { firstMessage: ["I'm here. Go ahead.", "I'm listening.", 'Go ahead.', "What's on your mind?"][L.calls++ % 4] } } : null;
+      const ov = { ...(again || {}), ...(opts.text ? { conversation: { textOnly: true } } : voiceId ? { tts: { voiceId } } : {}) };
       L.conv = await Conversation.startSession({
-        ...(opts.text ? { signedUrl, connectionType: 'websocket', textOnly: true, overrides: { conversation: { textOnly: true } } } : { conversationToken: token, connectionType: 'webrtc', overrides: voiceId ? { tts: { voiceId } } : undefined }),
+        ...(opts.text ? { signedUrl, connectionType: 'websocket', textOnly: true } : { conversationToken: token, connectionType: 'webrtc' }),
+        ...(Object.keys(ov).length ? { overrides: ov } : {}),
         stripAudioTags: true,
         clientTools: clientTools(),
-        onConnect: () => { L.status = 'connected'; L.startedAt = L.lastActivity = performance.now(); ui.setState('listening'); ui.status('Live · just talk'); ctx.audio.chime(); pub(); note(50); },
+        onConnect: () => { ui.S.introduced = true; L.status = 'connected'; L.startedAt = L.lastActivity = performance.now(); ui.setState('listening'); ui.status('Live · just talk'); ctx.audio.chime(); pub(); note(50); },
         onDisconnect: () => stopped(),
         onError: (message) => { console.warn('[maya live]', message); },
         onModeChange: ({ mode }) => { L.mode = mode; L.lastActivity = performance.now(); if (L.status === 'connected') { ui.setState(mode === 'speaking' ? 'talking' : 'listening'); ui.status(mode === 'speaking' ? 'Talking · cut in any time' : 'Live · just talk'); } pub(); },
@@ -123,6 +139,8 @@ export function initMayaLive(ctx, ui) {
   // keep her current: selection, the down payment and solar switches, missions, pins, city
   ctx.on('reveal-panel', () => note(300));
   ctx.on('select', (l) => { if (!l) note(600); });
+  ctx.on('mission', () => note(900));
+  ctx.on('near-listing', () => note(1200));
   ctx.on('client-mission', () => note());
   ctx.on('client-result', () => note());
   ctx.on('buyer', () => note());

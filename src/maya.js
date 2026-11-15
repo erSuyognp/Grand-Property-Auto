@@ -2,7 +2,7 @@
 // voice, and the bridge between her tools and the game. Hold V and talk; start talking while
 // she speaks and she stops at once. If the model or the voice fails she falls back to scripted
 // lines built from the same data, and to the browser voice, so the demo never goes silent.
-import { makeTools } from './mayaTools.js';
+import { makeTools, label } from './mayaTools.js';
 import { scripted, extractPrefs, PEOPLE_RE } from './mayaScript.js';
 import { parseMission } from './parser.js';
 import { dataBase } from './data.js';
@@ -38,7 +38,7 @@ export function initMaya(ctx) {
   const muted = () => ctx.params.has('mute') || ctx.muteVoice || ctx.settings?.voiceOff;
   const S = { state: 'idle', prefs: [], history: [], offered: null, busy: 0, lastLatency: null, lastTools: [], source: null, caption: '', alts: [] };
   try { S.prefs = JSON.parse(sessionStorage.getItem('gpa-maya-prefs') || '[]'); } catch { /* fresh session */ }
-  const pub = () => { window.__gpa.maya = { state: S.state, prefs: S.prefs.map((p) => p.text), tools: S.lastTools, source: S.source, voice: S.lastVoice || null, caption: S.caption, latencyMs: S.lastLatency, offered: S.offered?.id || null, alts: S.alts.map((l) => l.id), say: (t) => hear(t) }; };
+  const pub = () => { window.__gpa.maya = { state: S.state, prefs: S.prefs.map((p) => p.text), tools: S.lastTools, source: S.source, voice: S.lastVoice || null, caption: S.caption, latencyMs: S.lastLatency, offered: S.offered?.id || null, alts: S.alts.map((l) => l.id), marked: (S.marked || []).map((l) => l.id), introduced: !!S.introduced, act: (n, i) => act(n, i), say: (t) => hear(t) }; };
   let statusText = null, liveLevel = null, live = null;
   const idleHint = () => (live?.available() ? 'Press <kbd>V</kbd> to talk' : 'Hold <kbd>V</kbd> to talk');
   function setState(s) { S.state = s; el.dataset.state = s; q('.mstate').innerHTML = statusText || { idle: idleHint(), listening: 'Listening', thinking: 'Thinking', talking: 'Talking' }[s]; el.classList.toggle('live', !!live?.state.conv); pub(); }
@@ -174,7 +174,34 @@ export function initMaya(ctx) {
     else if (name === 'remember_preference' && input.preference) remember(String(input.preference).slice(0, 40));
     else if (name === 'alternatives') { S.alts = (input.ids || []).map(byId).filter(Boolean); S.offered = S.alts[0] || null; renderAlts(input.why || []); }
     else if (name === 'start_route') { const l = byId(input.id) || S.offered; if (l) { S.offered = null; renderAlts([]); S.alts = []; ctx.reveal.close(); ctx.missions.goTo(l, true); ctx.emit('maya-route', l); } }
-    else if (name === 'set_filters' && input.query) { ctx.reveal.close(); ctx.missions.handle(input.query); }
+    else if (name === 'set_filters' && input.query) {
+      ctx.reveal.close();
+      S.marked = [];
+      // the search answers with what it really lit up, so she never claims a mark that is not there
+      const done = ctx.missions.handle(input.query).then((p) => {
+        if (!p || p.action || p.reset || (p.empty && !p.relative)) return { ok: false, error: 'That did not read as a home search, nothing was lit up. Ask the player for a budget, bedrooms or a feature.' };
+        const M = ctx.missions.state;
+        if (!M.active || !M.top.length) return { ok: false, error: 'No home matches, nothing was lit up' };
+        const TT = tools();
+        return { ok: true, exactMatches: M.exact, litUp: M.top.map((l) => ({ home: TT.alias(l.id), label: label(l, ctx.insights.row(l.id)) })), routeTo: TT.alias(M.target.id),
+          note: M.exact ? 'These glow in the world and are ringed on the minimap and the big map (key M). A gold line on the road leads to the first one.' : 'Nothing matches everything, so the closest fits are lit up instead. Say that.' };
+      }).catch(() => ({ ok: false, error: 'The search failed, nothing was lit up' }));
+      pub();
+      return Promise.race([done, new Promise((r) => setTimeout(() => r({ ok: true, note: 'The search is still running; the game will light up the matches in a moment. Do not state a count.' }), 6500))]);
+    }
+    else if (name === 'show_on_map') {
+      const ls = [...new Set((input.ids || []).map(byId).filter(Boolean))].slice(0, 6);
+      if (!ls.length) return { error: 'No such home, nothing was marked' };
+      S.alts = []; q('.malts').classList.remove('show');
+      for (const l of ls) if (!ctx.listingsSys.visible[l.kind]) ctx.listingsSys.setVisible(l.kind, true);
+      const mt = ctx.missions.active ? ctx.missions.target : null; // a route in progress keeps its target
+      ctx.listingsSys.setHighlights([...ls.map((l) => l.id), ...(mt ? [mt.id] : [])], mt || ls[0]);
+      S.marked = ls;
+      ctx.audio.chime?.();
+      ctx.hud.toast(`${ls.length === 1 ? 'Home' : ls.length + ' homes'} lit up in gold · M opens the map`, 3200);
+      pub();
+      return { ok: true, marked: ls.length, homes: ls.map((l) => label(l, ctx.insights.row(l.id))), note: 'Their buildings glow gold and their dots are ringed on the minimap and the big map (key M).' };
+    }
     else if (name === 'start_mission') { if (input.missionId && ctx.clients?.accept(String(input.missionId))) { /* accepted */ } else ctx.clients?.open(); }
     else if (name === 'pin_place') ctx.buyer?.pinByName(input.name, input.where);
     else if (name === 'set_profile') ctx.buyer?.setProfile(input);
@@ -203,7 +230,7 @@ export function initMaya(ctx) {
   async function askServer(text, my) {
     if (!ctx.config.maya || ctx.params.has('mayascript')) return false;
     abort = new AbortController();
-    const body = { city: ctx.city, selected: selected()?.id || null, text, history: S.history.slice(-8), prefs: S.prefs.map((p) => p.text), profile: ctx.buyer?.profile || null, places: ctx.buyer?.places || [], saved: ctx.saved.list().map((l) => l.id), mission: ctx.clients?.active ? ctx.clients.brief() : null, offered: S.offered?.id || null };
+    const body = { city: ctx.city, selected: selected()?.id || null, text, history: S.history.slice(-8), prefs: S.prefs.map((p) => p.text), profile: ctx.buyer?.profile || null, places: ctx.buyer?.places || [], saved: ctx.saved.list().map((l) => l.id), mission: ctx.clients?.active ? ctx.clients.brief() : null, offered: S.offered?.id || null, lit: [...(ctx.listingsSys.highlights || [])].slice(0, 6) };
     const timer = setTimeout(() => abort?.abort(), 9000); // nothing back in 9 s: use the script
     let res;
     try { res = await fetch('/api/maya', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: abort.signal }); } catch { clearTimeout(timer); return false; }
@@ -291,9 +318,11 @@ export function initMaya(ctx) {
   ctx.on('key', (code) => {
     if (ctx.state !== 'play' || ctx.hud.choosing) return;
     if (code === 'KeyB' && ctx.reveal?.open) hear('Show me better options');
+    // X also clears the homes she lit up (with a route running, the mission's own X does it)
+    if (code === 'KeyX' && S.marked?.length && !ctx.missions.active) { S.marked = []; ctx.listingsSys.setHighlights(null, null); ctx.hud.toast('Highlights cleared'); live?.note(); }
   });
   ctx.on('select', (l) => { S.offered = null; if (!l) { if (S.alts.length && !ctx.missions.active) { S.alts = []; renderAlts([]); } } else el.classList.add('show'); });
-  ctx.on('city', () => { interrupt(); S.history = []; S.alts = []; S.offered = null; T = null; q('.malts').classList.remove('show'); bubble(''); });
+  ctx.on('city', () => { interrupt(); S.history = []; S.alts = []; S.marked = []; S.offered = null; T = null; q('.malts').classList.remove('show'); bubble(''); });
   q('.mava').addEventListener('pointerdown', (e) => { e.preventDefault(); ctx.voice?.start(); });
   q('.mava').addEventListener('pointerup', () => ctx.voice?.stop());
   q('.mava').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ctx.voice?.openType(); } });

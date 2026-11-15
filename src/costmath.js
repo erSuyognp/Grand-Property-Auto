@@ -22,7 +22,7 @@ export function costFor(ins, { downPct = 20, solarOn = false } = {}) {
 // "Can I afford it?": the common 28% / 36% guideline. Housing costs at most 28% of gross
 // monthly income, and housing plus other debts at most 36%. Returns the monthly housing
 // budget and the price it supports (a guideline, not advice).
-export function affordability({ income = 0, debts = 0, savings = 0, target = 0 }, { ratePct, taxRatePct = 1.2, insuranceYear = 0 }) {
+export function affordability({ income = 0, debts = 0, savings = 0, target = 0 }, { ratePct, taxRatePct = 1.2, insuranceYear = 0, electricMonth = 0 }) {
   const gross = income / 12;
   const front = gross * 0.28, back = gross * 0.36 - debts;
   let budget = Math.max(0, Math.min(front, back));
@@ -31,8 +31,9 @@ export function affordability({ income = 0, debts = 0, savings = 0, target = 0 }
   const priceFor = (monthly) => {
     const r = ratePct / 100 / 12;
     const k = r ? r / (1 - (1 + r) ** -360) : 1 / 360;
-    const fixed = insuranceYear / 12;
-    // monthly = (price - savings) * k + price * tax / 12 + fixed
+    // monthly = (price - savings) * k + price * tax / 12 + insurance / 12 + a typical electric bill
+    // HOA is left out: it is not a function of the price
+    const fixed = (insuranceYear || 0) / 12 + (electricMonth || 0);
     const price = (monthly - fixed + savings * k) / (k + taxRatePct / 100 / 12);
     return Math.max(0, Math.round(price / 1000) * 1000);
   };
@@ -43,6 +44,14 @@ export function affordability({ income = 0, debts = 0, savings = 0, target = 0 }
 export function affordTier(total, aff) {
   if (total == null || !aff || !aff.budget) return null;
   return total <= aff.budget ? 'comfortable' : total <= aff.stretch ? 'stretch' : 'out';
+}
+
+// The state's average household bill, before this home's floor area scales it. 0 when the
+// electricity figures were not loaded.
+export function typicalElectric(money) {
+  const kwh = money?.use?.kwhMonth, cents = money?.priceKwh?.cents;
+  if (!kwh || !cents) return 0;
+  return kwh * cents / 100;
 }
 
 // Time estimates when no routing service is available: a route 1.3 times the straight line.

@@ -84,15 +84,27 @@ export function initBigMap(ctx) {
       g.strokeStyle = 'rgba(20,20,20,0.75)'; g.lineWidth = 9; g.stroke();
       g.strokeStyle = '#ffd24a'; g.lineWidth = 5; g.stroke();
     }
-    for (const p of M.points) {
+    // homes Maya or a search lit up: ringed in gold and drawn on top, the rest step back
+    const hs = ctx.listingsSys.highlights, tgt = ctx.listingsSys.target;
+    const lit = (p) => p.listing && ((hs && hs.has(p.item.id)) || (tgt && tgt.id === p.item.id));
+    for (const pass of [0, 1]) for (const p of M.points) {
+      const on = !!lit(p);
+      if ((pass === 1) !== on) continue;
       const k = KIND[p.kind], hov = p === M.hover;
-      const rad = (k.big ? 12 : 7.5) * (hov ? 1.3 : 1);
+      const rad = (k.big ? 12 : 7.5) * (hov ? 1.3 : 1) * (on ? 1.35 : 1);
+      g.globalAlpha = hs && !on && !hov ? 0.5 : 1;
       g.beginPath(); g.arc(p.x, p.y, rad, 0, Math.PI * 2);
       g.fillStyle = k.color; g.fill();
       g.lineWidth = k.big ? 3.5 : 2.5; g.strokeStyle = '#ffffff'; g.stroke();
       g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.55)';
       g.beginPath(); g.arc(p.x, p.y, rad + (k.big ? 2 : 1.5), 0, Math.PI * 2); g.stroke();
+      if (on) {
+        g.beginPath(); g.arc(p.x, p.y, rad + 9, 0, Math.PI * 2);
+        g.lineWidth = 9; g.strokeStyle = 'rgba(20,20,20,0.7)'; g.stroke();
+        g.lineWidth = 5; g.strokeStyle = '#ffd24a'; g.stroke();
+      }
     }
+    g.globalAlpha = 1;
     // the car
     const s = ctx.car.state, [cx, cy] = toPx(s.x, s.z);
     g.save();
@@ -111,7 +123,8 @@ export function initBigMap(ctx) {
     M.hover = null;
     const count = (key) => M.points.filter((p) => p.kind === key).length;
     q('.head b').textContent = w.area.name || w.city;
-    q('.head span').textContent = `${count('sale')} homes for sale · ${count('bizsale')} businesses for sale · ${M.points.length} properties in all`;
+    const nLit = ctx.listingsSys.highlights?.size || 0;
+    q('.head span').textContent = `${count('sale')} homes for sale · ${count('bizsale')} businesses for sale · ${M.points.length} properties in all${nLit ? ` · ${nLit} lit up, ringed in gold` : ''}`;
     q('.legend').innerHTML = KINDS.map((k) => `<span class="${k.big ? 'big' : ''}"><i style="background:${k.color}"></i>${k.label} <em>${count(k.key)}</em></span>`).join('') + '<span><i class="me"></i>You</span>';
     M.open = true;
     ctx.state = 'map';
@@ -167,6 +180,7 @@ export function initBigMap(ctx) {
   ctx.on('key', (code) => {
     if (code === 'KeyM') { if (M.open) close(); else if (!ctx.hud.choosing) open(); } else if (code === 'Escape' && M.open) close();
   });
+  ctx.on('highlights', () => { if (M.open) draw(); });
   ctx.on('city-unload', () => { close(); M.city = null; M.photo = null; });
   addEventListener('resize', () => { if (M.open) draw(); });
 

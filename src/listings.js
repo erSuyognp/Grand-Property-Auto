@@ -104,9 +104,43 @@ export function initListings(ctx) {
     for (const m of Object.values(meshes)) { m.instanceColor.needsUpdate = true; m.instanceMatrix.needsUpdate = true; }
   }
 
+  // The buildings of the lit up homes glow: gold walls and a roof outline that shows through
+  // other buildings, so "I've marked it" is something the player can actually see.
+  let marks = null;
+  function buildMarks() {
+    if (marks) { marks.parent?.remove(marks); marks.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); marks = null; }
+    if (!highlights || !group) return;
+    marks = new THREE.Group();
+    const seen = new Set();
+    for (const it of items) {
+      if (!highlights.has(it.l.id) || !it.b?.pts?.length || seen.has(it.b.id) || seen.size >= 12) continue;
+      seen.add(it.b.id);
+      const isTarget = target && target.id === it.l.id;
+      const pts = it.b.pts, top = it.b.top + 1, pos = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], c = pts[(i + 1) % pts.length];
+        pos.push(a.x, it.ground, a.y, c.x, it.ground, c.y, c.x, top, c.y, a.x, it.ground, a.y, c.x, top, c.y, a.x, top, a.y);
+      }
+      const wg = new THREE.BufferGeometry();
+      wg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      const walls = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ color: 0xffc940, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, toneMapped: false }));
+      walls.renderOrder = 6; walls.frustumCulled = false;
+      walls.userData = { base: isTarget ? 0.42 : 0.28, id: it.l.id };
+      const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map((p) => new THREE.Vector3(p.x, top, p.y))), new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false, fog: false }));
+      outline.renderOrder = 9; outline.frustumCulled = false;
+      outline.userData = { id: it.l.id };
+      marks.add(walls, outline);
+    }
+    group.add(marks);
+  }
+
   function update(dt) {
     if (!meshes) return;
     t += dt;
+    if (marks) {
+      const open = ctx.reveal?.listing?.id; // the reveal draws its own glow on the selected home
+      for (const o of marks.children) { o.visible = o.userData.id !== open; if (o.userData.base) o.material.opacity = o.userData.base * (0.7 + 0.3 * Math.sin(t * 3)); }
+    }
     lift += ((hover ? 1 : 0) - lift) * Math.min(1, dt * 12);
     const zero = 0.0001;
     items.forEach((it, i) => {
@@ -156,8 +190,8 @@ export function initListings(ctx) {
     if (bc !== nearCommercial) { nearCommercial = bc; ctx.emit('near-commercial', bc); }
   }
 
-  ctx.on('city', (world) => { highlights = null; target = null; near = null; nearCommercial = null; build(world); });
-  ctx.on('city-unload', () => { meshes = null; items = []; if (near) ctx.emit('near-listing', null); near = null; });
+  ctx.on('city', (world) => { highlights = null; target = null; near = null; nearCommercial = null; marks = null; build(world); });
+  ctx.on('city-unload', () => { meshes = null; items = []; marks = null; if (near) ctx.emit('near-listing', null); near = null; });
   ctx.on('update', (dt) => { if (ctx.state !== 'tour') update(dt); });
 
   const api = {
@@ -167,8 +201,9 @@ export function initListings(ctx) {
     get items() { return items; },
     toggle(kind) { visible[kind] = !visible[kind]; refresh(); ctx.emit('filters', visible); },
     setVisible(kind, on) { visible[kind] = on; refresh(); ctx.emit('filters', visible); },
-    setHighlights(ids, tgt) { highlights = ids ? new Set(ids) : null; target = tgt || null; refresh(); },
+    setHighlights(ids, tgt) { highlights = ids ? new Set(ids) : null; target = tgt || null; refresh(); buildMarks(); ctx.emit('highlights', highlights); },
     get target() { return target; },
+    get highlights() { return highlights; },
     setHover(l) { if (l !== hover) { hover = l; if (l) lift = 0; } },
     byId(id) { return ctx.world.listings.find((l) => l.id === id); },
   };

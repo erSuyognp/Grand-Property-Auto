@@ -302,3 +302,26 @@ Asked for: a guided tour in every home, not only the ones whose scan has named r
 - **No scan at all.** She takes the buyer through up to 6 listing photos and says so up front.
 - **A route can be one stop** (a scan with a single position). She starts by herself once per space; after switching views with `T`, `Q` or `P` starts her again.
 - Tests: `tests/guide-all.spec.js` (unnamed spaces, photo tour, Matterport view).
+
+## Estimates checked (Nov 14)
+
+The map chrome (city switch, status tag, insight panel edge, walk labels) stays. The title screen stays as it was.
+
+Checked every insight file in Los Angeles, Houston and the mock neighborhood against the formulas in `src/costmath.js`: loan payment, tax divided by 12, insurance divided by 12, electric bill against yearly kWh and the price per kWh, solar cover and yearly saving, and walk and drive times against distance. The real cities match. Four mock homes rounded a half-dollar solar month the other way from the browser, and three mock walks of exactly 6.5 minutes were stored as 6.
+
+- The solar line on the cost card now shows the same monthly dollar the total subtracts (`cost.solarMonth`), not a second rounding of the yearly saving.
+- A roof that already has panels does not offer that saving again. The electric line is a state average and says so.
+- The down payment under 20% says mortgage insurance is not in the number.
+- "Home price that fits" now includes a typical electric bill. HOA stays out of that price, and the count of homes uses each home's own monthly total at the down payment chosen on the card.
+- The tree-cover bar matches the percent next to it.
+- New enrich runs round the solar month half up, the same way the browser does. Already written insight files were not rebuilt.
+
+## Maya sounds like a person, marks what she says she marks, faster boost (Nov 14)
+
+- **Tour greeting.** Inside a home she now opens with who she is, the best thing about this home from its own data (the top point of `pitch()`, or a listing highlight when there is none), then the facts as a sentence: "It has 2 bedrooms and 2 baths, 1,720 square feet, and it was built in 1928."
+- **One introduction per game.** `ctx.maya.state.introduced` is shared by the tour and the live voice. The live agent's own first message is the introduction; every later call opens with a short line ("I'm here. Go ahead.") through the `first_message` override. The voice previews in settings no longer say her name. Her prompt tells her not to greet or introduce herself again.
+- **"Marked on the map" is now true.** New client tool `show_on_map` (home names, comma separated). Lit up homes get gold glowing walls and a roof outline in the world (`src/listings.js`), a pulsing gold ring on the minimap with rim pins when they are off the map, and a gold ring on the big map (`M`), with the other dots stepping back. `X` clears them. `set_filters` now answers with what the search really lit up instead of a bare ok, and the game state note tells her which homes are lit, where the route leads and which home the car is next to. Her prompt only lets her say a home is marked when a tool confirmed it in the same turn.
+- **Agent setup rerun.** `node tools/setup_maya_agent.mjs` was run to add the tool and the new prompt (21 tools). Only the prompt and tool schemas are sent, as before.
+- **Boost.** Top speed with Shift goes from 46 to 60 m/s with stronger pull. The speed blur is now a radial motion blur from the point the car is heading to (16 dithered samples, sharp center, a little color fringe at the edges), and the field of view opens further at speed. No blur while a home reveal is open.
+- **Checked** in the running game: three homes marked and visible in all three views, the live agent in text mode over two calls (introduction once), boost to about 118 mph with the blur at 60 fps. `npm run shot` and the Playwright tests were not rerun.
+- `.claude/launch.json` starts `npm run dev` for the in-app preview with `PORT` cleared, because the preview sets `PORT=5173` and the Node server would otherwise take Vite's port.

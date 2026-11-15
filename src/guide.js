@@ -202,8 +202,20 @@ export function initGuide(ctx) {
 
   // ---- what she says on the way to a room, like an agent walking a step ahead of you
   function hello() {
-    const l = G.listing;
-    return `Welcome in, I'm Maya. ${l.beds != null ? `${l.beds} bedrooms, ` : ''}${l.baths != null ? `${l.baths} baths` : ''}${l.sqft ? `, ${Number(l.sqft).toLocaleString('en-US')} square feet` : ''}${l.yearBuilt ? `, built in ${l.yearBuilt}` : ''}. Walk with me, I'll show you around. Stop me any time.`;
+    const l = G.listing, ms = ctx.maya?.state;
+    // she says who she is once per game, not at every door
+    const open = ms && ms.introduced ? 'Welcome in.' : "Welcome in, I'm Maya, your real estate AI agent.";
+    if (ms) ms.introduced = true;
+    // the best thing about this home first, from its own data; a listing highlight when there is none
+    const top = G.ins ? pitch(G.ins, ctx.insights.row(l.id)).points[0] : null;
+    const hl = top ? null : (l.highlights || []).find((x) => x && x.length < 40);
+    if (hl) G.hl = 1;
+    const best = top ? ` Here's my favorite thing about this one: ${top.text}.` : hl ? ` The listing's headline here is ${hl.toLowerCase()}.` : '';
+    const n = (v, w) => `${v} ${w}${Number(v) === 1 ? '' : 's'}`;
+    const rooms = [l.beds != null ? n(l.beds, 'bedroom') : null, l.baths != null ? n(l.baths, 'bath') : null].filter(Boolean);
+    const facts = [rooms.length ? `It has ${rooms.join(' and ')}` : null, l.sqft ? `${rooms.length ? '' : 'It has '}${Number(l.sqft).toLocaleString('en-US')} square feet` : null].filter(Boolean).join(', ');
+    const built = l.yearBuilt ? (facts ? `, and it was built in ${l.yearBuilt}` : `It was built in ${l.yearBuilt}`) : '';
+    return `${open}${best}${facts || built ? ` ${facts}${built}.` : ''} Walk with me, I'll show you around. Stop me any time.`;
   }
   function onTheWay(s, from) {
     const fl = (x) => x?.panos?.[0]?.floor;
